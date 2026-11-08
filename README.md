@@ -44,7 +44,8 @@ in your shell win over `backend/.env`.
 
 ## Run the frontend
 
-Needs Node.js 22.
+Needs Node.js 22.22.2 or newer on the 22 line, or 24.15+ (the minimum jsdom
+declares; it runs the frontend tests).
 
 ```bash
 cd frontend
