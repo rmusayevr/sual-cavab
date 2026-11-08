@@ -3,12 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import ProjectList from "./ProjectList";
 
-const project = (id: number, name: string, role: "owner" | "member" = "member") => ({
+const project = (id: number, name: string, role: "owner" | "member" = "member", open = 0) => ({
   id,
   name,
   client_name: "Invented Client",
   description: "",
   my_role: role,
+  open_question_count: open,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
 });
@@ -35,6 +36,16 @@ describe("ProjectList", () => {
 
     expect(await screen.findByRole("link", { name: "Ticketing" })).toHaveAttribute("href", "/projects/1");
     expect(screen.getByRole("link", { name: "Refunds" })).toHaveAttribute("href", "/projects/2");
+  });
+
+  it("shows how many questions are still open on each project, including none", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3), project(2, "Refunds")])));
+
+    render(<ProjectList />);
+
+    await screen.findByRole("link", { name: "Ticketing" });
+    expect(screen.getByText(/3 still open/)).toBeInTheDocument();
+    expect(screen.getByText(/0 still open/)).toBeInTheDocument();
   });
 
   it("says so when I am on no project", async () => {

@@ -374,3 +374,55 @@ class MemberManagementTests(ProjectAccessTestCase):
         self.as_user(self.owner).delete(f"{self.members()}{self.member.pk}/")
 
         self.assertEqual(self.as_user(self.member).get(self.detail()).status_code, 404)
+
+
+class OpenQuestionCountTests(ProjectAccessTestCase):
+    """The project list shows how many questions are still open (#7)."""
+
+    def add(self, project, status, n):
+        from questions.models import Question
+
+        return Question.objects.create(
+            project=project, number=n, text=f"Invented question {n}", status=status, created_by=self.owner
+        )
+
+    def count_for(self, user, project):
+        rows = self.as_user(user).get("/api/projects/").json()
+        return next(r["open_question_count"] for r in rows if r["id"] == project.pk)
+
+    def test_counts_open_and_asked_only(self):
+        for n, status in enumerate(["open", "asked", "answered", "dropped", "open"], start=1):
+            self.add(self.project, status, n)
+        self.assertEqual(self.count_for(self.member, self.project), 3)
+
+    def test_counts_are_per_project(self):
+        other = Project.objects.create(name="Booking", client_name="Invented Client", created_by=self.owner)
+        Membership.objects.create(project=other, user=self.owner, role=Membership.Role.OWNER)
+        self.add(self.project, "open", 1)
+        self.add(other, "open", 1)
+        self.add(other, "asked", 2)
+        self.assertEqual(self.count_for(self.owner, self.project), 1)
+        self.assertEqual(self.count_for(self.owner, other), 2)
+
+    def test_zero_when_nothing_is_open(self):
+        self.add(self.project, "answered", 1)
+        self.assertEqual(self.count_for(self.owner, self.project), 0)
+
+    def test_a_just_created_project_answers_with_a_zero_count(self):
+        created = self.as_user(self.owner).post(
+            "/api/projects/", {"name": "Fresh", "client_name": "Invented Client"}, format="json"
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["open_question_count"], 0)
+
+    def test_detail_and_edit_answer_carry_the_count(self):
+        self.add(self.project, "open", 1)
+        client = self.as_user(self.owner)
+        self.assertEqual(client.get(self.detail()).json()["open_question_count"], 1)
+        edited = client.patch(self.detail(), {"name": "Ticketing 2"}, format="json")
+        self.assertEqual(edited.json()["open_question_count"], 1)
+
+    def test_an_outsider_learns_nothing(self):
+        self.add(self.project, "open", 1)
+        self.assertEqual(self.as_user(self.outsider).get("/api/projects/").json(), [])
+        self.assertEqual(self.as_user(self.outsider).get(self.detail()).status_code, 404)

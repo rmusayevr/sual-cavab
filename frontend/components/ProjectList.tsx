@@ -53,7 +53,7 @@ export default function ProjectList() {
           {state.projects.map((p) => (
             <li key={p.id}>
               <Link href={`/projects/${p.id}`}>{p.name}</Link> · {p.client_name}
-              {p.my_role === "owner" ? " (owner)" : ""}
+              {p.my_role === "owner" ? " (owner)" : ""} · {p.open_question_count} still open
             </li>
           ))}
         </ul>

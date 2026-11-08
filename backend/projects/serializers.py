@@ -8,11 +8,23 @@ from .models import Membership, Project
 
 class ProjectSerializer(serializers.ModelSerializer):
     my_role = serializers.SerializerMethodField()
+    # Questions still open or asked; annotated by with_open_count(). A project
+    # just created has none.
+    open_question_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Project
-        fields = ["id", "name", "client_name", "description", "my_role", "created_at", "updated_at"]
-        read_only_fields = ["id", "my_role", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "name",
+            "client_name",
+            "description",
+            "my_role",
+            "open_question_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "my_role", "open_question_count", "created_at", "updated_at"]
 
     def update(self, instance, validated_data):
         # Write only the fields that were sent. DRF's default saves every column
@@ -23,7 +35,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save(update_fields=[*validated_data, "updated_at"])
         # Answer with the row as it is now, not the copy loaded earlier.
-        return Project.objects.prefetch_related("memberships").get(pk=instance.pk)
+        return Project.objects.with_open_count().prefetch_related("memberships").get(pk=instance.pk)
 
     def get_my_role(self, project):
         user = self.context["request"].user
