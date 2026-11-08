@@ -2,7 +2,7 @@
   "harness": "0.2.0",
   "profile": "full",
   "command": "install --profile full",
-  "installedAt": "2026-11-08T12:04:21.837Z",
+  "installedAt": "2026-11-08T12:42:47.323Z",
   "source": "C:/Users/ADMIN/Desktop/Projects/claude-harness",
   "files": [
     {
@@ -207,7 +207,7 @@
       "to": ".claude/skills/review-a-dependency/SKILL.md",
       "from": "skills/review-a-dependency/SKILL.md",
       "kind": "skill",
-      "sha": "e14328e70f811cdb"
+      "sha": "3a76247370129e72"
     },
     {
       "to": ".claude/skills/review-an-interface/SKILL.md",
@@ -303,7 +303,7 @@
       "to": ".claude/skills/work-the-queue/SKILL.md",
       "from": "skills/work-the-queue/SKILL.md",
       "kind": "skill",
-      "sha": "c56935b85024bb96"
+      "sha": "733e56dd8e019c16"
     },
     {
       "to": ".claude/skills/write-a-bug-report/SKILL.md",
@@ -345,31 +345,31 @@
       "to": ".claude/agents/fresh-eyes-reviewer.md",
       "from": "agents/fresh-eyes-reviewer.md",
       "kind": "agent",
-      "sha": "484ced6150f8a284"
+      "sha": "27bfe0feabfd7e23"
     },
     {
       "to": ".claude/hooks/guard-merge.mjs",
       "from": "hooks/guard-merge.mjs",
       "kind": "hook",
-      "sha": "6ba48c6f82cfcafe"
+      "sha": "fec282c0d83d10e2"
     },
     {
       "to": ".claude/hooks/guard-prod-ddl.mjs",
       "from": "hooks/guard-prod-ddl.mjs",
       "kind": "hook",
-      "sha": "d8c9e68f8427a5cb"
+      "sha": "58c18588ea504c65"
     },
     {
       "to": ".claude/hooks/guard-risky-ops.mjs",
       "from": "hooks/guard-risky-ops.mjs",
       "kind": "hook",
-      "sha": "ca26506f5a67a4d7"
+      "sha": "0b8d945e4b1336c5"
     },
     {
       "to": ".claude/hooks/harness-usage.mjs",
       "from": "hooks/harness-usage.mjs",
       "kind": "hook",
-      "sha": "f1de76b911882888"
+      "sha": "952e5970a2de8705"
     },
     {
       "to": ".claude/harness/scripts/vault.mjs",
@@ -381,7 +381,7 @@
       "to": ".claude/harness/scripts/audit.mjs",
       "from": "scripts/audit.mjs",
       "kind": "script",
-      "sha": "103b0c4356f5d6ca"
+      "sha": "ddb716d1e5db5a41"
     },
     {
       "to": ".claude/harness/scripts/listing-cost.mjs",
@@ -393,7 +393,7 @@
       "to": ".claude/harness/scripts/usage.mjs",
       "from": "scripts/usage.mjs",
       "kind": "script",
-      "sha": "9dba072c226c38f7"
+      "sha": "cb9cf914df19cb57"
     }
   ],
   "settings": {
