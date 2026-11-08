@@ -8,16 +8,13 @@
 | Delete the project                  | nobody in v1 (no endpoint)            |
 
 Seeing is enforced by Project.objects.visible_to(); this module only decides
-what a member may do once the project is visible.
+what a member may do once the project is visible. Membership changes are
+decided from rows locked in the same transaction (see the views), never from
+a role read earlier.
 """
 
 from .models import Membership
 
 
-def role_in(project, user):
-    membership = project.memberships.filter(user=user).only("role").first()
-    return membership.role if membership else None
-
-
-def can_manage_members(project, user) -> bool:
-    return role_in(project, user) == Membership.Role.OWNER
+def role_may_manage_members(role) -> bool:
+    return role == Membership.Role.OWNER

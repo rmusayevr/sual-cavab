@@ -93,6 +93,16 @@ class EditTests(ProjectAccessTestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_member_edits_the_project_with_put(self):
+        body = {"name": "Renamed", "client_name": "Invented Client", "description": ""}
+
+        self.assertEqual(self.as_user(self.member).put(self.detail(), body, format="json").status_code, 200)
+
+    def test_a_role_sent_with_a_project_edit_changes_nothing(self):
+        self.as_user(self.member).patch(self.detail(), {"role": "owner", "my_role": "owner"}, format="json")
+
+        self.assertEqual(Membership.objects.get(project=self.project, user=self.member).role, "member")
+
     def test_outsider_gets_404_when_editing(self):
         response = self.as_user(self.outsider).patch(self.detail(), {"name": "Hijacked"}, format="json")
 
@@ -126,6 +136,46 @@ class CreateTests(ProjectAccessTestCase):
         self.assertEqual(response.json()["my_role"], "owner")
 
 
+class MemberAddThrottleTests(ProjectAccessTestCase):
+    """Owner-approved on #19: a 201 vs a 400 on 'add member' tells a signed-in
+    user whether an email has an account. Accepted for v1, with attempts
+    limited per user so it can't be used to list accounts in bulk."""
+
+    def setUp(self):
+        super().setUp()
+        from django.core.cache import caches
+
+        caches["throttle"].clear()
+
+    def guess(self, user, n):
+        return self.as_user(user).post(self.members(), {"email": f"guess{n}@example.com"}, format="json")
+
+    def test_member_add_attempts_are_limited_per_user(self):
+        for n in range(30):
+            self.guess(self.owner, n)
+
+        self.assertEqual(self.guess(self.owner, 30).status_code, 429)
+
+    def test_failed_guesses_count_toward_the_limit(self):
+        # Every one of these is a 400 ("no active user has this email").
+        statuses = {self.guess(self.owner, n).status_code for n in range(30)}
+
+        self.assertEqual(statuses, {400})
+        self.assertEqual(self.guess(self.owner, 30).status_code, 429)
+
+    def test_one_users_limit_does_not_block_another_user(self):
+        for n in range(31):
+            self.guess(self.owner, n)
+
+        self.assertEqual(self.guess(self.member, 0).status_code, 403)  # reaches the view: not throttled
+
+    def test_listing_members_is_not_limited(self):
+        for n in range(31):
+            self.guess(self.owner, n)
+
+        self.assertEqual(self.as_user(self.owner).get(self.members()).status_code, 200)
+
+
 class MemberManagementTests(ProjectAccessTestCase):
     def setUp(self):
         super().setUp()
@@ -139,6 +189,14 @@ class MemberManagementTests(ProjectAccessTestCase):
 
     def test_member_cannot_add_members(self):
         self.assertEqual(self.add(self.member, "newcomer@example.com").status_code, 403)
+
+    def test_a_member_gets_403_whether_or_not_the_email_has_an_account(self):
+        # Authorize before validating: otherwise a non-owner can tell an email
+        # with no account (400) from one with an account (403).
+        unknown = self.add(self.member, "nobody@example.com")
+        known = self.add(self.member, "newcomer@example.com")
+
+        self.assertEqual((unknown.status_code, known.status_code), (403, 403))
 
     def test_outsider_gets_404_when_adding_members(self):
         self.assertEqual(self.add(self.outsider, "newcomer@example.com").status_code, 404)
@@ -182,6 +240,64 @@ class MemberManagementTests(ProjectAccessTestCase):
         url = f"{self.members()}{self.owner.pk}/"
 
         self.assertEqual(self.as_user(self.owner).delete(url).status_code, 204)
+
+    def test_the_last_active_owner_cannot_be_removed_when_the_other_owner_is_deactivated(self):
+        # Review of #19: a deactivated owner can't manage the project, so
+        # counting them let the only active owner leave.
+        ghost = make_user("ghost@example.com")
+        Membership.objects.create(project=self.project, user=ghost, role=Membership.Role.OWNER)
+        ghost.is_active = False
+        ghost.save()
+        url = f"{self.members()}{self.owner.pk}/"
+
+        self.assertEqual(self.as_user(self.owner).delete(url).status_code, 400)
+
+    def test_a_deactivated_owner_can_be_removed(self):
+        ghost = make_user("ghost@example.com")
+        Membership.objects.create(project=self.project, user=ghost, role=Membership.Role.OWNER)
+        ghost.is_active = False
+        ghost.save()
+
+        self.assertEqual(self.as_user(self.owner).delete(f"{self.members()}{ghost.pk}/").status_code, 204)
+
+    def test_an_owner_removed_a_moment_ago_cannot_remove_members(self):
+        # Review of #19: the owner check ran before the row lock, so an owner
+        # removed concurrently still completed one removal. Simulate the
+        # concurrent removal landing right after the project is looked up.
+        from unittest import mock
+
+        from .views import ProjectViewSet
+
+        real_get_object = ProjectViewSet.get_object
+
+        def get_object_then_lose_ownership(view):
+            project = real_get_object(view)
+            Membership.objects.filter(project=project, user=self.owner).delete()
+            return project
+
+        with mock.patch.object(ProjectViewSet, "get_object", get_object_then_lose_ownership):
+            response = self.as_user(self.owner).delete(f"{self.members()}{self.member.pk}/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Membership.objects.filter(project=self.project, user=self.member).exists())
+
+    def test_an_owner_removed_a_moment_ago_cannot_add_members(self):
+        from unittest import mock
+
+        from .views import ProjectViewSet
+
+        real_get_object = ProjectViewSet.get_object
+
+        def get_object_then_lose_ownership(view):
+            project = real_get_object(view)
+            Membership.objects.filter(project=project, user=self.owner).delete()
+            return project
+
+        with mock.patch.object(ProjectViewSet, "get_object", get_object_then_lose_ownership):
+            response = self.add(self.owner, "newcomer@example.com")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(Membership.objects.filter(project=self.project, user=self.newcomer).exists())
 
     def test_removed_member_loses_access(self):
         self.as_user(self.owner).delete(f"{self.members()}{self.member.pk}/")

@@ -145,7 +145,11 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     # Sign-in attempts per account (accounts.throttles.LoginPerAccountThrottle).
-    "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("DJANGO_LOGIN_RATE", "10/min")},
+    "DEFAULT_THROTTLE_RATES": {
+        "login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"),
+        # 'Add member' attempts per user (projects.throttles.MemberAddThrottle).
+        "member_add": os.environ.get("DJANGO_MEMBER_ADD_RATE", "30/hour"),
+    },
     # For any throttle keyed on the client address: how many proxies in front
     # *append* to X-Forwarded-For. Keep 0 (use the connection address) unless
     # something like nginx or a load balancer appends it. Next.js does not

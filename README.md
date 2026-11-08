@@ -82,10 +82,14 @@ you are not on is a 404, the same as one that does not exist.
 | Delete the project                  | nobody in v1 (there is no delete endpoint) |
 
 - Any signed-in user can create a project and becomes its first owner.
-- The last owner of a project cannot be removed.
+- The last active owner of a project cannot be removed (a deactivated owner
+  does not count, because they cannot manage the project).
 - Superusers have no special access through the API; they use `/admin/`.
 - Owners can only add people who already have an account (an admin creates
-  accounts).
+  accounts). Because anyone can create a project and so become an owner, a
+  signed-in user can tell whether an email has an account by trying to add it.
+  Accepted for v1 (small, admin-created user base); attempts are limited to
+  30 an hour per user, failures included.
 
 ## Built with claude-harness
 
