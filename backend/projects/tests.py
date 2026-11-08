@@ -408,10 +408,12 @@ class OpenQuestionCountTests(ProjectAccessTestCase):
         self.add(self.project, "answered", 1)
         self.assertEqual(self.count_for(self.owner, self.project), 0)
 
-    def test_two_members_do_not_double_the_count(self):
-        # Two members on the project, one question: counted once, not per member.
-        self.add(self.project, "open", 1)
-        self.assertEqual(self.count_for(self.owner, self.project), 1)
+    def test_a_just_created_project_answers_with_a_zero_count(self):
+        created = self.as_user(self.owner).post(
+            "/api/projects/", {"name": "Fresh", "client_name": "Invented Client"}, format="json"
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["open_question_count"], 0)
 
     def test_detail_and_edit_answer_carry_the_count(self):
         self.add(self.project, "open", 1)

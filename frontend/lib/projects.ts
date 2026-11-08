@@ -41,6 +41,6 @@ export function daysOpen(createdAt: string, now: Date = new Date()): number {
 }
 
 export function ageText(days: number): string {
-  if (days === 0) return "opened today";
+  if (days === 0) return "open for less than a day";
   return days === 1 ? "open for 1 day" : `open for ${days} days`;
 }

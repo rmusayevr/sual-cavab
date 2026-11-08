@@ -49,7 +49,7 @@ describe("StillOpen", () => {
     expect(screen.getByText(/Blocks: Refund screen/)).toBeInTheDocument();
     expect(screen.getByText(/open for 5 days/)).toBeInTheDocument();
     expect(screen.getByText(/asked · open for 1 day\b/)).toBeInTheDocument();
-    expect(screen.getByText(/opened today/)).toBeInTheDocument();
+    expect(screen.getByText(/open for less than a day/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /still open \(3\)/i })).toBeInTheDocument();
   });
 
