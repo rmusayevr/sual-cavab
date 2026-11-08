@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import nextConfig from "./next.config";
 
@@ -19,4 +19,33 @@ describe("the /api proxy", () => {
 
     expect(api?.destination).toMatch(/\/api\/:path\*\/$/);
   });
+});
+
+// The address the rewrite forwards to, for a given environment. The config reads
+// it when it loads, so each case loads it afresh.
+async function destinationWith(env: Record<string, string | undefined>) {
+  vi.resetModules();
+  for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value as string);
+  const { default: config } = await import("./next.config");
+  const rewrites = await config.rewrites!();
+  const list = Array.isArray(rewrites) ? rewrites : (rewrites.afterFiles ?? []);
+  return list.find((r) => r.source === "/api/:path*")?.destination;
+}
+
+describe("where /api is forwarded", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("goes to localhost:8000 when nothing is set", async () => {
+    expect(await destinationWith({ BACKEND_URL: "" })).toBe("http://localhost:8000/api/:path*/");
+  });
+
+  it("goes to BACKEND_URL, without a trailing slash doubling up", async () => {
+    expect(await destinationWith({ BACKEND_URL: "https://api.example.invalid/" })).toBe(
+      "https://api.example.invalid/api/:path*/",
+    );
+  });
+
 });

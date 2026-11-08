@@ -33,3 +33,6 @@ Thumbs.db
 
 # Local override of docker-compose.yml (see README, Local setup)
 docker-compose.override.yml
+
+# collectstatic output (the deploy build step writes it)
+backend/staticfiles/
