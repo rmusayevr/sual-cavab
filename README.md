@@ -35,10 +35,12 @@ source .venv/bin/activate     # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 cp .env.example .env          # then set the POSTGRES_* values for your database
 python manage.py migrate
+python manage.py createsuperuser   # accounts are created by an admin; there is no sign-up
 python manage.py runserver
 ```
 
-`GET http://localhost:8000/api/health/` returns `{"status": "ok"}`.
+`GET http://localhost:8000/api/health/` returns `{"status": "ok"}`. Add more
+users at `http://localhost:8000/admin/`. People sign in with their email.
 Run the tests with `python manage.py test`. Environment variables already set
 in your shell win over `backend/.env`.
 
@@ -50,11 +52,13 @@ declares; it runs the frontend tests).
 ```bash
 cd frontend
 npm ci
-cp .env.example .env.local    # NEXT_PUBLIC_API_URL points at the backend
+cp .env.example .env.local    # BACKEND_URL: where /api/* is forwarded
 npm run dev
 ```
 
-Open `http://localhost:3000`. Checks: `npm run lint`, `npm run typecheck`,
+Open `http://localhost:3000` and sign in at `/login`. The browser only talks to
+the frontend: Next.js forwards `/api/*` to the backend, so the session cookie
+stays on one origin. Checks: `npm run lint`, `npm run typecheck`,
 `npm test`, `npm run build`.
 
 ## Built with claude-harness
