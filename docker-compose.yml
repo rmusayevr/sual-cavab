@@ -1,0 +1,41 @@
+# A local PostgreSQL for development and for the backend checks (#15).
+#
+#   docker compose --env-file backend/.env up -d --wait db
+#
+# Database, user, password and host port come from backend/.env (the same
+# POSTGRES_* values the backend reads), so the two cannot disagree. Copy
+# backend/.env.example to backend/.env first; a missing value stops compose
+# with a message instead of starting a database nobody can sign in to.
+#
+# This is for local work only: the port is bound to 127.0.0.1, the password is
+# whatever your .env says. Staging and production are a separate matter (#10).
+
+name: sual-cavab
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in backend/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in backend/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in backend/.env}
+    ports:
+      # Host port from backend/.env. Pick one that no PostgreSQL on this machine
+      # already uses (a native install often holds 5432).
+      - "127.0.0.1:${POSTGRES_PORT:?set POSTGRES_PORT in backend/.env}:5432"
+      # IPv6 loopback too: "localhost" often resolves to ::1 first, and when
+      # nothing listens there a connection waits ~10 s before falling back.
+      - "[::1]:${POSTGRES_PORT:?set POSTGRES_PORT in backend/.env}:5432"
+    volumes:
+      # Named volume: the data survives `docker compose down`.
+      # `docker compose down -v` deletes it (the reset).
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  db-data:
