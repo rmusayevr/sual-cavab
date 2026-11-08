@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "core",
     "accounts",
     "projects",
+    "questions",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

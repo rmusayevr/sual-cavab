@@ -17,6 +17,11 @@ class Project(models.Model):
     name = models.CharField(max_length=200)
     client_name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    # The number the next question gets (Q1, Q2...). Taken under a row lock when a
+    # question is created, so numbers are never reused (#6). db_default keeps the
+    # default in the database: during a deploy, code that does not know this
+    # column can still insert projects.
+    next_question_number = models.PositiveIntegerField(default=1, db_default=1)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

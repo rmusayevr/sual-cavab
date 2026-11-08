@@ -92,6 +92,38 @@ you are not on is a 404, the same as one that does not exist.
   about 30 an hour per user, failures included (a burst of parallel requests
   can slightly exceed it).
 
+## Questions, statuses and answers
+
+Questions belong to a project and are numbered Q1, Q2... per project. A number
+is never reused, even if the question is dropped. Any member of the project
+(owner or member) can add, edit, change the status of and answer questions;
+everyone else gets a 404. API: `/api/projects/<id>/questions/`
+(`?status=open,asked` filters), `…/<number>/` to read or edit the text fields,
+and `POST …/<number>/transition/` with `{"to": "<status>"}` to change status.
+
+Decided by the owner (#6). Anything not listed is refused with a 400 that names
+what is allowed:
+
+| From       | Can become                                   |
+|------------|----------------------------------------------|
+| `open`     | `asked`, `answered` (with an answer), `dropped` |
+| `asked`    | `open` (un-ask), `answered` (with an answer), `dropped` |
+| `answered` | `open` (re-open)                              |
+| `dropped`  | `open` (restore)                              |
+
+- Marking a question `answered` needs an answer: the text, who answered (free
+  text, since the client contact may not be a user), the date, and where
+  (chat, meeting, email or other, with an optional note). The user who recorded
+  it is saved too.
+- Answers are never edited or deleted. Re-opening a question keeps its answer
+  as history (`previous_answers`); answering again adds a new one. To correct
+  an answer, re-open and answer again.
+- Nothing is deleted by the app: there is no delete endpoint ("dropped" is a
+  status), and removing a project, question or user in the admin is blocked
+  while questions or answers depend on it.
+- Editing a question's text overwrites the previous text (there is no edit
+  history in v1).
+
 ## Built with claude-harness
 
 This project is built with [claude-harness](https://github.com/rmusayevr/claude-harness):
