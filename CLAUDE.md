@@ -25,9 +25,10 @@ asking them. Backend: Django + DRF in `backend/`. Frontend: Next.js in
 ## Working agreement
 
 Rules below must hold in plain conversation, where no skill has been invoked.
-Anything that is a *procedure* belongs in a skill body, not here — see
-`ARCHITECTURE.md`. Keep this block under 80 lines: it is loaded every session
-and again inside every subagent.
+Anything that is a *procedure* belongs in a skill body, not here; see the
+harness's ARCHITECTURE.md (https://github.com/rmusayevr/claude-harness/blob/main/ARCHITECTURE.md).
+Keep this block under 80 lines: it is loaded every session and again inside
+every subagent.
 
 ### Claims
 

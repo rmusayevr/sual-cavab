@@ -2,7 +2,7 @@
   "harness": "0.2.0",
   "profile": "full",
   "command": "install --profile full",
-  "installedAt": "2026-11-08T11:37:25.616Z",
+  "installedAt": "2026-11-08T12:04:21.837Z",
   "source": "C:/Users/ADMIN/Desktop/Projects/claude-harness",
   "files": [
     {
@@ -351,7 +351,7 @@
       "to": ".claude/hooks/guard-merge.mjs",
       "from": "hooks/guard-merge.mjs",
       "kind": "hook",
-      "sha": "ed44871feeee00cf"
+      "sha": "6ba48c6f82cfcafe"
     },
     {
       "to": ".claude/hooks/guard-prod-ddl.mjs",
@@ -363,13 +363,13 @@
       "to": ".claude/hooks/guard-risky-ops.mjs",
       "from": "hooks/guard-risky-ops.mjs",
       "kind": "hook",
-      "sha": "fff13990e148c1d5"
+      "sha": "ca26506f5a67a4d7"
     },
     {
       "to": ".claude/hooks/harness-usage.mjs",
       "from": "hooks/harness-usage.mjs",
       "kind": "hook",
-      "sha": "514481a430e5652c"
+      "sha": "f1de76b911882888"
     },
     {
       "to": ".claude/harness/scripts/vault.mjs",
@@ -403,6 +403,6 @@
   "claudeMd": {
     "mode": "block",
     "path": "CLAUDE.md",
-    "sha": "b30c47b28f18dd55"
+    "sha": "859d3db37f10d492"
   }
 }
