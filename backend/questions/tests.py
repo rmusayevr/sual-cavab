@@ -450,6 +450,169 @@ class ListAndEditTests(QuestionTestCase):
         self.assertEqual(self.db_question(1).created_by, self.owner)
 
 
+class StaleWriteTests(QuestionTestCase):
+    """Review of #21: a save that writes every column from a copy loaded earlier
+    overwrites what a concurrent request changed. Each test makes the view load
+    its copy, changes the database behind its back, then lets the view save."""
+
+    def after_get_object(self, viewset, action):
+        """Patch `viewset.get_object` so `action()` runs right after it loads."""
+        from unittest import mock
+
+        real = viewset.get_object
+
+        def wrapper(view):
+            obj = real(view)
+            action()
+            return obj
+
+        return mock.patch.object(viewset, "get_object", wrapper)
+
+    def test_a_project_edit_does_not_rewind_the_question_counter(self):
+        from projects.views import ProjectViewSet
+
+        with self.after_get_object(ProjectViewSet, lambda: self.ask("Created during the edit")):
+            response = self.as_user(self.owner).patch(
+                f"/api/projects/{self.project.pk}/", {"name": "Renamed"}, format="json"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.ask("After the edit")["number"], 2)
+
+    def test_the_project_admin_does_not_write_the_question_counter(self):
+        from types import SimpleNamespace
+
+        from django.contrib import admin
+
+        stale = Project.objects.get(pk=self.project.pk)
+        self.ask("Created while the admin form was open")
+        stale.name = "Renamed in the admin"
+
+        admin.site._registry[Project].save_model(None, stale, SimpleNamespace(changed_data=["name"]), change=True)
+
+        self.project.refresh_from_db()
+        self.assertEqual((self.project.name, self.project.next_question_number), ("Renamed in the admin", 2))
+        self.assertEqual(self.ask("Next")["number"], 2)
+
+    def test_the_counter_is_not_editable_in_the_project_admin(self):
+        from django.contrib import admin
+
+        self.assertIn("next_question_number", admin.site._registry[Project].readonly_fields)
+
+    def test_an_edit_does_not_overwrite_an_answer_given_meanwhile(self):
+        from .views import QuestionViewSet
+
+        self.ask("Original")
+
+        def answer_meanwhile():
+            self.move(1, "answered", answer=answer_payload())
+
+        with self.after_get_object(QuestionViewSet, answer_meanwhile):
+            response = self.as_user(self.owner).patch(self.url(number=1), {"text": "Reworded"}, format="json")
+
+        question = self.db_question(1)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((question.text, question.status), ("Reworded", "answered"))
+        self.assertIsNotNone(question.answered_at)
+        self.assertEqual(response.json()["status"], "answered")
+        self.assertIsNotNone(response.json()["current_answer"])  # the response shows the row as it is now
+
+    def test_a_question_edited_while_being_answered_can_still_be_reopened_and_answered_again(self):
+        from .views import QuestionViewSet
+
+        self.ask("Original")
+        with self.after_get_object(QuestionViewSet, lambda: self.move(1, "answered", answer=answer_payload())):
+            self.as_user(self.owner).patch(self.url(number=1), {"text": "Reworded"}, format="json")
+
+        self.assertEqual(self.move(1, "open").status_code, 200)
+        self.assertEqual(self.move(1, "answered", answer=answer_payload(text="Again")).status_code, 200)
+
+    def test_an_edit_does_not_undo_a_reopen_done_meanwhile(self):
+        from .views import QuestionViewSet
+
+        self.ask("Original")
+        self.move(1, "answered", answer=answer_payload())
+
+        with self.after_get_object(QuestionViewSet, lambda: self.move(1, "open")):
+            self.as_user(self.owner).patch(self.url(number=1), {"text": "Reworded"}, format="json")
+
+        self.assertEqual(self.db_question(1).status, "open")
+        self.assertEqual(Answer.objects.filter(superseded_at__isnull=True).count(), 0)
+
+    def test_the_question_admin_does_not_write_the_status(self):
+        from types import SimpleNamespace
+
+        from django.contrib import admin
+
+        self.ask("Original")
+        stale = self.db_question(1)
+        self.move(1, "answered", answer=answer_payload())
+        stale.text = "Fixed typo in the admin"
+
+        admin.site._registry[Question].save_model(None, stale, SimpleNamespace(changed_data=["text"]), change=True)
+
+        question = self.db_question(1)
+        self.assertEqual((question.text, question.status), ("Fixed typo in the admin", "answered"))
+
+    def test_the_question_admin_cannot_change_status_add_or_delete(self):
+        from django.contrib import admin
+        from django.test import RequestFactory
+
+        model_admin = admin.site._registry[Question]
+        request = RequestFactory().get("/")
+        request.user = get_user_model().objects.create_superuser(email="root@example.com", password=PASSWORD)
+
+        # The admin form may edit the three text fields and nothing else.
+        self.assertEqual(sorted(model_admin.get_form(request).base_fields), ["blocks", "text", "why_it_matters"])
+        self.assertFalse(model_admin.has_add_permission(request))
+        self.assertFalse(model_admin.has_delete_permission(request))
+
+
+class RemovedMidRequestTests(QuestionTestCase):
+    """A member removed after the view's membership check must not get a write
+    through: the check is repeated under a row lock before writing."""
+
+    def removing_membership_after_the_check(self):
+        from unittest import mock
+
+        from .views import QuestionViewSet
+
+        real_initial = QuestionViewSet.initial
+
+        def initial(view, request, *args, **kwargs):
+            real_initial(view, request, *args, **kwargs)
+            Membership.objects.filter(project=self.project, user=self.member).delete()
+
+        return mock.patch.object(QuestionViewSet, "initial", initial)
+
+    def test_a_member_removed_mid_request_cannot_add_a_question(self):
+        with self.removing_membership_after_the_check():
+            response = self.as_user(self.member).post(self.url(), {"text": "Too late"}, format="json")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Question.objects.count(), 0)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.next_question_number, 1)
+
+    def test_a_member_removed_mid_request_cannot_change_a_status(self):
+        self.ask()
+
+        with self.removing_membership_after_the_check():
+            response = self.move(1, "dropped", user=self.member)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.db_question(1).status, "open")
+
+    def test_a_member_removed_mid_request_cannot_edit_a_question(self):
+        self.ask("Original")
+
+        with self.removing_membership_after_the_check():
+            response = self.as_user(self.member).patch(self.url(number=1), {"text": "Too late"}, format="json")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.db_question(1).text, "Original")
+
+
 class DataSafetyTests(QuestionTestCase):
     def test_the_database_stores_utf8(self):
         with connection.cursor() as cursor:

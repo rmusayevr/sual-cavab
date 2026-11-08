@@ -14,6 +14,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "client_name", "description", "my_role", "created_at", "updated_at"]
         read_only_fields = ["id", "my_role", "created_at", "updated_at"]
 
+    def update(self, instance, validated_data):
+        # Write only the fields that were sent. DRF's default saves every column
+        # from the copy loaded at the start of the request, which would write
+        # back a stale next_question_number and rewind the question counter
+        # (review of #21), or revert another user's edit to a field not sent.
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save(update_fields=[*validated_data, "updated_at"])
+        return instance
+
     def get_my_role(self, project):
         user = self.context["request"].user
         for membership in project.memberships.all():  # prefetched by the view

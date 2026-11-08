@@ -43,6 +43,10 @@ python manage.py runserver
 `GET http://localhost:8000/api/health/` returns `{"status": "ok"}`. Add more
 users at `http://localhost:8000/admin/`. People sign in with their email.
 
+After pulling changes, run `python manage.py migrate` **before** starting the
+new code: it selects columns that migrations add (for example
+`next_question_number`), so new code on an un-migrated database fails with 500s.
+
 If you ran `migrate` before accounts existed (#4), that database still has
 Django's default user table and `migrate` now stops with
 `InconsistentMigrationHistory`. It holds no project data yet: drop and recreate
@@ -119,8 +123,11 @@ what is allowed:
   as history (`previous_answers`); answering again adds a new one. To correct
   an answer, re-open and answer again.
 - Nothing is deleted by the app: there is no delete endpoint ("dropped" is a
-  status), and removing a project, question or user in the admin is blocked
-  while questions or answers depend on it.
+  status). In the admin, questions can't be added or deleted, only their three
+  text fields can be edited (status moves only through the rules above), and a
+  project or user with questions or answers depending on it can't be deleted.
+- Edits write only the fields that were sent, so an edit racing an answer or a
+  re-open can't write back an old status.
 - Editing a question's text overwrites the previous text (there is no edit
   history in v1).
 
