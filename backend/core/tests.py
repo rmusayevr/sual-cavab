@@ -18,7 +18,7 @@ class HealthEndpointTests(SimpleTestCase):
         response = self.client.get(reverse("health"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"status": "ok"})
+        self.assertEqual(response.json(), {"status": "deliberately-wrong"})
 
     def test_post_is_not_allowed(self):
         response = self.client.post(reverse("health"))
