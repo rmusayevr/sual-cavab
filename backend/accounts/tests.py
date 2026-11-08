@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
+from django.core.cache import caches
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.response import Response
@@ -15,7 +15,7 @@ def make_user(email="ada@example.com", **extra):
 
 class AccountTestCase(TestCase):
     def setUp(self):
-        cache.clear()  # throttle counters live in the cache
+        caches["throttle"].clear()  # sign-in attempt counters
         self.client = APIClient()
 
     def sign_in(self, email="ada@example.com", password=PASSWORD):
@@ -179,6 +179,16 @@ class LoginThrottleTests(TestCase):
             self.allowed("ADA@Example.com")
 
         self.assertFalse(self.allowed("ada@example.com"))
+
+    def test_a_maximum_length_email_is_throttled(self):
+        # Review round 4 of #18: the cache key column is varchar(255); with the
+        # raw email in the key, a 238+ character email overflowed it, the write
+        # failed silently, and that account was never throttled.
+        long_email = "a" * 242 + "@example.com"  # 254 characters, EmailField's maximum
+        for _ in range(10):
+            self.allowed(long_email)
+
+        self.assertFalse(self.allowed(long_email))
 
     def test_junk_emails_do_not_evict_a_locked_accounts_counter(self):
         # Review round 3 of #18: with the 300-entry in-memory cache, ~300 made-up

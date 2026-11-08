@@ -122,10 +122,13 @@ STATIC_URL = "static/"
 CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
     # Sign-in throttle counters (#4, owner's decision on #18): in PostgreSQL, so
-    # every worker shares them, restarts keep them, and made-up emails can't
-    # push a real account's counter out. The in-memory default holds 300 entries
-    # and evicted it. Expired entries are culled first; live ones only above
-    # MAX_ENTRIES, and counters live one minute. Needs `createcachetable`.
+    # workers read the same counters, restarts keep them, and made-up emails
+    # can't push a real account's counter out (the 300-entry in-memory default
+    # evicted it). Culling only runs once the table passes MAX_ENTRIES: it then
+    # deletes expired rows, and live ones only if still over the limit. Until
+    # then expired rows accumulate (follow-up). DRF's update isn't atomic, so
+    # simultaneous requests can exceed the rate slightly. Needs
+    # `createcachetable`; without the table, sign-in fails closed with a 500.
     "throttle": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "throttle_cache",
