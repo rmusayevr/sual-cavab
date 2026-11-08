@@ -149,6 +149,40 @@ still decides, and its message is shown if it refuses. Validation errors from
 the API appear next to the field. Re-opening an answered question keeps the old
 answer, shown as "Earlier answer".
 
+## Drafting a message (Claude)
+
+`/projects/<id>/draft`: pick open or asked questions (up to 10) and get a
+**draft** message, in Azerbaijani with technical terms kept in English, as text
+in a box you can edit and copy. **The app never sends anything**: there is no
+email or chat integration, and a test fails if the drafting code gains one.
+Nothing is stored: close the page and the draft is gone.
+
+**What goes to the Claude API** (owner's decision on #9): for each selected
+question its number, the question text, "why it matters" and "what it blocks",
+each cut at 1,500 characters. Never the project or client name, anyone's name or
+email, answers, statuses, dates or ids. Question text can still contain names if
+someone typed them there, so keep client details out of it, or ask Anthropic for
+zero data retention for your organization. The screen says what is sent.
+
+Who may use it: any member of the project (same rule as questions). Limits: 20
+drafts per user per hour (`DJANGO_DRAFT_RATE`), 30-second timeout, one retry.
+
+Set up (see `backend/.env.example`):
+
+- `ANTHROPIC_API_KEY`: from the environment of the server only, never in code,
+  logs or the browser. **Without it the draft button answers "not set up"
+  (503) and nothing else changes.**
+- `DRAFTING_MODEL`: defaults to `claude-sonnet-5-5`. **The server refuses to
+  start** if it names a Claude Fable or Claude Mythos model: Anthropic keeps
+  prompts and outputs of those for at least 30 days and offers no zero data
+  retention, and the owner decided drafting must not use them.
+- If Claude fails (timeout, rate limit, refusal, empty or cut-off answer) the
+  person sees "The draft could not be written. Try again in a minute." Nothing
+  the API sent back is shown or logged; logs hold counts and error class names.
+
+Not checked by any test: a real call to the API (tests use a fake client). The
+first real draft has to be made by hand once the key is set.
+
 ## Built with claude-harness
 
 This project is built with [claude-harness](https://github.com/rmusayevr/claude-harness):

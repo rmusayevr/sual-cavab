@@ -65,6 +65,14 @@ describe("ProjectDetail", () => {
     expect(screen.getByText(/Blocks: Checkout/)).toBeInTheDocument();
   });
 
+  it("links to the screen that drafts a message from the open questions", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url, json(200, project))));
+
+    render(<ProjectDetail />);
+
+    expect(await screen.findByRole("link", { name: "Draft a message" })).toHaveAttribute("href", "/projects/5/draft");
+  });
+
   it("links to the screen where questions are added, edited and answered", async () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url, json(200, project))));
 

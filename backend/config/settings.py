@@ -10,6 +10,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from drafting.config import DEFAULT_MODEL, validate_drafting_model
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -63,6 +65,7 @@ INSTALLED_APPS = [
     "accounts",
     "projects",
     "questions",
+    "drafting",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -150,6 +153,8 @@ REST_FRAMEWORK = {
         "login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"),
         # 'Add member' attempts per user (projects.throttles.MemberAddThrottle).
         "member_add": os.environ.get("DJANGO_MEMBER_ADD_RATE", "30/hour"),
+        # Drafts per user (drafting.throttles.DraftThrottle): each is a paid API call.
+        "draft": os.environ.get("DJANGO_DRAFT_RATE", "20/hour"),
     },
     # For any throttle keyed on the client address: how many proxies in front
     # *append* to X-Forwarded-For. Keep 0 (use the connection address) unless
@@ -164,3 +169,6 @@ REST_FRAMEWORK = {
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
 if DEBUG and not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+# Drafting (#9). A Fable or Mythos model makes the server refuse to start.
+DRAFTING_MODEL = validate_drafting_model(os.environ.get("DRAFTING_MODEL") or DEFAULT_MODEL)
