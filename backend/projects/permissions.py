@@ -18,6 +18,9 @@ membership rows, so one global order means no cycle can form between a write
 and a removal, or between two writes by the same user. Taking them the other
 way round deadlocked on real PostgreSQL (review of #21): lock the membership
 with `lock_caller_membership()` before anything else in the transaction.
+Known gap: the Django admin project form (project row, then inline membership
+rows) takes them the other way round; a simultaneous admin save and member write
+can deadlock, and PostgreSQL aborts one side with nothing half-written.
 """
 
 from django.http import Http404
