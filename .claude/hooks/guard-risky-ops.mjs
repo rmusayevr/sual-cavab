@@ -2,7 +2,7 @@
 /**
  * PreToolUse guard for mechanically-decidable risky operations.
  *
- * Contract (see ARCHITECTURE.md):
+ * Contract (see ARCHITECTURE.md in the harness repo):
  *   deny  - things that should never happen by accident. Requires CERTAINTY.
  *   ask   - things Claude should not self-authorize, but the operator may approve.
  *   null  - no decision; exit 0 silently and say nothing.
@@ -298,19 +298,29 @@ function checkBashWrite(t, segment) {
   return null;
 }
 
+/**
+ * Every segment, every rule; the most severe decision wins.
+ *
+ * Returning the first match let an `ask` hide a `deny` later in the same
+ * command. Bought by sual-cavab: `rm -rf core/models.py ... && cp .env.example
+ * .env` matched `rm-rf-nondisposable` (ask), the `.env` write was never
+ * checked, the permission mode auto-approved the ask, and `.env` was written.
+ */
+const RULES = [checkGitPush, checkRm, checkGitDiscard, checkDeploy, checkBashWrite];
+
 function checkBash(command) {
+  let ask = null;
   for (const segment of segments(command)) {
     const t = tokens(segment);
     if (t.length === 0) continue;
-    const hit =
-      checkGitPush(t, segment) ??
-      checkRm(t, segment) ??
-      checkGitDiscard(t, segment) ??
-      checkDeploy(t, segment) ??
-      checkBashWrite(t, segment);
-    if (hit) return hit;
+    for (const rule of RULES) {
+      const hit = rule(t, segment);
+      if (!hit) continue;
+      if (hit.decision === 'deny') return hit;
+      ask ??= hit;
+    }
   }
-  return null;
+  return ask;
 }
 
 // ---------------------------------------------------------------- write rules
