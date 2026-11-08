@@ -249,6 +249,69 @@ Set up (see `backend/.env.example`):
 Not checked by any test: a real call to the API (tests use a fake client). The
 first real draft has to be made by hand once the key is set.
 
+## Staging on Render
+
+A staging site for looking at the app with **invented demo data**. It is
+described by `render.yaml` (the API, the frontend and a PostgreSQL 17 database,
+all on Render's free plan, in Frankfurt) and deploys from the `staging` branch.
+
+**Never put real client questions, names or messages on it.** The free database
+has no backups and is deleted 30 days after it is created.
+
+### First deploy (once; needs a Render account, so the owner does it)
+
+1. In Render: **New > Blueprint**, connect this GitHub repository, choose the
+   `staging` branch. Render reads `render.yaml` and asks for three values:
+   - `DEMO_PASSWORD`: the shared password of the demo accounts. Choose one with
+     12 or more characters. It is stored only in Render.
+   - `DJANGO_CSRF_TRUSTED_ORIGINS`: the frontend's address, normally
+     `https://sual-cavab-web.onrender.com`.
+   - `BACKEND_URL`: the API's address, normally
+     `https://sual-cavab-api.onrender.com`.
+2. If Render shows different addresses for the two services (a name was taken),
+   correct those two values in each service's **Environment** tab and deploy
+   **both** again. `BACKEND_URL` is read when the frontend is built.
+3. The first request to a sleeping free service takes about a minute.
+4. Check it from your machine (needs only Python):
+
+   ```bash
+   SMOKE_PASSWORD=<the DEMO_PASSWORD> python scripts/smoke_test.py https://sual-cavab-web.onrender.com
+   ```
+
+   It signs in with the demo accounts and checks the health endpoint, sign-in,
+   the still-open view and counts, and that someone who is on no project sees
+   none. It changes nothing and exits non-zero if anything fails.
+
+### What is on it
+
+- Sign in with `demo.owner@example.invalid` or `demo.member@example.invalid`
+  (the shared `DEMO_PASSWORD`); `demo.outsider@example.invalid` is on no project.
+- Two demo projects with questions in every status, and one answer that was
+  corrected after a re-open. Restarting the API runs `load_demo_data` again; it
+  changes nothing that is already there and refuses a database that holds
+  anything but demo projects.
+- Drafting is **off** until you add `ANTHROPIC_API_KEY` in the API service's
+  Environment tab; without it the draft button says "not set up". A real draft
+  there sends the demo question text to the Claude API, as anywhere else.
+
+### Things to know (Render's free plan, from its documentation)
+
+- **Services sleep** after 15 minutes without traffic and restart at will.
+  Everything the API needs is done in its start command (`migrate`,
+  `createcachetable`, `load_demo_data`), because free instances have no shell.
+- **The database expires 30 days after creation**, with 14 days to upgrade, then
+  it and its data are deleted. To renew: delete the database resource, then sync
+  the Blueprint (Render recreates it); the API restarts, migrates and reloads
+  the demo data. Not tested.
+- **A drafting reply can take up to about 135 seconds.** Render's documentation
+  states no limit on request duration, so whether a free instance allows it is
+  untested.
+- The API's own address is public (free services cannot receive private
+  traffic); it answers only what the app's rules allow, and `/admin/` is
+  reachable on it. The admin sign-in is the same account system with the same
+  rate limit; make no superuser account for staging unless you need one.
+- Python is Render's default (3.14.x); Node is pinned to 22.22.2, as in CI.
+
 ## Built with claude-harness
 
 This project is built with [claude-harness](https://github.com/rmusayevr/claude-harness):

@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
 
 // Where Next.js forwards /api/*. Server-side only and read when the config
-// loads (build and start), so set it for both.
-const BACKEND_URL = (process.env.BACKEND_URL ?? "http://localhost:8000").replace(/\/+$/, "");
+// loads (build and start), so set it for both. An empty value counts as not
+// set: an empty one would make the rewrite point at itself (a blank field in a
+// platform dashboard, #10).
+const BACKEND_URL = (process.env.BACKEND_URL || "http://localhost:8000").replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
   cacheComponents: true,

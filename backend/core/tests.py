@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -83,3 +84,40 @@ class PasswordHasherTests(SimpleTestCase):
             "from django.conf import settings; print(settings.PASSWORD_HASHERS[0])"
         )
         self.assertEqual(self.first_hasher_when_loaded_by(code), "django.contrib.auth.hashers.PBKDF2PasswordHasher")
+
+
+class DeployCheckTests(SimpleTestCase):
+    """DJANGO_BEHIND_HTTPS=1 makes `manage.py check --deploy` clean (#10)."""
+
+    def deploy_check(self, **env):
+        base = {k: v for k, v in os.environ.items() if k not in ("DJANGO_DEBUG", "DJANGO_BEHIND_HTTPS")}
+        return subprocess.run(
+            [sys.executable, "manage.py", "check", "--deploy", "--fail-level", "WARNING"],
+            cwd=Path(settings.BASE_DIR),
+            env={**base, "DJANGO_SECRET_KEY": "k" * 8 + "Zq9x" * 15, "DJANGO_ALLOWED_HOSTS": "api.example.invalid", **env},
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+    def test_a_deployment_with_the_https_switch_on_is_clean(self):
+        result = self.deploy_check(DJANGO_DEBUG="0", DJANGO_BEHIND_HTTPS="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_the_same_deployment_without_the_switch_is_not(self):
+        result = self.deploy_check(DJANGO_DEBUG="0")
+        self.assertNotEqual(result.returncode, 0)
+        for warning in ("security.W004", "security.W012", "security.W016"):  # HSTS, session cookie, CSRF cookie
+            self.assertIn(warning, result.stderr)
+
+    def test_the_switch_does_not_make_django_redirect(self):
+        # Only the platform redirects: a Django redirect would loop behind two proxies.
+        code = (
+            "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); "
+            "from django.conf import settings; print(settings.SECURE_SSL_REDIRECT, settings.SESSION_COOKIE_SECURE, settings.CSRF_COOKIE_SECURE)"
+        )
+        base = {k: v for k, v in os.environ.items() if k != "DJANGO_BEHIND_HTTPS"}
+        result = subprocess.run(
+            [sys.executable, "-c", code], cwd=Path(settings.BASE_DIR), env={**base, "DJANGO_BEHIND_HTTPS": "1"}, capture_output=True, text=True, timeout=120
+        )
+        self.assertEqual(result.stdout.strip(), "False True True", result.stderr)

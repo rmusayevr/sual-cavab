@@ -13,6 +13,8 @@ from django.core.exceptions import ImproperlyConfigured
 
 from drafting.config import DEFAULT_MODEL, validate_drafting_model, validate_sdk_environment
 
+from .dburl import database_from_url
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -73,6 +75,8 @@ AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serves collected static files (the admin's CSS and JS) from the app itself (#10).
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -100,8 +104,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+# One URL (DJANGO_DATABASE_URL) when a platform hands the database over that way
+# (Render does, #10); otherwise the separate POSTGRES_* values.
+_DATABASE_URL = os.environ.get("DJANGO_DATABASE_URL", "").strip()
 DATABASES = {
-    "default": {
+    "default": database_from_url(_DATABASE_URL)
+    if _DATABASE_URL
+    else {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("POSTGRES_DB", "sual_cavab"),
         "USER": os.environ.get("POSTGRES_USER", "sual_cavab"),
@@ -138,6 +147,14 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"  # `collectstatic` writes here (the deploy's build step)
+# Compressed, but without the hashed-name manifest: the manifest storage fails
+# any page that names a file `collectstatic` has not run for, which would break
+# the admin in tests and local runs.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
 
 CACHES = {
     "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
@@ -197,3 +214,26 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "loggers": {"drafting": {"handlers": ["console"], "level": "INFO"}},
 }
+
+# Deployed behind a platform that terminates HTTPS (#10). Set DJANGO_BEHIND_HTTPS=1
+# there. It only ever adds protection, so a stray value cannot weaken a server:
+# the platform's proxy says "https" in X-Forwarded-Proto, cookies are Secure, and
+# browsers are told to insist on HTTPS. `manage.py check --deploy` is clean with
+# it on (a test runs exactly that).
+# Django does NOT redirect plain HTTP itself (SECURE_SSL_REDIRECT stays off): the
+# platform's load balancer already redirects HTTP to HTTPS (Render's docs), and
+# the browser reaches Django through the Next.js proxy, a second proxy hop that
+# may pass the visitor's X-Forwarded-Proto on as it is. Anything other than the
+# exact "https" Django compares with (say "https, https" if a hop appends) would
+# turn a Django redirect into a loop on every request. That has not been seen;
+# it was not worth risking when the platform already redirects.
+if _env_bool("DJANGO_BEHIND_HTTPS"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # One hour while staging settles; raise it once HTTPS is known to work for good.
+    SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_HSTS_SECONDS") or 3600)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # Not "preload": that is a promise to browser vendors that lasts a year or
+    # more, and does not belong on a staging host with a one-hour HSTS.
+    SILENCED_SYSTEM_CHECKS = ["security.W021", "security.W008"]  # W008: the redirect is the platform's
