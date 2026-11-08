@@ -28,6 +28,33 @@ class UserModelTests(TestCase):
 
         self.assertEqual(user.email, "ada@example.com")
 
+    def test_email_lookup_ignores_case(self):
+        make_user(email="ada@example.com")
+
+        found = get_user_model().objects.get_by_natural_key("ADA@Example.com")
+
+        self.assertEqual(found.email, "ada@example.com")
+
+    def test_admin_add_form_rejects_an_email_that_differs_only_in_case(self):
+        from accounts.admin import EmailUserCreationForm
+
+        make_user(email="ada@example.com")
+        form = EmailUserCreationForm(data={"email": "Ada@Example.com", "password1": PASSWORD, "password2": PASSWORD})
+
+        self.assertIn("email", form.errors)
+
+    def test_admin_change_form_rejects_another_users_email_in_other_case(self):
+        from accounts.admin import EmailUserChangeForm
+
+        make_user(email="ada@example.com")
+        other = make_user(email="grace@example.com")
+        form = EmailUserChangeForm(
+            instance=other,
+            data={"email": "ADA@example.com", "date_joined": other.date_joined, "is_active": True},
+        )
+
+        self.assertIn("email", form.errors)
+
     def test_superuser_is_created_with_email_only(self):
         admin = get_user_model().objects.create_superuser(email="root@example.com", password=PASSWORD)
 
@@ -106,6 +133,20 @@ class SignInTests(AccountTestCase):
             self.sign_in(password="wrong")
 
         self.assertEqual(self.sign_in(password="wrong").status_code, 429)
+
+    def test_forged_forwarded_for_header_does_not_reset_the_throttle(self):
+        def attempt(n):
+            return self.client.post(
+                reverse("auth-login"),
+                {"email": "ada@example.com", "password": "wrong"},
+                format="json",
+                HTTP_X_FORWARDED_FOR=f"203.0.113.{n}",
+            )
+
+        for n in range(10):
+            attempt(n)
+
+        self.assertEqual(attempt(99).status_code, 429)
 
 
 class SignOutTests(AccountTestCase):

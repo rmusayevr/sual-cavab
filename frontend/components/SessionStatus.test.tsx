@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import SessionStatus from "./SessionStatus";
@@ -41,6 +41,33 @@ describe("SessionStatus", () => {
     render(<SessionStatus />);
 
     expect(await screen.findByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+  });
+
+  it("shows signed out after the backend confirms sign-out", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
+      url === "/api/auth/me/"
+        ? new Response(JSON.stringify({ id: 1, email: "ada@example.com", name: "" }), { status: 200 })
+        : new Response(null, { status: 204 }),
+    ));
+    render(<SessionStatus />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByRole("link", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("stays signed in and says so when the backend refuses sign-out", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
+      url === "/api/auth/me/"
+        ? new Response(JSON.stringify({ id: 1, email: "ada@example.com", name: "" }), { status: 200 })
+        : new Response(JSON.stringify({ detail: "CSRF Failed" }), { status: 403 }),
+    ));
+    render(<SessionStatus />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sign-out failed. You are still signed in.");
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
   });
 
   it("reports an unreachable server instead of claiming the user is signed out", async () => {

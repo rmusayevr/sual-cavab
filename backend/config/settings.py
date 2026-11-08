@@ -128,6 +128,11 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
     "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("DJANGO_LOGIN_RATE", "10/min")},
+    # How many trusted proxies append to X-Forwarded-For. 0 = ignore the header
+    # and throttle on the connection's address: the header is client-controlled,
+    # and Next.js passes a client's value through unchanged, so trusting it by
+    # default let every request pick a fresh throttle bucket (review of #18).
+    "NUM_PROXIES": int(os.environ.get("DJANGO_NUM_PROXIES", "0")),
 }
 
 # The browser talks to the Next.js origin, which proxies /api to Django, so a

@@ -10,6 +10,10 @@ def normalize_email(email: str) -> str:
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
+    def get_by_natural_key(self, email):
+        # Used by authenticate() and createsuperuser's "already exists" check.
+        return self.get(email__iexact=normalize_email(email))
+
     def _create_user(self, email, password, **extra_fields):
         if not email:
             raise ValueError("An email address is required.")

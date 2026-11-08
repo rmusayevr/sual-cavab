@@ -13,6 +13,7 @@ type State =
 
 export default function SessionStatus() {
   const [state, setState] = useState<State>({ kind: "loading" });
+  const [signOutFailed, setSignOutFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,9 +32,17 @@ export default function SessionStatus() {
     };
   }, []);
 
+  // Only show "signed out" once the backend confirms it: on a shared computer,
+  // a refused logout that looked successful would leave the session usable.
   async function signOut() {
-    await apiFetch("/api/auth/logout/", { method: "POST" });
-    setState({ kind: "signed-out" });
+    setSignOutFailed(false);
+    try {
+      const response = await apiFetch("/api/auth/logout/", { method: "POST" });
+      if (response.ok) setState({ kind: "signed-out" });
+      else setSignOutFailed(true);
+    } catch {
+      setSignOutFailed(true);
+    }
   }
 
   switch (state.kind) {
@@ -41,12 +50,15 @@ export default function SessionStatus() {
       return <p>Checking your session…</p>;
     case "signed-in":
       return (
-        <p>
-          Signed in as {state.user.name || state.user.email}.{" "}
-          <button type="button" onClick={signOut}>
-            Sign out
-          </button>
-        </p>
+        <>
+          <p>
+            Signed in as {state.user.name || state.user.email}.{" "}
+            <button type="button" onClick={signOut}>
+              Sign out
+            </button>
+          </p>
+          {signOutFailed && <p role="alert">Sign-out failed. You are still signed in.</p>}
+        </>
       );
     case "signed-out":
       return (
