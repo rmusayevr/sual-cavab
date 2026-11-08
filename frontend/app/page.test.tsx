@@ -7,6 +7,6 @@ describe("HomePage", () => {
   it("shows the product name as the main heading", () => {
     render(<HomePage />);
 
-    expect(screen.getByRole("heading", { level: 1, name: "Deliberately wrong" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Sual-Cavab" })).toBeInTheDocument();
   });
 });
