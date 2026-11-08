@@ -1,12 +1,12 @@
 from django.db import transaction
-from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from projects.models import Membership, Project
+from projects.models import Project
+from projects.permissions import lock_caller_membership
 
 from .models import Question
 from .serializers import QuestionSerializer, TransitionSerializer
@@ -50,28 +50,21 @@ class QuestionViewSet(
             raise ValidationError({"status": [f"Use any of: {', '.join(Question.Status.values)} (comma-separated)."]})
         return queryset.filter(status__in=wanted)
 
-    def require_membership(self):
-        """Re-check, under a row lock, that the caller is still a member.
-
-        initial() checked membership before any lock. Removing a member locks
-        the project's membership rows, so locking the caller's row here makes a
-        member removed mid-request get a 404 instead of one more write.
-        """
-        row = Membership.objects.select_for_update().filter(project=self.project, user=self.request.user).first()
-        if row is None:
-            raise Http404
+    # Every write below locks the caller's membership row FIRST (it also re-checks
+    # that they are still a member), then the project or question row: one lock
+    # order everywhere, or concurrent requests deadlock. See projects/permissions.py.
 
     @transaction.atomic
     def perform_update(self, serializer):
-        self.require_membership()
+        lock_caller_membership(self.project, self.request.user)
         serializer.save()
 
     @transaction.atomic
     def perform_create(self, serializer):
+        lock_caller_membership(self.project, self.request.user)
         # Lock the project row to take the next number: concurrent creates
         # queue here, so numbers are unique and never reused.
         project = Project.objects.select_for_update().get(pk=self.project.pk)
-        self.require_membership()
         number = project.next_question_number
         Project.objects.filter(pk=project.pk).update(next_question_number=number + 1)
         serializer.save(project=project, number=number, created_by=self.request.user)
@@ -81,8 +74,8 @@ class QuestionViewSet(
         payload = TransitionSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
         with transaction.atomic():
+            lock_caller_membership(self.project, request.user)
             locked = get_object_or_404(Question.objects.select_for_update().filter(project=self.project), number=number)
-            self.require_membership()
             try:
                 change_status(locked, payload.validated_data["to"], request.user, payload.validated_data.get("answer"))
             except TransitionNotAllowed as err:

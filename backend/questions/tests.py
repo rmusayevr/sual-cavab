@@ -613,6 +613,89 @@ class RemovedMidRequestTests(QuestionTestCase):
         self.assertEqual(self.db_question(1).text, "Original")
 
 
+class LockOrderTests(QuestionTestCase):
+    """Review round 2 of #21: every path locks the caller's membership row FIRST,
+    then the project or question row. Removing a member locks only membership
+    rows, so one global order means no cycle can form between a write and a
+    removal, or between two writes by the same user. These tests read the order
+    from the SQL each request runs."""
+
+    def sql_of(self, do):
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as ctx:
+            do()
+        return [q["sql"] for q in ctx.captured_queries]
+
+    def first_index(self, queries, *needles):
+        return next(i for i, sql in enumerate(queries) if all(n in sql for n in needles))
+
+    def assert_membership_locked_before(self, queries, *later_needles):
+        membership = self.first_index(queries, 'FROM "projects_membership"', "FOR UPDATE")
+        later = self.first_index(queries, *later_needles)
+        self.assertLess(membership, later, "the membership row must be locked before the row it protects")
+
+    def test_creating_a_question_locks_the_membership_before_the_project(self):
+        queries = self.sql_of(lambda: self.ask())
+
+        self.assert_membership_locked_before(queries, 'FROM "projects_project"', "FOR UPDATE")
+
+    def test_changing_a_status_locks_the_membership_before_the_question(self):
+        self.ask()
+
+        queries = self.sql_of(lambda: self.move(1, "asked"))
+
+        self.assert_membership_locked_before(queries, 'FROM "questions_question"', "FOR UPDATE")
+
+    def test_editing_a_question_locks_the_membership_before_writing_it(self):
+        self.ask()
+
+        queries = self.sql_of(
+            lambda: self.as_user(self.owner).patch(self.url(number=1), {"text": "Reworded"}, format="json")
+        )
+
+        self.assert_membership_locked_before(queries, 'UPDATE "questions_question"')
+
+
+class SameUserConcurrencyTests(TransactionTestCase):
+    """The same person saving a question's text while changing its status (two
+    tabs, or two quick clicks) must never deadlock into a 500."""
+
+    def test_editing_and_changing_status_at_the_same_time_never_fails(self):
+        owner = make_user("owner@example.com")
+        project = Project.objects.create(name="Ticketing", client_name="Invented Client", created_by=owner)
+        Membership.objects.create(project=project, user=owner, role=Membership.Role.OWNER)
+        client = APIClient()
+        client.force_authenticate(owner)
+        base = f"/api/projects/{project.pk}/questions/"
+        client.post(base, {"text": "Original"}, format="json")
+        outcomes, errors = [], []
+
+        def call(method, path, body):
+            try:
+                c = APIClient()
+                c.force_authenticate(owner)
+                outcomes.append(getattr(c, method)(path, body, format="json").status_code)
+            except Exception as exc:  # pragma: no cover - reported below
+                errors.append(repr(exc))
+            finally:
+                connections.close_all()
+
+        for i in range(12):
+            to = "asked" if i % 2 == 0 else "open"
+            pair = [
+                threading.Thread(target=call, args=("patch", base + "1/", {"text": f"Edit {i}"})),
+                threading.Thread(target=call, args=("post", base + "1/transition/", {"to": to})),
+            ]
+            for t in pair:
+                t.start()
+            for t in pair:
+                t.join()
+
+        self.assertEqual(errors, [])
+        self.assertEqual(set(outcomes), {200})
+
+
 class DataSafetyTests(QuestionTestCase):
     def test_the_database_stores_utf8(self):
         with connection.cursor() as cursor:

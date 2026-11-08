@@ -22,7 +22,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save(update_fields=[*validated_data, "updated_at"])
-        return instance
+        # Answer with the row as it is now, not the copy loaded earlier.
+        return Project.objects.prefetch_related("memberships").get(pk=instance.pk)
 
     def get_my_role(self, project):
         user = self.context["request"].user

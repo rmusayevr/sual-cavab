@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from .models import Membership, Project
-from .permissions import role_may_manage_members
+from .permissions import lock_caller_membership, role_may_manage_members
 from .serializers import AddMemberSerializer, MemberSerializer, ProjectSerializer
 from .throttles import MemberAddThrottle
 
@@ -49,6 +49,11 @@ class ProjectViewSet(
         if self.action == "members" and self.request.method == "POST":
             return [MemberAddThrottle()]
         return super().get_throttles()
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        lock_caller_membership(serializer.instance, self.request.user)  # first: see permissions.py
+        serializer.save()
 
     @transaction.atomic
     def perform_create(self, serializer):
