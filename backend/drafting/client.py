@@ -11,6 +11,9 @@ import os
 import anthropic
 
 # Decided on #9: 30 seconds, one retry.
+# Pinned so an ANTHROPIC_BASE_URL in the environment cannot send question text
+# anywhere else; the constructor argument wins over the environment.
+API_BASE_URL = "https://api.anthropic.com"
 TIMEOUT_SECONDS = 30.0
 MAX_RETRIES = 1
 # A safety bound, not the target length: the prompt asks for a short message.
@@ -37,7 +40,9 @@ class DraftClient:
 
 class AnthropicDraftClient(DraftClient):
     def __init__(self, api_key):
-        self._client = anthropic.Anthropic(api_key=api_key, timeout=TIMEOUT_SECONDS, max_retries=MAX_RETRIES)
+        self._client = anthropic.Anthropic(
+            api_key=api_key, base_url=API_BASE_URL, timeout=TIMEOUT_SECONDS, max_retries=MAX_RETRIES
+        )
 
     def __repr__(self):
         return "<AnthropicDraftClient>"  # never the key

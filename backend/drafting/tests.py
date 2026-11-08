@@ -48,7 +48,7 @@ from .client import (
     DraftingNotConfigured,
     get_client,
 )
-from .config import validate_drafting_model
+from .config import DEFAULT_MODEL, validate_drafting_model, validate_sdk_environment
 from .prompt import MAX_FIELD_CHARS, SYSTEM_PROMPT, build_prompt
 from .throttles import DraftThrottle
 from .views import COULD_NOT_WRITE, NOT_SET_UP
@@ -214,7 +214,15 @@ class DataSentTests(DraftTestCase):
     def test_the_configured_model_is_the_one_used(self):
         _, fake = self.draft(self.member, [1])
         self.assertEqual(fake.calls[0]["model"], settings.DRAFTING_MODEL)
-        self.assertEqual(settings.DRAFTING_MODEL, "claude-sonnet-5-5")
+
+    @override_settings(DRAFTING_MODEL="claude-haiku-5-5")
+    def test_a_different_allowed_model_is_used_when_configured(self):
+        _, fake = self.draft(self.member, [1])
+        self.assertEqual(fake.calls[0]["model"], "claude-haiku-5-5")
+
+    def test_the_default_model_is_sonnet(self):
+        # The constant, not settings: a developer's environment may set another model.
+        self.assertEqual(DEFAULT_MODEL, "claude-sonnet-5-5")
 
     def test_the_response_is_the_draft_text_and_is_not_cached(self):
         response, _ = self.draft(self.member, [1])
@@ -480,6 +488,25 @@ class ModelGuardTests(SimpleTestCase):
                     validate_drafting_model(blank)
 
 
+class SdkEnvironmentTests(SimpleTestCase):
+    def test_request_body_logging_is_refused(self):
+        for value in ("debug", "DEBUG", " Debug "):
+            with self.subTest(value=value):
+                with self.assertRaises(ImproperlyConfigured) as caught:
+                    validate_sdk_environment({"ANTHROPIC_LOG": value})
+                self.assertIn("ANTHROPIC_LOG", str(caught.exception))
+
+    def test_other_values_and_no_value_are_fine(self):
+        for env in ({}, {"ANTHROPIC_LOG": ""}, {"ANTHROPIC_LOG": "info"}, {"ANTHROPIC_LOG": "warn"}):
+            with self.subTest(env=env):
+                validate_sdk_environment(env)
+
+    def test_a_base_url_in_the_environment_does_not_redirect_the_client(self):
+        with mock.patch.dict(os.environ, {"ANTHROPIC_BASE_URL": "https://example.invalid"}):
+            client = AnthropicDraftClient(FAKE_KEY)
+        self.assertEqual(str(client._client.base_url).rstrip("/"), "https://api.anthropic.com")
+
+
 class StartupRefusalTests(SimpleTestCase):
     """The server really does refuse to start: run Django with the setting."""
 
@@ -504,6 +531,11 @@ class StartupRefusalTests(SimpleTestCase):
         result = self.run_check(DRAFTING_MODEL="claude-mythos-5")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Covered Model", result.stderr)
+
+    def test_request_body_logging_stops_the_server_before_it_starts(self):
+        result = self.run_check(ANTHROPIC_LOG="debug")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ANTHROPIC_LOG", result.stderr)
 
     def test_the_default_model_starts(self):
         result = self.run_check(DRAFTING_MODEL="")
@@ -539,7 +571,9 @@ class ClientTests(SimpleTestCase):
 
     def test_the_sdk_is_set_up_with_the_key_the_timeout_and_one_retry(self):
         _, sdk = self.make()
-        sdk.assert_called_once_with(api_key=FAKE_KEY, timeout=30.0, max_retries=1)
+        sdk.assert_called_once_with(
+            api_key=FAKE_KEY, base_url="https://api.anthropic.com", timeout=30.0, max_retries=1
+        )
         self.assertEqual((TIMEOUT_SECONDS, MAX_RETRIES), (30.0, 1))
 
     def test_the_request_has_only_what_it_needs(self):
@@ -592,6 +626,8 @@ class ClientTests(SimpleTestCase):
                     self.draft(client)
                 self.assertEqual(str(caught.exception), type(error).__name__)
                 self.assertNotIn(FAKE_KEY, str(caught.exception))
+                # `from None`: the SDK error (which can echo the prompt) is not chained.
+                self.assertTrue(caught.exception.__suppress_context__)
                 self.assertIsNone(caught.exception.__cause__)
 
     def test_the_key_is_not_in_the_clients_repr(self):

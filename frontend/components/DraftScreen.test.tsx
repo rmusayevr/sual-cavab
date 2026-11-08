@@ -197,6 +197,12 @@ describe("DraftScreen: when drafting does not work", () => {
     expect(await fails(() => Promise.reject(new Error("offline")))).toHaveTextContent(/could not reach the server/i);
   });
 
+  it("does not claim the project is gone when the session has ended (403)", async () => {
+    expect(await fails(() => json(403, { detail: "Authentication credentials were not provided." }))).toHaveTextContent(
+      /signed out\. Sign in again/i,
+    );
+  });
+
   it("falls back to a plain message for a reply it cannot read", async () => {
     expect(await fails(() => new Response("<html>oops</html>", { status: 500 }))).toHaveTextContent(
       "Could not write the draft.",
@@ -226,9 +232,33 @@ describe("DraftScreen: when drafting does not work", () => {
     await pick("Q1");
     fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
     await screen.findByDisplayValue("First draft");
-    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
+    fireEvent.click(screen.getByRole("button", { name: /write a new draft/i }));
     await screen.findByRole("alert");
     expect(screen.getByDisplayValue("First draft")).toBeInTheDocument();
+  });
+});
+
+describe("DraftScreen: a draft that is already on screen", () => {
+  const shown = async () => {
+    draftBackend({ [DRAFT]: () => json(200, { draft: "First draft", model: "m" }) });
+    render(<DraftScreen />);
+    await pick("Q1");
+    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
+    await screen.findByDisplayValue("First draft");
+  };
+
+  it("says that writing again replaces it", async () => {
+    await shown();
+    expect(screen.getByRole("button", { name: /write a new draft \(replaces the one below\)/i })).toBeInTheDocument();
+  });
+
+  it("warns when the ticked questions no longer match the draft", async () => {
+    await shown();
+    expect(screen.queryByText(/ticked questions have changed/i)).not.toBeInTheDocument();
+    await pick("Q2");
+    expect(screen.getByText(/ticked questions have changed/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: /^Q2\b/ })); // back to the same set
+    expect(screen.queryByText(/ticked questions have changed/i)).not.toBeInTheDocument();
   });
 });
 
@@ -252,6 +282,15 @@ describe("DraftScreen: copying", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     expect(await screen.findByText("Copied.")).toBeInTheDocument();
     expect(writeText).toHaveBeenCalledWith("Edited draft");
+  });
+
+  it("stops saying Copied once the text is edited", async () => {
+    withClipboard(async () => {});
+    const box = await draftShown();
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await screen.findByText("Copied.");
+    fireEvent.change(box, { target: { value: "Changed after copying" } });
+    expect(screen.queryByText("Copied.")).not.toBeInTheDocument();
   });
 
   it("tells the person to copy by hand when the browser refuses", async () => {

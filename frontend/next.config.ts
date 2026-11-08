@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
   // Django's URLs end in "/". Without this, Next.js 308-redirects /api/x/ to
   // /api/x before the rewrite, and a POST would lose its body.
   skipTrailingSlashRedirect: true,
+  // The proxy gives up on a backend request after 30 s by default and answers a
+  // plain 500. A draft can take 30 s per attempt plus one retry (#9), so without
+  // this the browser saw a 500 while Django finished a paid call nobody read.
+  experimental: { proxyTimeout: 90_000 },
   async rewrites() {
     // Same origin for the browser: session and CSRF cookies stay first-party
     // and no CORS setup is needed (#4). `:path*` drops the trailing slash, and

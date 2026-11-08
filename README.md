@@ -154,7 +154,9 @@ answer, shown as "Earlier answer".
 `/projects/<id>/draft`: pick open or asked questions (up to 10) and get a
 **draft** message, in Azerbaijani with technical terms kept in English, as text
 in a box you can edit and copy. **The app never sends anything**: there is no
-email or chat integration, and a test fails if the drafting code gains one.
+email or chat integration, and a test fails if a module of the drafting package
+imports anything that can send (mail, sockets, HTTP clients; the Claude SDK is
+allowed in one file only).
 Nothing is stored: close the page and the draft is gone.
 
 **What goes to the Claude API** (owner's decision on #9): for each selected
@@ -178,7 +180,10 @@ Set up (see `backend/.env.example`):
   retention, and the owner decided drafting must not use them.
 - If Claude fails (timeout, rate limit, refusal, empty or cut-off answer) the
   person sees "The draft could not be written. Try again in a minute." Nothing
-  the API sent back is shown or logged; logs hold counts and error class names.
+  the API sent back is shown or logged; the `drafting` log lines hold counts and
+  error class names, and `ANTHROPIC_LOG=debug` (which would log request bodies)
+  makes the server refuse to start. The API address is fixed in code, so an
+  `ANTHROPIC_BASE_URL` in the environment is ignored.
 
 Not checked by any test: a real call to the API (tests use a fake client). The
 first real draft has to be made by hand once the key is set.

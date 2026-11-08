@@ -16,6 +16,19 @@ DEFAULT_MODEL = "claude-sonnet-5-5"
 COVERED_MODEL_MARKERS = ("fable", "mythos")
 
 
+def validate_sdk_environment(environ):
+    """Refuse a setting that would write the prompt (question text) to a log.
+
+    The Anthropic SDK reads ANTHROPIC_LOG; at "debug" it logs every request
+    body. The owner decided on #9 that question text is never logged.
+    """
+    if (environ.get("ANTHROPIC_LOG") or "").strip().lower() == "debug":
+        raise ImproperlyConfigured(
+            "ANTHROPIC_LOG=debug makes the Anthropic SDK log every request body, which holds question text. "
+            "The owner decided on #9 that question text is never logged. Unset ANTHROPIC_LOG."
+        )
+
+
 def validate_drafting_model(model):
     """Return `model`, or refuse it with a message that says why."""
     if not isinstance(model, str) or not model.strip():

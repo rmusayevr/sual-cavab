@@ -10,7 +10,7 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
-from drafting.config import DEFAULT_MODEL, validate_drafting_model
+from drafting.config import DEFAULT_MODEL, validate_drafting_model, validate_sdk_environment
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -172,3 +172,13 @@ if DEBUG and not CSRF_TRUSTED_ORIGINS:
 
 # Drafting (#9). A Fable or Mythos model makes the server refuse to start.
 DRAFTING_MODEL = validate_drafting_model(os.environ.get("DRAFTING_MODEL") or DEFAULT_MODEL)
+validate_sdk_environment(os.environ)
+
+# Drafting logs counts and error class names only (never question text or
+# anything the API sent back); this makes those lines reach the server log.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"drafting": {"handlers": ["console"], "level": "INFO"}},
+}

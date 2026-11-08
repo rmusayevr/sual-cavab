@@ -22,7 +22,9 @@ async function explain(response: Response): Promise<string> {
   if (response.status === 503) return "Drafting is not set up on this server.";
   if (response.status === 429) return "You have asked for a lot of drafts. Try again later.";
   if (response.status === 502) return "The draft could not be written. Try again in a minute.";
-  if (response.status === 404 || response.status === 403) return "This project is not available.";
+  if (response.status === 404) return "This project is not available.";
+  // SessionAuthentication answers 403 for a signed-out session or a failed CSRF check too.
+  if (response.status === 403) return "This project is not available, or you have been signed out. Sign in again.";
   try {
     const messages = Object.values(fieldErrors(await response.json()));
     if (messages.length > 0) return messages.join(" ");
@@ -41,6 +43,7 @@ export default function DraftScreen() {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [picked, setPicked] = useState<number[]>([]);
   const [draft, setDraft] = useState<string | null>(null);
+  const [draftFor, setDraftFor] = useState<number[]>([]); // the questions the current draft was written for
   const [writing, setWriting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"yes" | "failed" | null>(null);
@@ -87,7 +90,10 @@ export default function DraftScreen() {
         method: "POST",
         body: { questions: [...picked].sort((a, b) => a - b) },
       });
-      if (response.ok) setDraft(((await response.json()) as { draft: string }).draft);
+      if (response.ok) {
+        setDraft(((await response.json()) as { draft: string }).draft);
+        setDraftFor([...picked].sort((a, b) => a - b));
+      }
       else setError(await explain(response));
     } catch {
       setError("Could not reach the server.");
@@ -96,6 +102,9 @@ export default function DraftScreen() {
       setWriting(false);
     }
   }
+
+  const sortedPicked = [...picked].sort((a, b) => a - b);
+  const draftIsStale = draft !== null && draftFor.join(",") !== sortedPicked.join(",");
 
   async function copy() {
     try {
@@ -145,7 +154,7 @@ export default function DraftScreen() {
           </p>
           <div>
             <button type="submit" disabled={writing || picked.length === 0}>
-              {writing ? "Writing…" : "Write a draft"}
+              {writing ? "Writing…" : draft !== null ? "Write a new draft (replaces the one below)" : "Write a draft"}
             </button>
           </div>
         </form>
@@ -156,7 +165,16 @@ export default function DraftScreen() {
       {draft !== null && (
         <section style={{ marginTop: "1.5rem", display: "grid", gap: "0.5rem" }}>
           <label htmlFor="draft-text">Draft (edit it before you send it)</label>
-          <textarea id="draft-text" rows={10} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          {draftIsStale && <p role="status">The ticked questions have changed since this draft was written.</p>}
+          <textarea
+            id="draft-text"
+            rows={10}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setCopied(null); // "Copied." no longer describes what is in the box
+            }}
+          />
           <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
             <button type="button" onClick={copy}>
               Copy
