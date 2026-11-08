@@ -2,7 +2,7 @@
   "harness": "0.2.0",
   "profile": "full",
   "command": "install --profile full",
-  "installedAt": "2026-11-08T15:06:15.995Z",
+  "installedAt": "2026-11-08T15:21:45.823Z",
   "source": "C:/Users/ADMIN/Desktop/Projects/claude-harness",
   "files": [
     {
@@ -303,7 +303,7 @@
       "to": ".claude/skills/work-the-queue/SKILL.md",
       "from": "skills/work-the-queue/SKILL.md",
       "kind": "skill",
-      "sha": "ce2b1a5784b70475"
+      "sha": "9aef5b5af000fd19"
     },
     {
       "to": ".claude/skills/write-a-bug-report/SKILL.md",
@@ -345,13 +345,13 @@
       "to": ".claude/agents/fresh-eyes-reviewer.md",
       "from": "agents/fresh-eyes-reviewer.md",
       "kind": "agent",
-      "sha": "27bfe0feabfd7e23"
+      "sha": "ae9279fc57b264e3"
     },
     {
       "to": ".claude/hooks/guard-merge.mjs",
       "from": "hooks/guard-merge.mjs",
       "kind": "hook",
-      "sha": "16fe9c5e10283f1a"
+      "sha": "b0abc87487b332a5"
     },
     {
       "to": ".claude/hooks/guard-prod-ddl.mjs",
@@ -363,7 +363,7 @@
       "to": ".claude/hooks/guard-risky-ops.mjs",
       "from": "hooks/guard-risky-ops.mjs",
       "kind": "hook",
-      "sha": "100be7a74c0ecf8d"
+      "sha": "48ebbc4dbecc2c67"
     },
     {
       "to": ".claude/hooks/harness-usage.mjs",

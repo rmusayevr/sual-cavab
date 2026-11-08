@@ -22,7 +22,7 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-merge.mjs\"",
-            "timeout": 10
+            "timeout": 20
           }
         ]
       },
