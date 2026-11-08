@@ -30,13 +30,196 @@ const base = (p) => {
 /** Strip one layer of surrounding quotes from a shell token. */
 const unquote = (t) => t.replace(/^['"]|['"]$/g, '');
 
-/** Split a compound shell command into independently-evaluated segments. */
-function segments(command) {
+/**
+ * Split a shell command into the segments that run independently: on `&&`,
+ * `||`, `;`, `|`, a lone `&` and newlines, outside quotes.
+ *
+ * What it understands, and why each one is here:
+ * - Quotes. Text inside quotes is not a command, so a `.env` path in a quoted
+ *   loop list is not judged as a write (sual-cavab PR #13).
+ * - Comments. `#` at the start of a word runs to the end of the line, so the
+ *   apostrophe in `# don't` does not open a quote that swallows every later
+ *   line (sual-cavab PR #16).
+ * - Heredocs. A body fed to `cat` or `node` is data and is skipped; a body
+ *   fed to a shell (`bash <<EOF`) is commands and is checked.
+ * - Arithmetic. `<<` inside `$(( ))` is a shift, not a heredoc.
+ * - Nested commands. The string after `bash -c`, `sh -c`, `su -c`, `eval` or
+ *   `ssh host` is a command too, so it is split and returned as well. So is
+ *   the inside of `( )`, `{ }` and `$( )`.
+ * - Keywords. `then`, `do`, `else`, `!`, `time` and friends are dropped from
+ *   the front of a segment, so `then rm -rf ~` is seen as `rm -rf ~`.
+ *
+ * Not understood, so not checked: backtick substitutions, commands
+ * assembled from variables, and scripts that do the work themselves. That
+ * under-blocks, like every other undecidable case here.
+ */
+const SHELL = /^\s*(?:sudo\s+)?(?:[\w./-]*\/)?(?:bash|sh|zsh|dash|ksh)\b/;
+const KEYWORDS = /^(?:(?:then|do|else|elif|if|while|until|time|!|\{)\s+)+/;
+
+/**
+ * Command strings handed to `bash -c`, `sh -c` or `eval` anywhere in a
+ * segment, so wrappers (`wsl -d Ubuntu -- bash -lc '...'`, `docker exec web
+ * sh -c "..."`) are seen. A shell word inside quotes is only text.
+ */
+function nestedCommands(seg) {
+  let masked = ''; // quoted content blanked, quote marks kept, same length
+  let q = null;
+  for (let i = 0; i < seg.length; i++) {
+    const c = seg[i];
+    if (q) {
+      if (c === '\\' && q === '"') { masked += '  '; i++; continue; }
+      if (c === q) q = null;
+      masked += c === q || q === null ? c : ' ';
+      continue;
+    }
+    if (c === '\\') { masked += c + (seg[i + 1] ?? ''); i++; continue; }
+    if (c === "'" || c === '"') q = c;
+    masked += c;
+  }
+  const quoted = (at) => {
+    const open = seg[at];
+    let body = '';
+    for (let i = at + 1; i < seg.length; i++) {
+      if (seg[i] === '\\' && open === '"') { body += seg[i + 1] ?? ''; i++; continue; }
+      if (seg[i] === open) break;
+      body += seg[i];
+    }
+    return body;
+  };
+  const out = [];
+  // Options may take a value (`-o pipefail`) before `-c`.
+  const shell = /(?:^|[\s;&|(])(?:[\w./-]*\/)?(?:bash|sh|zsh|dash|ksh)\s+(?:(?:[-+]o\s+\w+|-[a-zA-Z]+)\s+)*?-[a-zA-Z]*c[a-zA-Z]*\s+(['"])/g;
+  // `su [user] -c '...'` runs it as another user; `ssh host '...'` runs it remotely.
+  const su = /(?:^|[\s;&|(])su\b[^'"\n]*?\s-c\s+(['"])/g;
+  const ssh = /(?:^|[\s;&|(])ssh\s[^'"\n]*?(['"])/g;
+  for (const re of [shell, su, ssh]) for (const m of masked.matchAll(re)) out.push(quoted(m.index + m[0].length - 1));
+  for (const m of masked.matchAll(/(?:^|[\s;&|(])eval\s+/g)) {
+    const at = m.index + m[0].length;
+    if (seg[at] === '"' || seg[at] === "'") { out.push(quoted(at)); continue; }
+    // An unquoted eval runs the rest of the segment. Any later eval is inside
+    // that rest and is found when it is split, so stop here: pushing every
+    // suffix made `eval eval eval ...` grow as n^depth (sual-cavab PR #16,
+    // round 5: 400 evals took 22 s against a 10 s hook timeout).
+    out.push(seg.slice(at).replace(/^(?:eval\s+)+/, ''));
+    break;
+  }
+  return out;
+}
+
+// Most segments the shell-aware split may produce. Past it, nested strings are
+// not expanded further. That is never weaker than the release: the plain split
+// is checked as well and does not expand them at all.
+const MAX_SEGMENTS = 2000;
+
+function segments(command, depth = 0, budget = { left: MAX_SEGMENTS }) {
+  const s = String(command ?? '');
+  const out = [];
+  let cur = '';
+  let quote = null;
+  let arith = 0; // open `$((` count
+  let heredoc = null; // set by `<<TAG`; its body starts at the next newline
+  const push = () => {
+    const seg = cur.trim().replace(KEYWORDS, '');
+    cur = '';
+    if (!seg || seg === '}') return;
+    out.push(seg);
+    if (--budget.left <= 0 || depth >= 3) return;
+    for (const inner of nestedCommands(seg)) {
+      if (budget.left <= 0) break;
+      for (const x of segments(inner, depth + 1, budget)) out.push(x);
+    }
+  };
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (quote) {
+      // In "..." and in bash's $'...', a backslash escapes the next character.
+      if (c === '\\' && (quote === '"' || quote === '$')) { cur += c + (s[i + 1] ?? ''); i++; continue; }
+      if (c === (quote === '$' ? "'" : quote)) quote = null;
+      cur += c;
+      continue;
+    }
+    if (c === '\\') { cur += c + (s[i + 1] ?? ''); i++; continue; }
+    if (c === "'" || c === '"') { quote = c === "'" && cur.endsWith('$') ? '$' : c; cur += c; continue; }
+    if (c === '#' && (cur === '' || /[\s;&|(]$/.test(cur))) {
+      while (i + 1 < s.length && s[i + 1] !== '\n') i++; // comment: skip to end of line
+      continue;
+    }
+    if (c === '$' && s[i + 1] === '(' && s[i + 2] === '(') { arith++; cur += '$(('; i += 2; continue; }
+    if (arith > 0) {
+      if (c === ')' && s[i + 1] === ')') { arith--; cur += '))'; i++; continue; }
+      cur += c;
+      continue;
+    }
+    if (c === '<' && s[i + 1] === '<' && s[i + 2] !== '<') {
+      const m = s.slice(i).match(/^<<(-?)\s*(['"]?)([A-Za-z_][\w-]*)\2/);
+      if (m) {
+        // A shell reading the heredoc runs it: leave the body to be split.
+        if (!SHELL.test(cur)) heredoc = { tag: m[3], strip: m[1] === '-' };
+        cur += m[0];
+        i += m[0].length - 1;
+        continue;
+      }
+    }
+    if (c === '\n') {
+      push();
+      if (heredoc) {
+        // Skip the body, up to and including the line that is exactly the tag.
+        let j = i + 1;
+        for (;;) {
+          const end = s.indexOf('\n', j);
+          const line = s.slice(j, end === -1 ? s.length : end);
+          const bare = heredoc.strip ? line.replace(/^\t+/, '') : line;
+          if (bare.trim() === heredoc.tag || end === -1) { i = end === -1 ? s.length : end; break; }
+          j = end + 1;
+        }
+        heredoc = null;
+      }
+      continue;
+    }
+    if (c === ';') { push(); continue; }
+    if (c === '(' || c === ')') {
+      // Subshells, `$( )` and case patterns: what is inside runs on its own.
+      if (c === '(' && cur.endsWith('$')) cur = cur.slice(0, -1);
+      push();
+      continue;
+    }
+    if (c === '|') {
+      push();
+      if (s[i + 1] === '|' || s[i + 1] === '&') i++;
+      continue;
+    }
+    if (c === '&') {
+      if (s[i + 1] === '&') { push(); i++; continue; }
+      // `2>&1`, `<&3` and `&>file` redirect; they do not separate commands.
+      if (cur.endsWith('>') || cur.endsWith('<') || s[i + 1] === '>') { cur += c; continue; }
+      push();
+      continue;
+    }
+    cur += c;
+  }
+  push();
+  return out;
+}
+/**
+ * Every segment either splitter finds: the guards are never weaker than the
+ * plain split they started with.
+ *
+ * Two review rounds in sual-cavab (PRs #13 and #16) showed that each rule the
+ * shell-aware splitter added to remove a false positive also removed blocks
+ * the plain split caught by accident: heredocs piped to a shell, commands
+ * passed to `ssh` or `su -c`, quotes inside `$( )`. Patching case by case kept
+ * missing cases, so the guards check both and the most severe answer wins.
+ * The price is the plain split's old false positives, such as a `.env` path
+ * mentioned inside quotes; they were there before the shell-aware splitter.
+ */
+function plainSegments(command) {
   return String(command ?? '')
-    .split(/&&|\|\||[;|\n]/)
+    .split(/&&|\|\||[;|\n]/) // exactly the baseline split: no lone &
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+
 
 /** Tokenize a segment, dropping a leading `sudo` / env-var prefix. */
 function tokens(segment) {
@@ -214,18 +397,27 @@ function checkDeploy(t, segment) {
  * degrading to a silent allow; the hook had simply never been handed the call.
  *
  * Quoting is tracked properly, so `git commit -m "redirect output > .env"`
- * mentions a path and does not write one.
+ * mentions a path and does not write one. Backslash escapes count too: a
+ * `\"` inside double quotes does not close them, or a `=>` in quoted
+ * JavaScript reads as a redirect (replaying real commands, 2026-11-08).
+ *
+ * `escapes: false` is the released guard's naive reading, used for the
+ * plain split's fragments. Those can start mid-quote; reading `\"` as an
+ * escape there kept a quote open and hid a real `> .env` that the released
+ * guard caught (sual-cavab PR #16, round 4).
  */
-function redirectTargets(segment) {
+function redirectTargets(segment, escapes = true) {
   const s = String(segment);
   const out = [];
   let quote = null;
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
     if (quote) {
+      if (escapes && c === '\\' && quote === '"') { i++; continue; }
       if (c === quote) quote = null;
       continue;
     }
+    if (escapes && c === '\\') { i++; continue; }
     if (c === '"' || c === "'") { quote = c; continue; }
     if (c !== '>') continue;
 
@@ -252,8 +444,8 @@ function redirectTargets(segment) {
 /** `-i`, `-i.bak`, `-pi`, `--in-place` — an editor rewriting the file in place. */
 const IN_PLACE = (x) => x === '--in-place' || /^-{1,2}[a-zA-Z]*i[\w.]*$/.test(x);
 
-function writeTargets(t, segment) {
-  const out = redirectTargets(segment);
+function writeTargets(t, segment, escapes = true) {
+  const out = redirectTargets(segment, escapes);
   const cmd = base(t[0] ?? '');
   const rest = t.slice(1);
   const positional = rest.filter((x) => !x.startsWith('-'));
@@ -284,18 +476,22 @@ function fileExists(p) {
  * wrong the answer is "does not exist", which under-asks rather than
  * interrupting — the same direction every other undecidable case takes here.
  */
-function checkBashWrite(t, segment) {
-  for (const target of writeTargets(t, segment)) {
+function checkBashWrite(t, segment, escapes = true) {
+  // Every target, deny first: `tee config/production.json .env` asked about
+  // the config file and never looked at `.env` (sual-cavab PR #13 review).
+  let found = null;
+  for (const target of writeTargets(t, segment, escapes)) {
     const hit = checkWrite(target, fileExists(target));
-    if (hit) {
-      return {
-        ...hit,
-        rule: `${hit.rule}-via-bash`,
-        reason: `${hit.reason} Reached through a shell command, but it is the same file the Write guard covers.`,
-      };
-    }
+    if (!hit) continue;
+    if (!found || (hit.decision === 'deny' && found.decision !== 'deny')) found = hit;
+    if (found.decision === 'deny') break;
   }
-  return null;
+  if (!found) return null;
+  return {
+    ...found,
+    rule: `${found.rule}-via-bash`,
+    reason: `${found.reason} Reached through a shell command, but it is the same file the Write guard covers.`,
+  };
 }
 
 /**
@@ -308,13 +504,18 @@ function checkBashWrite(t, segment) {
  */
 const RULES = [checkGitPush, checkRm, checkGitDiscard, checkDeploy, checkBashWrite];
 
+/**
+ * The shell-aware segments are read with escapes; the plain split's are read
+ * exactly as the released guard read them. So the plain path IS the released
+ * guard, and this one cannot be weaker than it, only stricter.
+ */
 function checkBash(command) {
   let ask = null;
-  for (const segment of segments(command)) {
+  for (const [split, escapes] of [[segments(command), true], [plainSegments(command), false]]) for (const segment of split) {
     const t = tokens(segment);
     if (t.length === 0) continue;
     for (const rule of RULES) {
-      const hit = rule(t, segment);
+      const hit = rule(t, segment, escapes);
       if (!hit) continue;
       if (hit.decision === 'deny') return hit;
       ask ??= hit;
