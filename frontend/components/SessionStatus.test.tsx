@@ -70,6 +70,25 @@ describe("SessionStatus", () => {
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
   });
 
+  it("shows signed out when sign-out is refused because the session already ended", async () => {
+    let meCalls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/auth/me/") {
+        meCalls += 1;
+        return meCalls === 1
+          ? new Response(JSON.stringify({ id: 1, email: "ada@example.com", name: "" }), { status: 200 })
+          : new Response(JSON.stringify({ detail: "Authentication credentials were not provided." }), { status: 403 });
+      }
+      return new Response(JSON.stringify({ detail: "Authentication credentials were not provided." }), { status: 403 });
+    }));
+    render(<SessionStatus />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByRole("link", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("reports an unreachable server instead of claiming the user is signed out", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network down"); }));
 

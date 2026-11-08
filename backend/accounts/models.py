@@ -12,7 +12,9 @@ class UserManager(BaseUserManager):
 
     def get_by_natural_key(self, email):
         # Used by authenticate() and createsuperuser's "already exists" check.
-        return self.get(email__iexact=normalize_email(email))
+        # Emails are stored lower-cased (save() and _create_user), so an exact
+        # match on the normalized input ignores case and uses the unique index.
+        return self.get(email=normalize_email(email))
 
     def _create_user(self, email, password, **extra_fields):
         if not email:

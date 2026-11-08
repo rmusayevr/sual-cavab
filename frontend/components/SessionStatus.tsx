@@ -34,11 +34,18 @@ export default function SessionStatus() {
 
   // Only show "signed out" once the backend confirms it: on a shared computer,
   // a refused logout that looked successful would leave the session usable.
+  // A refusal can mean "already signed out" (403, no session) or "still signed
+  // in but the request was rejected" (403, CSRF): ask the backend which.
   async function signOut() {
     setSignOutFailed(false);
     try {
       const response = await apiFetch("/api/auth/logout/", { method: "POST" });
-      if (response.ok) setState({ kind: "signed-out" });
+      if (response.ok) {
+        setState({ kind: "signed-out" });
+        return;
+      }
+      const me = await apiFetch("/api/auth/me/");
+      if (me.status === 401 || me.status === 403) setState({ kind: "signed-out" });
       else setSignOutFailed(true);
     } catch {
       setSignOutFailed(true);

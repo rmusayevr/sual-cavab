@@ -46,6 +46,7 @@ If you ran `migrate` before accounts existed (#4), that database still has
 Django's default user table and `migrate` now stops with
 `InconsistentMigrationHistory`. It holds no project data yet: drop and recreate
 the database, then migrate again.
+
 Run the tests with `python manage.py test`. Environment variables already set
 in your shell win over `backend/.env`.
 
