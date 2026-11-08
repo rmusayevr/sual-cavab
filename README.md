@@ -43,19 +43,34 @@ cd ../frontend && npm run lint && npm run typecheck && npm test && npm run build
 
 Things to know:
 
+- **Every compose command needs `--env-file backend/.env`** (also `ps`, `logs`,
+  `down`), or `export COMPOSE_ENV_FILES=backend/.env` once in your shell.
 - **The port comes from `backend/.env`** (`POSTGRES_PORT`), and the backend
-  reads the same file, so the two cannot disagree. It must not clash with a
+  reads the same file. The example uses 5433. It must not clash with a
   PostgreSQL already on your machine: a native install usually holds 5432, and
   talking to the wrong server shows up as password errors rather than "wrong
   port". Pick another, for example 5433. A `POSTGRES_PORT` exported in your
   shell wins over the file, for compose and for the backend alike.
+- **Compose and the backend read `backend/.env` a little differently**: compose
+  expands a `$` and drops a trailing `# comment`, the backend does neither. A
+  password such as `pa$word1`, or `POSTGRES_PORT=5433  # mine`, gives compose
+  one value and Django another, and the sign-in fails. Keep `$` and inline
+  comments out of the `POSTGRES_*` lines (or use single quotes).
 - **The database listens on this machine only** (127.0.0.1 and ::1), and is for
   local work. Staging and production are a separate matter. Both addresses are
   bound on purpose: with only IPv4, `POSTGRES_HOST=localhost` made every
   connection wait 10 seconds on Windows with Docker Desktop (it tries `::1`
-  first). If your Docker has no IPv6 and `up` fails on the `[::1]` line, delete
-  that line from
-  `docker-compose.yml` and set `POSTGRES_HOST=127.0.0.1` in `backend/.env`.
+  first). If your Docker has no IPv6 and `up` fails on the `[::1]` line, create
+  a `docker-compose.override.yml` (git ignores it) next to `docker-compose.yml`
+  instead of editing the tracked file, and set `POSTGRES_HOST=127.0.0.1` in
+  `backend/.env`:
+
+  ```yaml
+  services:
+    db:
+      ports: !override
+        - "127.0.0.1:${POSTGRES_PORT}:5432"
+  ```
 - **The data lives in a named volume.** It survives `docker compose down` and a
   reboot. `docker compose --env-file backend/.env down -v` deletes it: that is
   the reset (then `up` again and `migrate`).
@@ -63,6 +78,8 @@ Things to know:
   created.** Changing them in `backend/.env` later does not change an existing
   database; reset it as above.
 - If a value is missing from `backend/.env`, compose stops and says which one.
+- The compose project is named `sual-cavab`, so two clones of the repository on
+  one machine share one container and one volume.
 - Prefer your own PostgreSQL? Skip the compose step and point the `POSTGRES_*`
   values in `backend/.env` at it.
 

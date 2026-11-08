@@ -3,9 +3,15 @@
 #   docker compose --env-file backend/.env up -d --wait db
 #
 # Database, user, password and host port come from backend/.env (the same
-# POSTGRES_* values the backend reads), so the two cannot disagree. Copy
-# backend/.env.example to backend/.env first; a missing value stops compose
-# with a message instead of starting a database nobody can sign in to.
+# POSTGRES_* values the backend reads). Copy backend/.env.example to
+# backend/.env first; a missing value stops compose with a message instead of
+# starting a database nobody can sign in to. EVERY compose command needs
+# --env-file backend/.env (or COMPOSE_ENV_FILES=backend/.env in your shell),
+# also `ps`, `logs` and `down`.
+#
+# Compose and the backend read that file a little differently: compose expands
+# a "$" and drops a trailing "# comment", the backend does neither. Keep $ and
+# inline comments out of the POSTGRES_* values (or use single quotes).
 #
 # This is for local work only: the port is bound to 127.0.0.1, the password is
 # whatever your .env says. Staging and production are a separate matter (#10).
@@ -25,14 +31,18 @@ services:
       # already uses (a native install often holds 5432).
       - "127.0.0.1:${POSTGRES_PORT:?set POSTGRES_PORT in backend/.env}:5432"
       # IPv6 loopback too: "localhost" often resolves to ::1 first, and when
-      # nothing listens there a connection waits ~10 s before falling back.
+      # nothing listens there a connection waits ~10 s before falling back
+      # (seen on Windows with Docker Desktop). A host without IPv6 can drop this
+      # line without editing this file: see "Local setup" in the README.
       - "[::1]:${POSTGRES_PORT:?set POSTGRES_PORT in backend/.env}:5432"
     volumes:
       # Named volume: the data survives `docker compose down`.
-      # `docker compose down -v` deletes it (the reset).
+      # `docker compose --env-file backend/.env down -v` deletes it (the reset).
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      # Over TCP (-h): the image's temporary start-up server listens on the
+      # socket only, so a socket check could say "ready" too early.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 12
