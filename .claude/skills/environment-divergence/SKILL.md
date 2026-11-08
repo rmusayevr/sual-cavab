@@ -55,11 +55,4 @@ an unexplained green after a red is not evidence.
 
 ## Incidents
 
-- **sual-cavab #15 and #10 (2026-11-08).** On Windows `localhost` is tried as
-  `::1` before `127.0.0.1`. A compose database published on IPv4 only made every
-  connection through `POSTGRES_HOST=localhost` wait 10 s (10.03 s vs 0.06 s
-  measured), so a 28-test run took 706 s; later, `LiveServerTestCase` tests on
-  `localhost` took 20 s each (the `core` tests went 130 s to 12 s on
-  `127.0.0.1`). CI on Linux showed neither. Bind both loopbacks or use
-  `127.0.0.1`; when something is slow only on Windows, time one connection to
-  each name first. (vault: `localhost-ipv6-windows`)
+_None recorded yet. `/promote-lesson` appends real occurrences here._

@@ -72,10 +72,4 @@ nothing, and it is much harder to argue for removing later than it was to add.
 
 ## Incidents
 
-- **sual-cavab #6 to #9, #15 (2026-11-08).** The backend suite took 8 to 11
-  minutes and was waited on in full, several times per issue, until the owner
-  asked why. Timing one password hash (0.54 s, times about 1,265 in the suite)
-  found the cause in minutes; a fast hasher under `manage.py test` took it from
-  683 s to 14 s. On #15, timing one connection (10 s) explained a 706-second
-  run after the fact. Time the smallest repeated unit before waiting for the
-  whole run again. (vault: `time-one-unit-before-waiting`)
+_None recorded yet. `/promote-lesson` appends real occurrences here._
