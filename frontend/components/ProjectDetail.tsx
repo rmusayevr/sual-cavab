@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Member, Project } from "@/lib/projects";
 
+import StillOpen from "./StillOpen";
+
 type State =
   | { kind: "loading" }
   | { kind: "ready"; project: Project; members: Member[] }
@@ -62,8 +64,7 @@ export default function ProjectDetail() {
           </li>
         ))}
       </ul>
-      <h2>Questions</h2>
-      <p>Questions for this project arrive with #6.</p>
+      <StillOpen key={id} projectId={id} />
     </>
   );
 }

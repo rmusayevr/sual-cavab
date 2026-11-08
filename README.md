@@ -131,6 +131,14 @@ what is allowed:
 - Editing a question's text overwrites the previous text (there is no edit
   history in v1).
 
+### Still open
+
+The project page lists what the project is waiting on: questions in status
+**open** or **asked**, each with its number, text, what it blocks and how long
+it has been open. The age counts from when the question was created; re-opening
+a question does not reset it. The project list shows the same count
+(`open_question_count`, computed in the database from the same two statuses).
+
 ## Built with claude-harness
 
 This project is built with [claude-harness](https://github.com/rmusayevr/claude-harness):

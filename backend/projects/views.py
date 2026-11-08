@@ -41,7 +41,7 @@ class ProjectViewSet(
     serializer_class = ProjectSerializer
 
     def get_queryset(self):
-        return Project.objects.visible_to(self.request.user).prefetch_related("memberships")
+        return Project.objects.visible_to(self.request.user).with_open_count().prefetch_related("memberships")
 
     def get_throttles(self):
         # Only adding a member is limited: it answers "does this email have an

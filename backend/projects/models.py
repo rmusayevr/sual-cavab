@@ -12,6 +12,20 @@ class ProjectQuerySet(models.QuerySet):
             return self.none()
         return self.filter(memberships__user=user).distinct()
 
+    def with_open_count(self):
+        """Annotate how many questions are still open (status open or asked).
+
+        distinct=True is cheap insurance if this is ever chained after a filter
+        that joins more than one row per project. Today visible_to() joins only
+        the caller's own membership row, so it is not what keeps the count right
+        (removing it left the tests green).
+        """
+        return self.annotate(
+            open_question_count=models.Count(
+                "questions", filter=models.Q(questions__status__in=["open", "asked"]), distinct=True
+            )
+        )
+
 
 class Project(models.Model):
     name = models.CharField(max_length=200)
