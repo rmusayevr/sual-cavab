@@ -65,6 +65,17 @@ describe("ProjectDetail", () => {
     expect(screen.getByText(/Blocks: Checkout/)).toBeInTheDocument();
   });
 
+  it("links to the screen where questions are added, edited and answered", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url, json(200, project))));
+
+    render(<ProjectDetail />);
+
+    expect(await screen.findByRole("link", { name: "Manage questions" })).toHaveAttribute(
+      "href",
+      "/projects/5/questions",
+    );
+  });
+
   it("shows not found for a project the backend hides", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json(404, { detail: "No Project matches the given query." })));
 
