@@ -6,6 +6,7 @@ The key is read from the environment when a client is made, never stored in
 settings, a module constant, a log line or an exception message.
 """
 
+import math
 import os
 import time
 
@@ -24,9 +25,12 @@ MAX_RETRIES = 1
 # We retry only if the server asks for a wait this short (or says nothing).
 MAX_RETRY_WAIT_SECONDS = 5.0
 DEFAULT_RETRY_WAIT_SECONDS = 1.0
-# The most one draft request can take, counting a connect, a write and a read
-# phase on each of two attempts plus the wait between. The Next.js proxy
-# timeout (frontend/next.config.ts) must be longer than this.
+# What one draft request takes at most in normal conditions: a connect, a write
+# and a read phase on each of two attempts plus the wait between. Not a hard
+# cap: the DNS lookup has no timeout, and the read timeout applies to each read,
+# so a slow resolver or a response trickled out in pieces can run longer (the
+# person then sees the web proxy's plain 500). The Next.js proxy timeout
+# (frontend/next.config.ts) is set above this.
 WORST_CASE_SECONDS = (MAX_RETRIES + 1) * (CONNECT_TIMEOUT_SECONDS + 2 * TIMEOUT_SECONDS) + MAX_RETRY_WAIT_SECONDS
 # A safety bound, not the target length: the prompt asks for a short message.
 # It is above the "about 600" the plan said because thinking tokens count
@@ -113,6 +117,8 @@ def retry_wait(err):
         if not (status in (408, 409, 429) or status >= 500):
             return None
         headers = err.response.headers
+        if (headers.get("x-should-retry") or "").strip().lower() == "false":
+            return None  # the server said a retry will not help
         requested = None
         try:
             if headers.get("retry-after-ms"):
@@ -121,6 +127,8 @@ def retry_wait(err):
                 requested = float(headers["retry-after"])
         except ValueError:
             requested = None  # an HTTP-date or junk: use the default wait
+        if requested is not None and math.isnan(requested):
+            requested = None  # "nan" parses as a float but is not a wait
         if requested is None:
             return DEFAULT_RETRY_WAIT_SECONDS
         if requested > MAX_RETRY_WAIT_SECONDS:

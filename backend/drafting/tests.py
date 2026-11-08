@@ -711,6 +711,23 @@ class ClientTests(SimpleTestCase):
         self.assertEqual(create.call_count, 1)
         self.assertLessEqual(MAX_RETRY_WAIT_SECONDS, 5.0)
 
+    def test_nan_and_infinite_waits_do_not_break_the_retry(self):
+        # float("nan") parses; time.sleep(nan) would raise and lose the real error class.
+        for value, expected in (("nan", 1.0), ("NaN", 1.0), ("inf", None), ("-inf", 0.0), ("-3", 0.0), (" 2 ", 2.0)):
+            with self.subTest(value=value):
+                err = status_error(anthropic.RateLimitError, 429, {"retry-after": value})
+                self.assertEqual(retry_wait(err), expected)
+        err = status_error(anthropic.RateLimitError, 429, {"retry-after-ms": "NaN"})
+        self.assertEqual(retry_wait(err), 1.0)
+
+    def test_a_server_that_says_do_not_retry_is_believed(self):
+        client, sdk = self.make()
+        create = sdk.return_value.messages.create
+        create.side_effect = [status_error(anthropic.InternalServerError, 503, {"x-should-retry": "false"})] * 2
+        with self.assertRaises(DraftingFailed):
+            self.draft(client)
+        self.assertEqual(create.call_count, 1)
+
     def test_an_unreadable_retry_after_falls_back_to_the_default_wait(self):
         err = status_error(anthropic.RateLimitError, 429, {"retry-after": "Wed, 21 Oct 2026 07:28:00 GMT"})
         self.assertEqual(retry_wait(err), 1.0)
