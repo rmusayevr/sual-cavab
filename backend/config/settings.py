@@ -60,7 +60,10 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "core",
+    "accounts",
 ]
+
+AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -116,8 +119,42 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    # Sign-in throttle counters (#4, owner's decision on #18): in PostgreSQL, so
+    # workers read the same counters, restarts keep them, and made-up emails
+    # can't push a real account's counter out (the 300-entry in-memory default
+    # evicted it). Culling only runs once the table passes MAX_ENTRIES: it then
+    # deletes expired rows, and live ones only if still over the limit. Until
+    # then expired rows accumulate (follow-up). DRF's update isn't atomic, so
+    # simultaneous requests can exceed the rate slightly. Needs
+    # `createcachetable`; without the table, sign-in fails closed with a 500.
+    "throttle": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "throttle_cache",
+        "OPTIONS": {"MAX_ENTRIES": 1_000_000},
+    },
+}
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    # Deny by default (#4): a view that forgets its permissions refuses anonymous users.
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    # Sign-in attempts per account (accounts.throttles.LoginPerAccountThrottle).
+    "DEFAULT_THROTTLE_RATES": {"login": os.environ.get("DJANGO_LOGIN_RATE", "10/min")},
+    # For any throttle keyed on the client address: how many proxies in front
+    # *append* to X-Forwarded-For. Keep 0 (use the connection address) unless
+    # something like nginx or a load balancer appends it. Next.js does not
+    # append: it passes a client-supplied value through, so 1 behind Next.js
+    # alone would trust a forged address (review of #18).
+    "NUM_PROXIES": int(os.environ.get("DJANGO_NUM_PROXIES") or 0),
 }
+
+# The browser talks to the Next.js origin, which proxies /api to Django, so a
+# POST's Origin header is the frontend's. Comma-separated full origins.
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+if DEBUG and not CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
