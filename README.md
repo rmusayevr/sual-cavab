@@ -68,6 +68,30 @@ the frontend: Next.js forwards `/api/*` to the backend, so the session cookie
 stays on one origin. Checks: `npm run lint`, `npm run typecheck`,
 `npm test`, `npm run build`.
 
+## Who can see or change a project
+
+Decided by the owner (#5). Access is checked in the query itself, so a project
+you are not on is a 404, the same as one that does not exist.
+
+| Action                              | Owner | Member | Not a member |
+|-------------------------------------|-------|--------|--------------|
+| See the project and its questions   | yes   | yes    | no (404)     |
+| Edit name, client, description      | yes   | yes    | no (404)     |
+| Add or remove members               | yes   | no     | no (404)     |
+| Add, edit and answer questions (#6) | yes   | yes    | no (404)     |
+| Delete the project                  | nobody in v1 (there is no delete endpoint) |
+
+- Any signed-in user can create a project and becomes its first owner.
+- The last active owner of a project cannot be removed (a deactivated owner
+  does not count, because they cannot manage the project).
+- Superusers have no special access through the API; they use `/admin/`.
+- Owners can only add people who already have an account (an admin creates
+  accounts). Because anyone can create a project and so become an owner, a
+  signed-in user can tell whether an email has an account by trying to add it.
+  Accepted for v1 (small, admin-created user base); attempts are limited to
+  about 30 an hour per user, failures included (a burst of parallel requests
+  can slightly exceed it).
+
 ## Built with claude-harness
 
 This project is built with [claude-harness](https://github.com/rmusayevr/claude-harness):

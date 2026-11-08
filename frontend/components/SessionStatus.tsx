@@ -59,7 +59,7 @@ export default function SessionStatus() {
       return (
         <>
           <p>
-            Signed in as {state.user.name || state.user.email}.{" "}
+            Signed in as {state.user.name || state.user.email}. <Link href="/projects">Your projects</Link>{" "}
             <button type="button" onClick={signOut}>
               Sign out
             </button>
