@@ -67,6 +67,15 @@ class SwitchTests(TestCase):
         output = load()
         self.assertNotIn(PASSWORD, output)
 
+    def test_a_weak_password_is_refused_and_nothing_is_created(self):
+        # all digits; too short (12 is the minimum); on Django's list of common passwords (12+ characters)
+        for weak in ("123456789012", "short-pw", "qwerty123456", "1q2w3e4r5t6y"):
+            with self.subTest(password=weak):
+                with self.assertRaises(CommandError) as caught:
+                    load(env={"DJANGO_DEMO_DATA": "1", "DEMO_PASSWORD": weak})
+                self.assertNotIn(weak, str(caught.exception))  # the weak value is not echoed back
+                self.assertEqual((Project.objects.count(), User.objects.count()), (0, 0))
+
 
 class RealDataGuardTests(TestCase):
     def test_refuses_when_the_database_holds_a_project_that_is_not_demo_data(self):
@@ -77,7 +86,7 @@ class RealDataGuardTests(TestCase):
         with self.assertRaises(CommandError) as caught:
             load()
 
-        self.assertIn("not demo projects", str(caught.exception))
+        self.assertIn("not created by a demo account", str(caught.exception))
         self.assertEqual(demo_state(), before)  # no demo account was added
 
     def test_runs_when_only_demo_projects_exist(self):
@@ -135,7 +144,24 @@ class IdempotenceTests(TestCase):
         first = demo_state()
         message = load()
         self.assertEqual(demo_state(), first)
-        self.assertIn("0 project(s) created, 2 already there", message)
+        self.assertIn("already loaded", message)
+
+    def test_a_project_a_visitor_made_with_a_demo_account_does_not_stop_a_restart(self):
+        load()
+        member = User.objects.get(email="demo.member@" + DEMO_DOMAIN)
+        Project.objects.create(name="Scribble by a visitor", client_name="Whoever", created_by=member)
+        before = demo_state()
+        load()  # must not raise (it used to, and a refusal kept staging from starting)
+        self.assertEqual(demo_state(), before)
+
+    def test_renaming_the_demo_projects_neither_stops_a_restart_nor_loads_a_second_copy(self):
+        load()
+        for number, project in enumerate(Project.objects.all()):
+            Project.objects.filter(pk=project.pk).update(name=f"Renamed by a visitor {number}")
+        before = demo_state()
+        load()
+        self.assertEqual(demo_state(), before)
+        self.assertEqual(Project.objects.count(), 2)
 
     def test_a_demo_project_that_exists_is_left_exactly_as_it_is(self):
         load()
@@ -199,3 +225,26 @@ class SignInTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 400)
+
+
+class StartCommandTests(TestCase):
+    """A refusal by load_demo_data must never keep the site from starting (the review of #28)."""
+
+    def start_command(self):
+        from pathlib import Path
+
+        from django.conf import settings
+
+        text = (Path(settings.BASE_DIR).parent / "render.yaml").read_text(encoding="utf-8")
+        start = text.index("startCommand: >-")
+        return " ".join(line.strip() for line in text[start:].splitlines()[1:8] if line.strip() and not line.strip().startswith("#"))
+
+    def test_the_site_starts_even_if_the_demo_loader_fails(self):
+        command = self.start_command()
+        self.assertIn("python manage.py load_demo_data ||", command)
+        self.assertNotIn("&& python manage.py load_demo_data &&", command)
+
+    def test_migrations_still_stop_the_start_if_they_fail(self):
+        # Only the demo loader is optional: a failed migrate must not start a half-working site.
+        command = self.start_command()
+        self.assertIn("python manage.py migrate --noinput && python manage.py createcachetable &&", command)

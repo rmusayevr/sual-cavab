@@ -93,7 +93,8 @@ def run(base, password, draft=False, out=print):
     by_name = {p["name"]: p for p in projects}
     for name, expected in EXPECTED_STILL_OPEN.items():
         got = by_name.get(name, {}).get("open_question_count")
-        check(f"{name}: {expected} still open on the project list", got == expected, f"got {got}")
+        why = "no project with this name: renamed, or the demo data was never loaded" if name not in by_name else f"got {got}"
+        check(f"{name}: {expected} still open on the project list", got == expected, why)
 
     ticketing = by_name.get(TICKETING)
     if ticketing:

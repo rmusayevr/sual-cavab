@@ -34,13 +34,15 @@ services:
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
     # Free instances have no shell and no pre-deploy command, so the start command
     # prepares the database: migrate, the sign-in counter table, then the demo
-    # data (a no-op unless DJANGO_DEMO_DATA=1, and it refuses a database that
-    # holds anything but demo projects). One worker with threads: a drafting
-    # request can run for minutes, and the timeout must outlast it (135 s).
+    # data (a no-op unless DJANGO_DEMO_DATA=1; it refuses a database with
+    # projects made by anyone but demo accounts). The loader is allowed to fail:
+    # a refusal must never keep the site down, and a free instance has no shell
+    # to fix it with. One worker with threads: a drafting request can run for
+    # minutes, and the timeout must outlast it (135 s).
     startCommand: >-
       python manage.py migrate --noinput
       && python manage.py createcachetable
-      && python manage.py load_demo_data
+      && (python manage.py load_demo_data || echo "load_demo_data did not run (see above); starting without it")
       && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
       --worker-class gthread --workers 1 --threads 4 --timeout 180
     healthCheckPath: /api/health/
@@ -55,6 +57,11 @@ services:
         value: .onrender.com
       - key: DJANGO_BEHIND_HTTPS
         value: "1"
+      # The API's address is public, and Django's admin sign-in has no rate limit
+      # (only the app's own sign-in has). Staging does not need the admin: the
+      # demo accounts come from load_demo_data.
+      - key: DJANGO_ADMIN_ENABLED
+        value: "0"
       - key: DJANGO_DATABASE_URL
         fromDatabase:
           name: sual-cavab-staging-db

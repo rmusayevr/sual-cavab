@@ -30,9 +30,11 @@ def database_from_url(url):
         raise ImproperlyConfigured("DJANGO_DATABASE_URL needs a host and a database name.")
 
     options = {}
-    for key, values in parse_qs(parts.query).items():
+    for key, values in parse_qs(parts.query, keep_blank_values=True).items():
         if key not in ALLOWED_OPTIONS:
             raise ImproperlyConfigured(f"DJANGO_DATABASE_URL: the option {key!r} is not supported.")
+        if not values[-1]:
+            raise ImproperlyConfigured(f"DJANGO_DATABASE_URL: the option {key!r} has no value.")
         options[key] = values[-1]
 
     entry = {

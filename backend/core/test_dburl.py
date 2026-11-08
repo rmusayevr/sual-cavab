@@ -67,6 +67,10 @@ class RefusalTests(SimpleTestCase):
     def test_an_unsupported_option_is_refused_not_ignored(self):
         self.assertIn("'options'", self.refused("postgresql://u:hunter2@host/name?options=-c%20x"))
 
+    def test_an_option_without_a_value_is_refused_not_dropped(self):
+        self.assertIn("'sslmode'", self.refused("postgresql://u:hunter2@host/name?sslmode="))
+        self.assertIn("'foo'", self.refused("postgresql://u:hunter2@host/name?foo"))
+
     def test_nonsense_is_refused(self):
         self.refused("not a url")
         self.refused("")

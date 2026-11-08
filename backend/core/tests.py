@@ -121,3 +121,32 @@ class DeployCheckTests(SimpleTestCase):
             [sys.executable, "-c", code], cwd=Path(settings.BASE_DIR), env={**base, "DJANGO_BEHIND_HTTPS": "1"}, capture_output=True, text=True, timeout=120
         )
         self.assertEqual(result.stdout.strip(), "False True True", result.stderr)
+
+
+class AdminSwitchTests(SimpleTestCase):
+    """DJANGO_ADMIN_ENABLED=0 removes /admin/ (its sign-in has no rate limit; #10)."""
+
+    def admin_reachable(self, **env):
+        base = {k: v for k, v in os.environ.items() if k != "DJANGO_ADMIN_ENABLED"}
+        code = (
+            "import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); django.setup(); "
+            "from django.urls import Resolver404, resolve\n"
+            "try:\n    resolve('/admin/login/'); print('reachable')\n"
+            "except Resolver404:\n    print('gone')"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code], cwd=Path(settings.BASE_DIR), env={**base, **env}, capture_output=True, text=True, timeout=120
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.strip()
+
+    def test_the_admin_is_on_by_default(self):
+        self.assertEqual(self.admin_reachable(), "reachable")
+
+    def test_the_admin_is_gone_when_switched_off(self):
+        for value in ("0", "false", "no"):
+            with self.subTest(value=value):
+                self.assertEqual(self.admin_reachable(DJANGO_ADMIN_ENABLED=value), "gone")
+
+    def test_the_app_itself_still_works_with_the_admin_off(self):
+        self.assertEqual(self.admin_reachable(DJANGO_ADMIN_ENABLED="1"), "reachable")

@@ -6,21 +6,29 @@ something to check.
 
 It is built to be safe to leave in the start-up command of a staging service:
 
-- It does nothing unless DJANGO_DEMO_DATA=1 is set, and it needs DEMO_PASSWORD
-  (12+ characters) from the environment. The password is never in the repo and
-  never printed.
-- It refuses to run if the database holds any project that is not one of the
-  demo projects, so it cannot add accounts with a shared password to a
-  database that holds real work.
-- It is idempotent and deletes nothing: a demo project that already exists is
-  left exactly as it is (an answer someone recorded stays), a demo account that
-  exists keeps its password.
+- It does nothing unless DJANGO_DEMO_DATA=1 is set (exactly "1"), and it needs
+  DEMO_PASSWORD from the environment: 12+ characters that also pass Django's
+  password validators. The password is never in the repo and never printed.
+- It refuses to run if any project was created by someone who is not a demo
+  account. That is what stops it adding accounts with a shared password to a
+  database that holds real work. It looks at who created a project, not at its
+  name, because a visitor on staging can rename a project but not its creator.
+  It is not a guarantee: a real database that has users but no projects yet
+  passes, so DJANGO_DEMO_DATA=1 belongs on a staging service only.
+- It loads once. If the demo owner already has any project the data is there
+  (or was renamed by a visitor) and nothing changes, so a restart is a no-op and
+  a visitor's renamed project cannot make it load a second copy. It deletes
+  nothing, and an existing demo account keeps its password.
+- A start-up command should still not depend on it succeeding (render.yaml
+  runs it with "||"): a refusal here must never keep the site down.
 """
 
 import os
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
@@ -105,6 +113,10 @@ def demo_password():
             f"DEMO_PASSWORD must be set in the environment, at least {MIN_PASSWORD_LENGTH} characters "
             "(it is the shared password of the demo accounts; it is never printed or committed)."
         )
+    try:
+        validate_password(password)  # not all digits, not a common password, and so on
+    except ValidationError as err:
+        raise CommandError("DEMO_PASSWORD is too weak: " + " ".join(err.messages)) from None
     return password
 
 
@@ -117,20 +129,24 @@ class Command(BaseCommand):
             return
         password = demo_password()
 
-        foreign = Project.objects.exclude(name__startswith=DEMO_PREFIX)
+        foreign = Project.objects.exclude(created_by__email__endswith="@" + DEMO_DOMAIN)
         if foreign.exists():
             raise CommandError(
-                f"Refusing to load demo data: this database holds {foreign.count()} project(s) that are not "
-                "demo projects. Demo accounts share one password and belong on a staging database only."
+                f"Refusing to load demo data: {foreign.count()} project(s) in this database were not created by "
+                "a demo account. Demo accounts share one password and belong on a staging database only."
             )
 
         with transaction.atomic():
             users = self.create_users(password)
-            created = [self.create_project(spec, users) for spec in PROJECTS]
+            if Project.objects.filter(created_by=users["owner"]).exists():
+                self.stdout.write("Demo data is already loaded: nothing changed.")
+                return
+            for spec in PROJECTS:
+                self.create_project(spec, users)
 
         self.stdout.write(
-            f"Demo data: {sum(created)} project(s) created, {len(PROJECTS) - sum(created)} already there; "
-            f"{len(users)} demo accounts. Sign in as {DEMO_USERS['owner'][0]}."
+            f"Demo data: {len(PROJECTS)} project(s) created; {len(users)} demo accounts. "
+            f"Sign in as {DEMO_USERS['owner'][0]}."
         )
 
     def create_users(self, password):
@@ -144,9 +160,7 @@ class Command(BaseCommand):
         return users
 
     def create_project(self, spec, users):
-        """Create one demo project with its members and questions. Returns True if it was created."""
-        if Project.objects.filter(name=spec["name"]).exists():
-            return False  # leave it exactly as it is
+        """Create one demo project with its members and questions."""
         project = Project.objects.create(
             name=spec["name"],
             client_name=spec["client_name"],
@@ -172,4 +186,3 @@ class Command(BaseCommand):
                     change_status(question, "answered", users["member"], step[1])
                 else:
                     change_status(question, step, users["member"])
-        return True
