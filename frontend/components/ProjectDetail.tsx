@@ -65,7 +65,8 @@ export default function ProjectDetail() {
         ))}
       </ul>
       <p>
-        <Link href={`/projects/${id}/questions`}>Manage questions</Link>
+        <Link href={`/projects/${id}/questions`}>Manage questions</Link> ·{" "}
+        <Link href={`/projects/${id}/draft`}>Draft a message</Link>
       </p>
       <StillOpen key={id} projectId={id} />
     </>

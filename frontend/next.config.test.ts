@@ -6,6 +6,10 @@ import nextConfig from "./next.config";
 // destination, POSTs through the proxy hit Django's APPEND_SLASH and fail with
 // a 500. Found running #4 end to end; unit tests of the components can't see it.
 describe("the /api proxy", () => {
+  it("waits longer than a drafting call can take (135 s: WORST_CASE_SECONDS in backend/drafting/client.py)", () => {
+    expect(nextConfig.experimental?.proxyTimeout).toBeGreaterThan(135_000);
+  });
+
   it("forwards to the backend with the trailing slash Django requires", async () => {
     const rewrites = await nextConfig.rewrites!();
     const list = Array.isArray(rewrites)
