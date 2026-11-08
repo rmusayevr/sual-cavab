@@ -1,0 +1,69 @@
+# Runs the same commands as `checks` in .claude/harness-loop.json, so a green
+# local run and a green CI run mean the same thing. Needs no secrets.
+name: CI
+
+on:
+  pull_request:
+    branches: [staging]
+  push:
+    branches: [staging]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Supersede runs on PR refs only. On staging every merge commit needs its own
+  # run to finish: the loop waits for it, and reads `cancelled` as a red base.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15 # a hang fails fast instead of holding the loop for GitHub's 6-hour default
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: sual_cavab
+          POSTGRES_USER: sual_cavab
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sual_cavab"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Invented, CI-only values. Not secrets: this database lives for one job.
+      DJANGO_SECRET_KEY: ci-only-not-a-secret
+      POSTGRES_DB: sual_cavab
+      POSTGRES_USER: sual_cavab
+      POSTGRES_PASSWORD: ci-only-password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - run: cd backend && python manage.py check
+      - run: cd backend && python manage.py makemigrations --check --dry-run
+      - run: cd backend && python manage.py test --noinput
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: cd frontend && npm ci
+      - run: cd frontend && npm run lint && npm run typecheck && npm test && npm run build
