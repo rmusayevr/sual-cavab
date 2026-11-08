@@ -60,7 +60,7 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
       append((await response.json()) as FullQuestion);
       return null;
     }
-    return await failure(response, "Could not add the question.");
+    return await failure(response, "Could not add the question.", [...QUESTION_FIELDS]);
   }
 
   return (
@@ -80,17 +80,31 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
   );
 }
 
-/** The messages in a refused response, keyed by field; a fallback if there are none. */
-async function failure(response: Response, fallback: string): Promise<Record<string, string>> {
+/**
+ * The messages in a refused response, keyed by the fields the form shows. A
+ * message about anything else (a gateway body, a field this form has no input
+ * for) goes under "form" instead of being dropped; "to" is kept so the caller
+ * can spot a refused move. A fallback if there is nothing readable.
+ */
+async function failure(response: Response, fallback: string, shown: string[]): Promise<Record<string, string>> {
   let body: unknown = null;
   try {
     body = await response.json();
   } catch {
     // not JSON (a proxy error page): fall through to the fallback
   }
-  const errors = fieldErrors(body);
+  const errors: Record<string, string> = {};
+  const extra: string[] = [];
+  for (const [key, message] of Object.entries(fieldErrors(body))) {
+    if (shown.includes(key) || key === "form" || key === "to") errors[key] = message;
+    else extra.push(message);
+  }
+  if (extra.length > 0) errors.form = [errors.form, ...extra].filter(Boolean).join(" ");
   return Object.keys(errors).length > 0 ? errors : { form: fallback };
 }
+
+const QUESTION_FIELDS = ["text", "why_it_matters", "blocks"] as const;
+const ANSWER_FIELDS = ["text", "answered_by", "answered_on", "channel", "channel_note"];
 
 type Mode = "view" | "edit" | "answer";
 
@@ -113,9 +127,20 @@ function QuestionItem({
     if (response.ok) {
       onChanged((await response.json()) as FullQuestion);
       setMode("view");
+      setMessage(null);
       return null;
     }
-    return await failure(response, "Could not change the status.");
+    const errors = await failure(response, "Could not change the status.", answer ? ANSWER_FIELDS : []);
+    if (errors.to) {
+      // The server says this move is not allowed, so what is on screen is out
+      // of date. Show the question as it is now, with the reason.
+      const fresh = await apiFetch(url);
+      if (fresh.ok) onChanged((await fresh.json()) as FullQuestion);
+      setMode("view");
+      setMessage(errors.to);
+      return null;
+    }
+    return errors;
   }
 
   async function move(to: QuestionStatus) {
@@ -132,13 +157,25 @@ function QuestionItem({
   }
 
   async function save(values: QuestionFields): Promise<SubmitResult> {
-    const response = await apiFetch(url, { method: "PATCH", body: values });
-    if (response.ok) {
-      onChanged((await response.json()) as FullQuestion);
+    // Send only the fields this person changed: one they did not touch may have
+    // been changed by a teammate since this page loaded, and sending the old
+    // value back would undo it (the API writes just the fields it is sent).
+    const changed: Partial<QuestionFields> = {};
+    for (const field of QUESTION_FIELDS) {
+      if (values[field] !== question[field]) changed[field] = values[field];
+    }
+    if (Object.keys(changed).length === 0) {
       setMode("view");
       return null;
     }
-    return await failure(response, "Could not save the question.");
+    const response = await apiFetch(url, { method: "PATCH", body: changed });
+    if (response.ok) {
+      onChanged((await response.json()) as FullQuestion);
+      setMode("view");
+      setMessage(null);
+      return null;
+    }
+    return await failure(response, "Could not save the question.", [...QUESTION_FIELDS]);
   }
 
   const id = `q${question.id}`;

@@ -51,7 +51,15 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
   }
 
   const id = (name: string) => `${idPrefix}-${name}`;
-  const error = (name: string) => errors[name] && <div role="alert">{errors[name]}</div>;
+  const error = (name: string) =>
+    errors[name] && (
+      <div role="alert" id={id(`${name}-error`)}>
+        {errors[name]}
+      </div>
+    );
+  /** Ties an input to its message, so tabbing back to the field announces it. */
+  const invalid = (name: string) =>
+    errors[name] ? { "aria-invalid": true as const, "aria-describedby": id(`${name}-error`) } : {};
 
   return (
     <form onSubmit={submit} style={{ display: "grid", gap: "0.5rem" }}>
@@ -64,13 +72,19 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
           style={{ width: "100%" }}
           value={values.text}
           onChange={(e) => setValues({ ...values, text: e.target.value })}
+          {...invalid("text")}
         />
         {error("text")}
       </div>
       <div>
         <label htmlFor={id("by")}>Answered by</label>
         <br />
-        <input id={id("by")} value={values.answered_by} onChange={(e) => setValues({ ...values, answered_by: e.target.value })} />
+        <input
+          id={id("by")}
+          value={values.answered_by}
+          onChange={(e) => setValues({ ...values, answered_by: e.target.value })}
+          {...invalid("answered_by")}
+        />
         {error("answered_by")}
       </div>
       <div>
@@ -81,6 +95,7 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
           type="date"
           value={values.answered_on}
           onChange={(e) => setValues({ ...values, answered_on: e.target.value })}
+          {...invalid("answered_on")}
         />
         {error("answered_on")}
       </div>
@@ -91,6 +106,7 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
           id={id("channel")}
           value={values.channel}
           onChange={(e) => setValues({ ...values, channel: e.target.value as Channel })}
+          {...invalid("channel")}
         >
           {CHANNELS.map((c) => (
             <option key={c.value} value={c.value}>
@@ -103,7 +119,12 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
       <div>
         <label htmlFor={id("note")}>Note (optional)</label>
         <br />
-        <input id={id("note")} value={values.channel_note} onChange={(e) => setValues({ ...values, channel_note: e.target.value })} />
+        <input
+          id={id("note")}
+          value={values.channel_note}
+          onChange={(e) => setValues({ ...values, channel_note: e.target.value })}
+          {...invalid("channel_note")}
+        />
         {error("channel_note")}
       </div>
       {errors.form && <p role="alert">{errors.form}</p>}

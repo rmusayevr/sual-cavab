@@ -67,8 +67,13 @@ export default function QuestionForm({
         value={values[name]}
         onChange={(e) => set(name)(e.target.value)}
         aria-invalid={errors[name] ? true : undefined}
+        aria-describedby={errors[name] ? `${idPrefix}-${name}-error` : undefined}
       />
-      {errors[name] && <div role="alert">{errors[name]}</div>}
+      {errors[name] && (
+        <div role="alert" id={`${idPrefix}-${name}-error`}>
+          {errors[name]}
+        </div>
+      )}
     </div>
   );
 
