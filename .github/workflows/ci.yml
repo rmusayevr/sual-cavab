@@ -13,11 +13,14 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede runs on PR refs only. On staging every merge commit needs its own
+  # run to finish: the loop waits for it, and reads `cancelled` as a red base.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15 # a hang fails fast instead of holding the loop for GitHub's 6-hour default
     services:
       postgres:
         image: postgres:17
@@ -54,6 +57,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
