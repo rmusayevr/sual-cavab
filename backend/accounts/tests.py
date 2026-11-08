@@ -148,6 +148,21 @@ class SignInTests(AccountTestCase):
 
         self.assertEqual(attempt(99).status_code, 429)
 
+    def test_one_locked_account_does_not_block_sign_in_to_another(self):
+        # Every request here comes from the same address (127.0.0.1), as all
+        # sign-ins do behind the Next.js proxy: the limit must be per account.
+        make_user(email="grace@example.com")
+        for _ in range(10):
+            self.sign_in(email="ada@example.com", password="wrong")
+
+        self.assertEqual(self.sign_in(email="grace@example.com").status_code, 200)
+
+    def test_differently_cased_emails_count_as_one_account(self):
+        for _ in range(10):
+            self.sign_in(email="ada@example.com", password="wrong")
+
+        self.assertEqual(self.sign_in(email="ADA@Example.com", password="wrong").status_code, 429)
+
 
 class SignOutTests(AccountTestCase):
     def test_sign_out_ends_the_session(self):

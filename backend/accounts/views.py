@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import normalize_email
+from .throttles import LoginPerAccountThrottle
 
 # One message for every failed sign-in, so the response does not reveal
 # whether an email has an account.
@@ -34,7 +35,7 @@ class LoginView(APIView):
 
     permission_classes = [AllowAny]
     authentication_classes: list = []
-    throttle_scope = "login"
+    throttle_classes = [LoginPerAccountThrottle]
 
     def post(self, request):
         email = request.data.get("email")
