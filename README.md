@@ -42,6 +42,20 @@ python manage.py runserver
 Run the tests with `python manage.py test`. Environment variables already set
 in your shell win over `backend/.env`.
 
+## Run the frontend
+
+Needs Node.js 22.
+
+```bash
+cd frontend
+npm ci
+cp .env.example .env.local    # NEXT_PUBLIC_API_URL points at the backend
+npm run dev
+```
+
+Open `http://localhost:3000`. Checks: `npm run lint`, `npm run typecheck`,
+`npm test`, `npm run build`.
+
 ## Built with claude-harness
 
 This project is built with [claude-harness](https://github.com/rmusayevr/claude-harness):
