@@ -134,8 +134,12 @@ function QuestionItem({
     if (errors.to) {
       // The server says this move is not allowed, so what is on screen is out
       // of date. Show the question as it is now, with the reason.
-      const fresh = await apiFetch(url);
-      if (fresh.ok) onChanged((await fresh.json()) as FullQuestion);
+      try {
+        const fresh = await apiFetch(url);
+        if (fresh.ok) onChanged((await fresh.json()) as FullQuestion);
+      } catch {
+        // Could not reload; the reason below is still the useful message.
+      }
       setMode("view");
       setMessage(errors.to);
       return null;
@@ -231,12 +235,23 @@ function QuestionItem({
               key={to}
               type="button"
               disabled={busy}
-              onClick={() => (to === "answered" ? setMode("answer") : void move(to))}
+              onClick={() => {
+                if (to !== "answered") return void move(to);
+                setMessage(null);
+                setMode("answer");
+              }}
             >
               {transitionLabel(question.status, to)}
             </button>
           ))}
-          <button type="button" disabled={busy} onClick={() => setMode("edit")}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setMessage(null);
+              setMode("edit");
+            }}
+          >
             Edit
           </button>
         </div>

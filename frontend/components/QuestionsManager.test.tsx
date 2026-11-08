@@ -304,6 +304,29 @@ describe("QuestionsManager: edit", () => {
     expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ text: "New text" });
   });
 
+  it("clears an old error message once an edit is saved", async () => {
+    let first = true;
+    backend({
+      [LIST]: () => json(200, [question(1)]),
+      [TRANSITION_1]: () => {
+        first = false;
+        return Promise.reject(new Error("offline"));
+      },
+      [EDIT_1]: () => json(200, question(1, { text: "Changed" })),
+    });
+    render(<QuestionsManager projectId="5" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Drop" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(first).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument(); // opening the form starts clean
+    fireEvent.change(screen.getByLabelText("Question", { selector: "#edit-1-text" }), { target: { value: "Changed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("sends nothing when nothing was changed", async () => {
     const calls = backend({ [LIST]: () => json(200, [question(1)]) });
     render(<QuestionsManager projectId="5" />);
@@ -458,6 +481,41 @@ describe("QuestionsManager: record an answer", () => {
     const input = screen.getByLabelText("Date");
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input.getAttribute("aria-describedby")).toBe(message.id);
+  });
+
+  it("clears an old error message once an answer is recorded", async () => {
+    let first = true;
+    backend({
+      [LIST]: () => json(200, [question(1)]),
+      [TRANSITION_1]: (body) => {
+        if (first) {
+          first = false;
+          return Promise.reject(new Error("offline"));
+        }
+        return json(200, question(1, { status: (body as { to: string }).to, current_answer: answerOf() }));
+      },
+    });
+    render(<QuestionsManager projectId="5" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Drop" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not reach the server/i);
+
+    fireEvent.click(screen.getByRole("button", { name: "Record answer" }));
+    expect(screen.queryByText(/could not reach the server/i)).not.toBeInTheDocument();
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+    expect(await screen.findByRole("button", { name: "Re-open" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the refusal reason when reloading the question also fails", async () => {
+    backend({
+      [LIST]: () => json(200, [question(1)]),
+      [TRANSITION_1]: () => json(400, { to: ["A answered question cannot become asked."], allowed: ["open"] }),
+      [QUESTION_1]: () => Promise.reject(new Error("offline")),
+    });
+    render(<QuestionsManager projectId="5" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Mark asked" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("A answered question cannot become asked.");
   });
 
   it("cancel closes the form without sending", async () => {
