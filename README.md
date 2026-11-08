@@ -167,7 +167,8 @@ someone typed them there, so keep client details out of it, or ask Anthropic for
 zero data retention for your organization. The screen says what is sent.
 
 Who may use it: any member of the project (same rule as questions). Limits: 20
-drafts per user per hour (`DJANGO_DRAFT_RATE`), 30-second timeout, one retry.
+drafts per user per hour (`DJANGO_DRAFT_RATE`), 30-second timeout, one retry (only for a timeout, a dropped
+connection, a 408/409/429 or a 5xx, and only if the server asks for a wait of 5 s or less).
 
 Set up (see `backend/.env.example`):
 

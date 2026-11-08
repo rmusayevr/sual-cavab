@@ -39,14 +39,18 @@ from questions.models import Answer, Question
 
 from . import client as client_module
 from .client import (
+    CONNECT_TIMEOUT_SECONDS,
     MAX_OUTPUT_TOKENS,
     MAX_RETRIES,
+    MAX_RETRY_WAIT_SECONDS,
     TIMEOUT_SECONDS,
+    WORST_CASE_SECONDS,
     AnthropicDraftClient,
     DraftClient,
     DraftingFailed,
     DraftingNotConfigured,
     get_client,
+    retry_wait,
 )
 from .config import DEFAULT_MODEL, validate_drafting_model, validate_sdk_environment
 from .prompt import MAX_FIELD_CHARS, SYSTEM_PROMPT, build_prompt
@@ -555,7 +559,19 @@ def api_request():
     return httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
 
 
+def status_error(cls, status, headers=None):
+    """An SDK error for an HTTP answer, whose message echoes the key and the prompt."""
+    response = httpx2.Response(status, headers=headers or {}, request=api_request())
+    return cls(f"upstream echoed {FAKE_KEY} and Which payment providers", response=response, body=None)
+
+
 class ClientTests(SimpleTestCase):
+    def setUp(self):
+        # No test here really sleeps between attempts.
+        patcher = mock.patch("drafting.client.time.sleep")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def make(self, response=None, error=None):
         sdk = mock.MagicMock()
         if error:
@@ -571,10 +587,32 @@ class ClientTests(SimpleTestCase):
 
     def test_the_sdk_is_set_up_with_the_key_the_timeout_and_one_retry(self):
         _, sdk = self.make()
-        sdk.assert_called_once_with(
-            api_key=FAKE_KEY, base_url="https://api.anthropic.com", timeout=30.0, max_retries=1
-        )
-        self.assertEqual((TIMEOUT_SECONDS, MAX_RETRIES), (30.0, 1))
+        kwargs = sdk.call_args.kwargs
+        self.assertEqual(kwargs["api_key"], FAKE_KEY)
+        self.assertEqual(kwargs["base_url"], "https://api.anthropic.com")
+        self.assertEqual(kwargs["timeout"], anthropic.Timeout(30.0, connect=5.0))
+        self.assertEqual((TIMEOUT_SECONDS, CONNECT_TIMEOUT_SECONDS, MAX_RETRIES), (30.0, 5.0, 1))
+
+    def test_the_sdk_does_not_retry_by_itself(self):
+        # Its retry waits as long as the server's retry-after says, with no cap.
+        _, sdk = self.make()
+        self.assertEqual(sdk.call_args.kwargs["max_retries"], 0)
+
+    def test_the_sdk_is_given_a_telemetry_option_so_the_environment_cannot_turn_content_on(self):
+        _, sdk = self.make()
+        self.assertEqual(sdk.call_args.kwargs["open_telemetry"], {"traces": {"enabled": False}, "propagation": False})
+
+    def test_the_real_sdk_ignores_the_telemetry_content_variable(self):
+        env = {"ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE": "content"}
+        with mock.patch.dict(os.environ, env):
+            client = AnthropicDraftClient(FAKE_KEY)
+        options = client._client._open_telemetry
+        self.assertFalse(options["traces"]["enabled"])
+        self.assertNotEqual(options["traces"]["content_mode"], "content")
+
+    def test_the_worst_case_fits_under_the_proxy_timeout(self):
+        # frontend/next.config.ts proxyTimeout is 150 s and its test asserts > 135 s.
+        self.assertEqual(WORST_CASE_SECONDS, 135.0)
 
     def test_the_request_has_only_what_it_needs(self):
         client, sdk = self.make()
@@ -629,6 +667,90 @@ class ClientTests(SimpleTestCase):
                 # `from None`: the SDK error (which can echo the prompt) is not chained.
                 self.assertTrue(caught.exception.__suppress_context__)
                 self.assertIsNone(caught.exception.__cause__)
+
+    def test_a_failure_is_retried_once_and_the_second_answer_is_used(self):
+        client, sdk = self.make()
+        create = sdk.return_value.messages.create
+        create.side_effect = [status_error(anthropic.InternalServerError, 500), sdk_response("Salam!")]
+        with mock.patch("drafting.client.time.sleep") as sleep:
+            self.assertEqual(self.draft(client), "Salam!")
+        self.assertEqual(create.call_count, 2)
+        sleep.assert_called_once_with(1.0)
+
+    def test_a_second_failure_ends_it_there(self):
+        client, sdk = self.make()
+        create = sdk.return_value.messages.create
+        create.side_effect = [status_error(anthropic.InternalServerError, 500)] * 3
+        with mock.patch("drafting.client.time.sleep"):
+            with self.assertRaises(DraftingFailed):
+                self.draft(client)
+        self.assertEqual(create.call_count, 2)  # never a third
+
+    def test_a_short_retry_after_is_waited_for(self):
+        client, sdk = self.make()
+        create = sdk.return_value.messages.create
+        limited = status_error(anthropic.RateLimitError, 429, {"retry-after": "2"})
+        create.side_effect = [limited, sdk_response("Salam!")]
+        with mock.patch("drafting.client.time.sleep") as sleep:
+            self.draft(client)
+        sleep.assert_called_once_with(2.0)
+
+    def test_retry_after_in_milliseconds_is_read_too(self):
+        err = status_error(anthropic.RateLimitError, 429, {"retry-after-ms": "1500"})
+        self.assertEqual(retry_wait(err), 1.5)
+
+    def test_a_long_retry_after_is_not_waited_for(self):
+        # The SDK would sleep the full 120 s; we answer the person now.
+        client, sdk = self.make()
+        create = sdk.return_value.messages.create
+        create.side_effect = [status_error(anthropic.RateLimitError, 429, {"retry-after": "120"}), sdk_response()]
+        with mock.patch("drafting.client.time.sleep") as sleep:
+            with self.assertRaises(DraftingFailed):
+                self.draft(client)
+        sleep.assert_not_called()
+        self.assertEqual(create.call_count, 1)
+        self.assertLessEqual(MAX_RETRY_WAIT_SECONDS, 5.0)
+
+    def test_an_unreadable_retry_after_falls_back_to_the_default_wait(self):
+        err = status_error(anthropic.RateLimitError, 429, {"retry-after": "Wed, 21 Oct 2026 07:28:00 GMT"})
+        self.assertEqual(retry_wait(err), 1.0)
+
+    def test_a_timeout_or_dropped_connection_is_retried_once(self):
+        for error in (
+            anthropic.APITimeoutError(request=api_request()),
+            anthropic.APIConnectionError(request=api_request()),
+        ):
+            with self.subTest(error=type(error).__name__):
+                client, sdk = self.make()
+                create = sdk.return_value.messages.create
+                create.side_effect = [error, sdk_response("Salam!")]
+                with mock.patch("drafting.client.time.sleep"):
+                    self.assertEqual(self.draft(client), "Salam!")
+                self.assertEqual(create.call_count, 2)
+
+    def test_errors_that_will_not_pass_by_themselves_are_not_retried(self):
+        for cls, status in (
+            (anthropic.BadRequestError, 400),
+            (anthropic.AuthenticationError, 401),
+            (anthropic.PermissionDeniedError, 403),
+            (anthropic.NotFoundError, 404),
+        ):
+            with self.subTest(status=status):
+                client, sdk = self.make()
+                create = sdk.return_value.messages.create
+                create.side_effect = [status_error(cls, status), sdk_response()]
+                with mock.patch("drafting.client.time.sleep") as sleep:
+                    with self.assertRaises(DraftingFailed):
+                        self.draft(client)
+                self.assertEqual(create.call_count, 1)
+                sleep.assert_not_called()
+
+    def test_a_refusal_or_a_cut_off_reply_is_not_retried(self):
+        for response in (sdk_response(stop_reason="refusal"), sdk_response(stop_reason="max_tokens")):
+            client, sdk = self.make(response)
+            with self.assertRaises(DraftingFailed):
+                self.draft(client)
+            self.assertEqual(sdk.return_value.messages.create.call_count, 1)
 
     def test_the_key_is_not_in_the_clients_repr(self):
         client, _ = self.make()
