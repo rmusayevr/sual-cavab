@@ -1,3 +1,9 @@
+import subprocess
+import sys
+from pathlib import Path
+
+from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import connection
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -24,3 +30,56 @@ class HealthEndpointTests(SimpleTestCase):
         response = self.client.post(reverse("health"))
 
         self.assertEqual(response.status_code, 405)
+
+
+class PasswordHasherTests(SimpleTestCase):
+    """The fast hasher is for `manage.py test` only (#25)."""
+
+    def first_hasher_when_loaded_by(self, code):
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=Path(settings.BASE_DIR),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.strip()
+
+    def test_tests_run_with_the_fast_hasher(self):
+        self.assertEqual(settings.PASSWORD_HASHERS, ["django.contrib.auth.hashers.MD5PasswordHasher"])
+
+    def test_a_password_made_in_a_test_still_checks(self):
+        encoded = make_password("invented-test-password")
+        self.assertTrue(encoded.startswith("md5$"))
+        self.assertTrue(check_password("invented-test-password", encoded))
+        self.assertFalse(check_password("another-password", encoded))
+
+    def test_a_server_loading_these_settings_keeps_the_default_hasher(self):
+        # What a wsgi/asgi server does: import the settings with no `test` on the command line.
+        code = (
+            "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); "
+            "from django.conf import settings; print(settings.PASSWORD_HASHERS[0])"
+        )
+        self.assertEqual(self.first_hasher_when_loaded_by(code), "django.contrib.auth.hashers.PBKDF2PasswordHasher")
+
+    def test_other_manage_py_commands_keep_the_default_hasher(self):
+        for command in ("shell", "check", "runserver"):
+            with self.subTest(command=command):
+                code = (
+                    "import os, sys; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); "
+                    f"sys.argv = ['manage.py', '{command}']; "
+                    "from django.conf import settings; print(settings.PASSWORD_HASHERS[0])"
+                )
+                self.assertEqual(
+                    self.first_hasher_when_loaded_by(code), "django.contrib.auth.hashers.PBKDF2PasswordHasher"
+                )
+
+    def test_a_test_word_later_in_the_command_line_does_not_count(self):
+        # `manage.py shell test` is not a test run.
+        code = (
+            "import os, sys; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); "
+            "sys.argv = ['manage.py', 'shell', 'test']; "
+            "from django.conf import settings; print(settings.PASSWORD_HASHERS[0])"
+        )
+        self.assertEqual(self.first_hasher_when_loaded_by(code), "django.contrib.auth.hashers.PBKDF2PasswordHasher")

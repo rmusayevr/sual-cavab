@@ -6,6 +6,7 @@ real environment win over the file.
 """
 
 import os
+import sys
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -116,6 +117,20 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# While `manage.py test` runs, hash passwords with a fast hasher. Most tests
+# create several users, and Django's default (PBKDF2, 1.5 million iterations,
+# about 0.5 s a hash here) made the suite take minutes (#25). This is decided
+# from the command line, not from an environment variable, so a running server
+# cannot end up with a weak hasher through a stray setting; a test checks that
+# any other way of loading these settings keeps the default.
+# Known limit: `manage.py test --parallel` on Linux with Python 3.14 starts its
+# workers through a forkserver, whose processes see sys.argv == ["-c"], so they
+# would hash with PBKDF2. Nothing here uses --parallel; if it is added, the two
+# in-process tests in core/tests.py (PasswordHasherTests) fail loudly in the
+# workers, and this switch needs another signal for them.
+if sys.argv[1:2] == ["test"]:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Baku"
