@@ -115,6 +115,54 @@ class EditTests(ProjectAccessTestCase):
         self.assertEqual(self.project.name, "Ticketing")
 
 
+class EditRaceTests(ProjectAccessTestCase):
+    """Review of #21: the project edit gets the same protections as questions."""
+
+    def after_get_object(self, action):
+        from unittest import mock
+
+        from .views import ProjectViewSet
+
+        real = ProjectViewSet.get_object
+
+        def wrapper(view):
+            project = real(view)
+            action()
+            return project
+
+        return mock.patch.object(ProjectViewSet, "get_object", wrapper)
+
+    def test_a_member_removed_mid_request_cannot_edit_the_project(self):
+        remove = lambda: Membership.objects.filter(project=self.project, user=self.member).delete()  # noqa: E731
+
+        with self.after_get_object(remove):
+            response = self.as_user(self.member).patch(self.detail(), {"name": "Too late"}, format="json")
+
+        self.assertEqual(response.status_code, 404)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.name, "Ticketing")
+
+    def test_the_edit_answers_with_the_project_as_it_is_now(self):
+        change = lambda: Project.objects.filter(pk=self.project.pk).update(description="Changed meanwhile")  # noqa: E731
+
+        with self.after_get_object(change):
+            response = self.as_user(self.owner).patch(self.detail(), {"name": "Renamed"}, format="json")
+
+        self.assertEqual(response.json()["description"], "Changed meanwhile")
+
+    def test_editing_a_project_locks_the_membership_before_writing_it(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as ctx:
+            self.as_user(self.owner).patch(self.detail(), {"name": "Renamed"}, format="json")
+        sql = [q["sql"] for q in ctx.captured_queries]
+
+        lock = next(i for i, s in enumerate(sql) if 'FROM "projects_membership"' in s and "FOR UPDATE" in s)
+        write = next(i for i, s in enumerate(sql) if 'UPDATE "projects_project"' in s)
+        self.assertLess(lock, write)
+
+
 class DeleteTests(ProjectAccessTestCase):
     def test_owner_cannot_delete_the_project(self):
         self.assertEqual(self.as_user(self.owner).delete(self.detail()).status_code, 405)

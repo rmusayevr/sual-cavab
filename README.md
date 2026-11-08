@@ -43,6 +43,10 @@ python manage.py runserver
 `GET http://localhost:8000/api/health/` returns `{"status": "ok"}`. Add more
 users at `http://localhost:8000/admin/`. People sign in with their email.
 
+After pulling changes, run `python manage.py migrate` **before** starting the
+new code: it selects columns that migrations add (for example
+`next_question_number`), so new code on an un-migrated database fails with 500s.
+
 If you ran `migrate` before accounts existed (#4), that database still has
 Django's default user table and `migrate` now stops with
 `InconsistentMigrationHistory`. It holds no project data yet: drop and recreate
@@ -91,6 +95,41 @@ you are not on is a 404, the same as one that does not exist.
   Accepted for v1 (small, admin-created user base); attempts are limited to
   about 30 an hour per user, failures included (a burst of parallel requests
   can slightly exceed it).
+
+## Questions, statuses and answers
+
+Questions belong to a project and are numbered Q1, Q2... per project. A number
+is never reused, even if the question is dropped. Any member of the project
+(owner or member) can add, edit, change the status of and answer questions;
+everyone else gets a 404. API: `/api/projects/<id>/questions/`
+(`?status=open,asked` filters), `…/<number>/` to read or edit the text fields,
+and `POST …/<number>/transition/` with `{"to": "<status>"}` to change status.
+
+Decided by the owner (#6). Anything not listed is refused with a 400 that names
+what is allowed:
+
+| From       | Can become                                   |
+|------------|----------------------------------------------|
+| `open`     | `asked`, `answered` (with an answer), `dropped` |
+| `asked`    | `open` (un-ask), `answered` (with an answer), `dropped` |
+| `answered` | `open` (re-open)                              |
+| `dropped`  | `open` (restore)                              |
+
+- Marking a question `answered` needs an answer: the text, who answered (free
+  text, since the client contact may not be a user), the date, and where
+  (chat, meeting, email or other, with an optional note). The user who recorded
+  it is saved too.
+- Answers are never edited or deleted. Re-opening a question keeps its answer
+  as history (`previous_answers`); answering again adds a new one. To correct
+  an answer, re-open and answer again.
+- Nothing is deleted by the app: there is no delete endpoint ("dropped" is a
+  status). In the admin, questions can't be added or deleted, only their three
+  text fields can be edited (status moves only through the rules above), and a
+  project or user with questions or answers depending on it can't be deleted.
+- Edits write only the fields that were sent, so an edit racing an answer or a
+  re-open can't write back an old status.
+- Editing a question's text overwrites the previous text (there is no edit
+  history in v1).
 
 ## Built with claude-harness
 
