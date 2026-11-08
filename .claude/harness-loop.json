@@ -1,0 +1,20 @@
+{
+  "base": "staging",
+  "protected": ["main"],
+  "queue": { "label": "ready", "parent": null },
+  "parkedLabel": "waiting",
+  "autoMerge": true,
+  "mergeMethod": "merge",
+  "checks": [
+    "cd backend && python manage.py check",
+    "cd backend && python manage.py makemigrations --check --dry-run",
+    "cd backend && python manage.py test --noinput",
+    "cd frontend && npm run lint && npm run typecheck && npm test && npm run build"
+  ],
+  "risky": ["backend/accounts/", "migrations/", "backend/drafting/"],
+  "stopFor": [
+    "who can see or change a project",
+    "anything that sends a message instead of drafting one",
+    "what client data is sent to the drafting API"
+  ]
+}

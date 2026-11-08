@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.sqlite3
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Secrets: only *.example files are committed
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Harness logs (local, per machine)
+.claude/harness-decisions.log
+.claude/harness-usage.log
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
