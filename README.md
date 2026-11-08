@@ -139,6 +139,16 @@ it has been open. The age counts from when the question was created; re-opening
 a question does not reset it. The project list shows the same count
 (`open_question_count`, computed in the database from the same two statuses).
 
+### Question screens
+
+`/projects/<id>/questions` lists every question (any status) and is where people
+add a question, edit its three text fields, change its status and record an
+answer (text, who answered, date, chat/meeting/email/other, optional note).
+Only the status buttons the transition table allows are offered; the server
+still decides, and its message is shown if it refuses. Validation errors from
+the API appear next to the field. Re-opening an answered question keeps the old
+answer, shown as "Earlier answer".
+
 ## Built with claude-harness
 
 This project is built with [claude-harness](https://github.com/rmusayevr/claude-harness):
