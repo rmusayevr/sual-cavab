@@ -30,3 +30,6 @@ coverage/
 Thumbs.db
 .idea/
 .vscode/
+
+# Local override of docker-compose.yml (see README, Local setup)
+docker-compose.override.yml
