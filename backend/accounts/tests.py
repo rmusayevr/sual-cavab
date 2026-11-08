@@ -157,11 +157,38 @@ class SignInTests(AccountTestCase):
 
         self.assertEqual(self.sign_in(email="grace@example.com").status_code, 200)
 
-    def test_differently_cased_emails_count_as_one_account(self):
-        for _ in range(10):
-            self.sign_in(email="ada@example.com", password="wrong")
+class LoginThrottleTests(TestCase):
+    """The throttle itself, without password hashing, so volume is cheap."""
 
-        self.assertEqual(self.sign_in(email="ADA@Example.com", password="wrong").status_code, 429)
+    def setUp(self):
+        from django.core.cache import caches
+
+        caches["throttle"].clear()
+
+    def allowed(self, email):
+        from rest_framework.parsers import JSONParser
+        from rest_framework.request import Request
+
+        from accounts.throttles import LoginPerAccountThrottle
+
+        raw = APIRequestFactory().post("/api/auth/login/", {"email": email, "password": "x"}, format="json")
+        return LoginPerAccountThrottle().allow_request(Request(raw, parsers=[JSONParser()]), view=None)
+
+    def test_differently_cased_emails_share_one_limit(self):
+        for _ in range(10):
+            self.allowed("ADA@Example.com")
+
+        self.assertFalse(self.allowed("ada@example.com"))
+
+    def test_junk_emails_do_not_evict_a_locked_accounts_counter(self):
+        # Review round 3 of #18: with the 300-entry in-memory cache, ~300 made-up
+        # emails pushed the victim's counter out and reset its limit.
+        for _ in range(10):
+            self.allowed("ada@example.com")
+        for n in range(400):
+            self.allowed(f"junk{n}@example.com")
+
+        self.assertFalse(self.allowed("ada@example.com"))
 
 
 class SignOutTests(AccountTestCase):

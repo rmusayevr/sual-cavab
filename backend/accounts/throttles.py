@@ -1,3 +1,4 @@
+from django.core.cache import caches
 from rest_framework.throttling import SimpleRateThrottle
 
 from .models import normalize_email
@@ -14,6 +15,12 @@ class LoginPerAccountThrottle(SimpleRateThrottle):
     """
 
     scope = "login"
+
+    @property
+    def cache(self):
+        # Its own cache alias (settings.CACHES["throttle"]): counters must be
+        # shared by all workers and must not be evictable by an attacker.
+        return caches["throttle"]
 
     def get_cache_key(self, request, view):
         email = request.data.get("email") if hasattr(request.data, "get") else None

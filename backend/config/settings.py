@@ -119,6 +119,20 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    # Sign-in throttle counters (#4, owner's decision on #18): in PostgreSQL, so
+    # every worker shares them, restarts keep them, and made-up emails can't
+    # push a real account's counter out. The in-memory default holds 300 entries
+    # and evicted it. Expired entries are culled first; live ones only above
+    # MAX_ENTRIES, and counters live one minute. Needs `createcachetable`.
+    "throttle": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "throttle_cache",
+        "OPTIONS": {"MAX_ENTRIES": 1_000_000},
+    },
+}
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
