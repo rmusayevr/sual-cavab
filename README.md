@@ -89,7 +89,8 @@ you are not on is a 404, the same as one that does not exist.
   accounts). Because anyone can create a project and so become an owner, a
   signed-in user can tell whether an email has an account by trying to add it.
   Accepted for v1 (small, admin-created user base); attempts are limited to
-  30 an hour per user, failures included.
+  about 30 an hour per user, failures included (a burst of parallel requests
+  can slightly exceed it).
 
 ## Built with claude-harness
 

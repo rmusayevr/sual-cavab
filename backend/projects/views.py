@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import Http404
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -71,9 +71,20 @@ class ProjectViewSet(
             payload = AddMemberSerializer(data=request.data)
             payload.is_valid(raise_exception=True)
             new_user = payload.validated_data["email"]
+            already_member = ValidationError({"email": ["This user is already a member."]})
             if any(m.user_id == new_user.pk for m in rows):
-                raise ValidationError({"email": ["This user is already a member."]})
-            membership = Membership.objects.create(project=project, user=new_user, role=payload.validated_data["role"])
+                raise already_member
+            try:
+                # A savepoint, so the unique violation doesn't poison the outer
+                # transaction. The locked rows can't show a membership another
+                # request inserted while this one waited for the lock (READ
+                # COMMITTED), so the constraint is the final check.
+                with transaction.atomic():
+                    membership = Membership.objects.create(
+                        project=project, user=new_user, role=payload.validated_data["role"]
+                    )
+            except IntegrityError:
+                raise already_member
         return Response(MemberSerializer(membership).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["delete"], url_path=r"members/(?P<user_id>\d+)")

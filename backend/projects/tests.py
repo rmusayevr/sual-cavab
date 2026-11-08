@@ -190,6 +190,29 @@ class MemberManagementTests(ProjectAccessTestCase):
     def test_member_cannot_add_members(self):
         self.assertEqual(self.add(self.member, "newcomer@example.com").status_code, 403)
 
+    def test_a_duplicate_add_that_races_the_lock_is_a_400_not_a_500(self):
+        # Review round 2 of #19: PostgreSQL's FOR UPDATE does not show a blocked
+        # request the row another request inserted while it waited, so the
+        # in-memory duplicate check can pass and the unique constraint fires.
+        # Simulate that stale view: the user is already a member, but the
+        # locked rows the view reads do not include them.
+        from unittest import mock
+
+        from . import views
+
+        Membership.objects.create(project=self.project, user=self.newcomer, role=Membership.Role.MEMBER)
+        real_lock = views.lock_memberships
+
+        def stale_lock(project, user):
+            rows, role = real_lock(project, user)
+            return [m for m in rows if m.user_id != self.newcomer.pk], role
+
+        with mock.patch.object(views, "lock_memberships", stale_lock):
+            response = self.add(self.owner, "newcomer@example.com")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Membership.objects.filter(project=self.project, user=self.newcomer).count(), 1)
+
     def test_a_member_gets_403_whether_or_not_the_email_has_an_account(self):
         # Authorize before validating: otherwise a non-owner can tell an email
         # with no account (400) from one with an account (403).
