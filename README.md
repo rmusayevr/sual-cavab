@@ -24,6 +24,24 @@ Sual-Cavab ("question-answer" in Azerbaijani) keeps them in one place:
 
 Django + Django REST Framework (backend), Next.js (frontend), PostgreSQL.
 
+## Run the backend
+
+Needs Python 3.12+ and a PostgreSQL you can create databases on.
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate     # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+cp .env.example .env          # then set the POSTGRES_* values for your database
+python manage.py migrate
+python manage.py runserver
+```
+
+`GET http://localhost:8000/api/health/` returns `{"status": "ok"}`.
+Run the tests with `python manage.py test`. Environment variables already set
+in your shell win over `backend/.env`.
+
 ## Built with claude-harness
 
 This project is built with [claude-harness](https://github.com/rmusayevr/claude-harness):
