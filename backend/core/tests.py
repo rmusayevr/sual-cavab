@@ -19,11 +19,16 @@ class DatabaseTests(TestCase):
             cursor.execute("SELECT 1")
             self.assertEqual(cursor.fetchone(), (1,))
 
-    def test_the_database_in_use_has_this_processs_id_in_its_name(self):
+    def test_the_database_in_use_is_the_one_configured_for_this_run(self):
+        # The wiring: Django created and uses the database the settings name. That the name carries
+        # the process's own id is checked in a fresh process (core.tests.TestDatabaseNameTests).
         # A TestCase, so the test database exists whichever tests were selected (#42).
+        # Compared with the configured name, not os.getpid(): a --parallel worker has its own
+        # id and connects to a clone named <configured name>_<n> (review of #59).
         name = connection.settings_dict["NAME"]
-        self.assertTrue(name.startswith("test_"), name)
-        self.assertTrue(name.endswith(f"_{os.getpid()}"), name)
+        default = settings.DATABASES["default"]
+        configured = default.get("TEST", {}).get("NAME") or default["NAME"]  # under --keepdb Django's own name
+        self.assertTrue(name == configured or name.startswith(configured + "_"), (name, configured))
 
 
 class HealthEndpointTests(SimpleTestCase):
@@ -100,32 +105,77 @@ class TestDatabaseNameTests(SimpleTestCase):
     seconds apart, a failed database creation when started together.
     """
 
-    def name_seen_by(self, argv="['manage.py', 'test']"):
+    def seen_by(self, argv="['manage.py', 'test']", **env):
+        """The test database name a fresh process gets, and that process's id."""
         code = (
             "import os, sys; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); "
             f"sys.argv = {argv}; "
             "from django.conf import settings; "
-            "print(settings.DATABASES['default'].get('TEST', {}).get('NAME', ''))"
+            "print('TESTNAME=' + settings.DATABASES['default'].get('TEST', {}).get('NAME', '')); "
+            "print('PID=' + str(os.getpid()))"
         )
         result = subprocess.run(
-            [sys.executable, "-c", code], cwd=Path(settings.BASE_DIR), capture_output=True, text=True, timeout=120
+            [sys.executable, "-c", code],
+            cwd=Path(settings.BASE_DIR),
+            env={**{k: v for k, v in os.environ.items() if k != "DJANGO_DATABASE_URL"}, "PYTHONIOENCODING": "utf-8", **env},
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=120,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        return result.stdout.strip()
+        # Looked up by prefix, so extra output or a space in a name cannot shift what is read.
+        lines = {line.split("=", 1)[0]: line.split("=", 1)[1] for line in result.stdout.splitlines() if "=" in line}
+        return lines["TESTNAME"], lines["PID"]
+
+    def test_the_name_ends_with_the_processs_own_id(self):
+        name, pid = self.seen_by()
+        self.assertTrue(name.startswith("test_"), name)
+        self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
 
     def test_two_test_runs_get_different_database_names(self):
-        first = self.name_seen_by()
-        second = self.name_seen_by()
-        self.assertTrue(first.startswith("test_"), first)
-        self.assertNotEqual(first, second)
+        self.assertNotEqual(self.seen_by()[0], self.seen_by()[0])
+
+    def test_a_long_database_name_still_fits_postgresql_and_keeps_the_id(self):
+        # PostgreSQL cuts a name at 63 characters without a word; Django then refuses it,
+        # and the cut name has lost the end of the process id (review of #59).
+        name, pid = self.seen_by(POSTGRES_DB="sual_cavab_" + "x" * 44)
+        self.assertLessEqual(len(name), 63 - 4, name)  # 4: room for a --parallel clone's _<n>
+        self.assertTrue(name.startswith("test_sual_cavab_x"), name)
+        self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
+
+    def test_a_name_with_a_space_is_read_whole(self):
+        # The probe once read output by splitting on spaces, so a name with one was taken for "no name".
+        name, pid = self.seen_by(POSTGRES_DB="has space")
+        self.assertEqual(name, f"test_has space_{pid}")
+
+    def test_the_limit_counts_bytes_not_characters(self):
+        # PostgreSQL's 63 is bytes: 44 letters of "ə" are 88 bytes.
+        name, pid = self.seen_by(POSTGRES_DB="sual_cavab_" + "ə" * 44)
+        self.assertLessEqual(len(name.encode()), 63 - 4, name)
+        self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
+
+    def test_keepdb_keeps_the_one_shared_name(self):
+        # --keepdb exists to find last run's database; a name that changes every run never does.
+        # argparse accepts any unambiguous start of a long option, so --keep and --keepd are keepdb too.
+        for flag in ("--keepdb", "--keepd", "--keep", "--k"):
+            with self.subTest(flag=flag):
+                self.assertEqual(self.seen_by(argv=f"['manage.py', 'test', '{flag}']")[0], "")
+
+    def test_k_is_a_test_name_filter_not_keepdb(self):
+        # In Django's test runner -k PATTERN selects tests by name; it does not keep the database.
+        for argv in ("['manage.py', 'test', '-k', 'test_health']", "['manage.py', 'test', '-ktest_health']"):
+            with self.subTest(argv=argv):
+                name, pid = self.seen_by(argv=argv)
+                self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
 
     def test_a_server_keeps_djangos_default_test_name(self):
         for command in ("runserver", "shell", "check", "migrate"):
             with self.subTest(command=command):
-                self.assertEqual(self.name_seen_by(argv=f"['manage.py', '{command}']"), "")
+                self.assertEqual(self.seen_by(argv=f"['manage.py', '{command}']")[0], "")
 
     def test_a_test_word_later_in_the_command_line_does_not_count(self):
-        self.assertEqual(self.name_seen_by(argv="['manage.py', 'shell', 'test']"), "")
+        self.assertEqual(self.seen_by(argv="['manage.py', 'shell', 'test']")[0], "")
 
 
 class DeployCheckTests(SimpleTestCase):
