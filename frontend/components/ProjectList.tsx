@@ -57,7 +57,7 @@ export default function ProjectList() {
       {state.projects.length === 0 ? (
         <p className="text-muted">You are not on any project yet. Create one below, or ask an owner to add you.</p>
       ) : (
-        <ul className="grid gap-3">
+        <ul className="grid list-none gap-3">
           {state.projects.map((p) => (
             <li key={p.id}>
               <Card className="grid gap-1">

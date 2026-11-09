@@ -142,3 +142,21 @@ describe("ProjectDetail look (#55)", () => {
     expect(screen.getByRole("link", { name: "Back to your projects" })).toHaveAttribute("href", "/projects");
   });
 });
+
+describe("ProjectDetail: no bullets (#57)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("the lists of open questions and of members have no bullet markers (there is no browser reset)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url, json(200, project))));
+
+    render(<ProjectDetail />);
+
+    await screen.findByText(/Which payment providers are allowed\?/); // the questions load after the members
+    await screen.findByText(/Olga Owner · owner/);
+    const lists = await screen.findAllByRole("list");
+    expect(lists).toHaveLength(2);
+    for (const list of lists) expect(list).toHaveClass("list-none");
+  });
+});

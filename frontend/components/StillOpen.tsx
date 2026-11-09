@@ -45,7 +45,7 @@ export default function StillOpen({ projectId, now }: { projectId: string; now?:
       {state.questions.length === 0 ? (
         <p className="text-muted">Nothing is open. Every question on this project has an answer or was dropped.</p>
       ) : (
-        <ul className="grid gap-3">
+        <ul className="grid list-none gap-3">
           {state.questions.map((q) => (
             <li key={q.id}>
               <Card className="grid gap-2">

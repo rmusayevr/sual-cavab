@@ -78,7 +78,7 @@ export default function ProjectDetail() {
       <section className="grid gap-3">
         <h2 className="text-lg font-semibold">Members</h2>
         <Card>
-          <ul className="grid gap-2">
+          <ul className="grid list-none gap-2">
             {members.map((m) => (
               <li key={m.user_id}>
                 {m.name || m.email} · {m.role}

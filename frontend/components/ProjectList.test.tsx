@@ -139,3 +139,17 @@ describe("ProjectList look (#55)", () => {
     expect(await screen.findByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
   });
 });
+
+describe("ProjectList: no bullets (#57)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("the list of projects is a card list without bullet markers (there is no browser reset)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3)])));
+
+    render(<ProjectList />);
+
+    expect(await screen.findByRole("list")).toHaveClass("list-none");
+  });
+});
