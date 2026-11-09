@@ -110,7 +110,7 @@ describe("SessionStatus look (#54)", () => {
 
     const link = await screen.findByRole("link", { name: "Sign in" });
     expect(link).toHaveAttribute("href", "/login");
-    expect(link).toHaveClass("min-h-11", "bg-primary");
+    expect(link).toHaveClass("min-h-11", "btn-primary");
   });
 
   it("when signed in, offers the projects as a link and sign-out as a button, both easy to tap", async () => {

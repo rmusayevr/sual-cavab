@@ -8,7 +8,7 @@ export default function DraftPage() {
     <PageShell>
       {/* useParams() reads the URL at request time; with cacheComponents the
           build fails unless it sits inside Suspense. */}
-      <Suspense fallback={<p className="text-muted">Loading questions…</p>}>
+      <Suspense fallback={<p className="text-muted-foreground">Loading questions…</p>}>
         <DraftScreen />
       </Suspense>
     </PageShell>

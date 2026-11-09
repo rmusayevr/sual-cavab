@@ -35,7 +35,7 @@ export default function StillOpen({ projectId, now }: { projectId: string; now?:
     };
   }, [projectId]);
 
-  if (state.kind === "loading") return <p className="text-muted">Loading questions…</p>;
+  if (state.kind === "loading") return <p className="text-muted-foreground">Loading questions…</p>;
   if (state.kind === "error") return <Alert tone="error">Could not load the questions.</Alert>;
 
   const reference = now ?? new Date();
@@ -43,7 +43,7 @@ export default function StillOpen({ projectId, now }: { projectId: string; now?:
     <section className="grid gap-3">
       <h2 className="text-lg font-semibold">Still open ({state.questions.length})</h2>
       {state.questions.length === 0 ? (
-        <p className="text-muted">Nothing is open. Every question on this project has an answer or was dropped.</p>
+        <p className="text-muted-foreground">Nothing is open. Every question on this project has an answer or was dropped.</p>
       ) : (
         <ul className="grid list-none gap-3">
           {state.questions.map((q) => (
@@ -54,8 +54,8 @@ export default function StillOpen({ projectId, now }: { projectId: string; now?:
                   <StatusChip status={q.status} />
                 </div>
                 <p>{q.text}</p>
-                <p className="text-sm text-muted">{ageText(daysOpen(q.created_at, reference))}</p>
-                {q.blocks && <p className="text-sm text-muted">Blocks: {q.blocks}</p>}
+                <p className="text-sm text-muted-foreground">{ageText(daysOpen(q.created_at, reference))}</p>
+                {q.blocks && <p className="text-sm text-muted-foreground">Blocks: {q.blocks}</p>}
               </Card>
             </li>
           ))}

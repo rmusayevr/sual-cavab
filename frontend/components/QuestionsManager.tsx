@@ -42,7 +42,7 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
     };
   }, [base]);
 
-  if (state.kind === "loading") return <p className="text-muted">Loading questions…</p>;
+  if (state.kind === "loading") return <p className="text-muted-foreground">Loading questions…</p>;
   if (state.kind === "not-found")
     return (
       <div className="grid gap-3">
@@ -75,7 +75,7 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
   return (
     <div className="grid gap-6">
       {state.questions.length === 0 ? (
-        <p className="text-muted">No questions yet. Add the first one below.</p>
+        <p className="text-muted-foreground">No questions yet. Add the first one below.</p>
       ) : (
         <ul className="grid list-none gap-4">
           {state.questions.map((q) => (
@@ -213,8 +213,8 @@ function QuestionItem({
               <StatusChip status={question.status} />
             </div>
             <p>{question.text}</p>
-            {question.why_it_matters && <p className="text-sm text-muted">Why it matters: {question.why_it_matters}</p>}
-            {question.blocks && <p className="text-sm text-muted">Blocks: {question.blocks}</p>}
+            {question.why_it_matters && <p className="text-sm text-muted-foreground">Why it matters: {question.why_it_matters}</p>}
+            {question.blocks && <p className="text-sm text-muted-foreground">Blocks: {question.blocks}</p>}
             {question.current_answer && <AnswerView answer={question.current_answer} heading="Answer" />}
             {question.previous_answers.map((a) => (
               <AnswerView key={a.id} answer={a} heading="Earlier answer" />
@@ -266,10 +266,10 @@ function QuestionItem({
 
 function AnswerView({ answer, heading }: { answer: Answer; heading: string }) {
   return (
-    <div className="grid gap-1 rounded-lg bg-bg p-3">
-      <p className="text-sm font-medium text-muted">{heading}</p>
+    <div className="grid gap-1 rounded-lg bg-background p-3">
+      <p className="text-sm font-medium text-muted-foreground">{heading}</p>
       <p>{answer.text}</p>
-      <p className="text-sm text-muted">
+      <p className="text-sm text-muted-foreground">
         by {answer.answered_by} · {answer.channel}
         {answer.channel_note ? ` (${answer.channel_note})` : ""} · {answer.answered_on}
       </p>

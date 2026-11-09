@@ -71,7 +71,7 @@ export default function DraftScreen() {
     };
   }, [id]);
 
-  if (load.kind === "loading") return <p className="text-muted">Loading questions…</p>;
+  if (load.kind === "loading") return <p className="text-muted-foreground">Loading questions…</p>;
   if (load.kind === "not-found")
     return (
       <div className="grid gap-3">
@@ -135,7 +135,7 @@ export default function DraftScreen() {
       <h1 className="text-2xl font-semibold">Draft a message</h1>
 
       {load.questions.length === 0 ? (
-        <p className="text-muted">
+        <p className="text-muted-foreground">
           Nothing is open, so there is nothing to ask. Questions that are open or asked appear here.
         </p>
       ) : (
@@ -148,7 +148,7 @@ export default function DraftScreen() {
                 return (
                   <label
                     key={q.id}
-                    className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-bg has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 has-[:disabled]:hover:bg-transparent"
+                    className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-background has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 has-[:disabled]:hover:bg-transparent"
                   >
                     <input
                       type="checkbox"
@@ -164,7 +164,7 @@ export default function DraftScreen() {
                 );
               })}
             </fieldset>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted-foreground">
               The text of the selected questions (the question, why it matters and what it blocks) is sent to Claude to
               write the draft. Nothing else about the project or the client is sent. The app never sends the message
               anywhere: you copy it and send it yourself.
@@ -202,7 +202,7 @@ export default function DraftScreen() {
               {copied === "yes" && <span role="status">Copied.</span>}
               {copied === "failed" && <span role="status">Could not copy. Select the text and copy it yourself.</span>}
             </div>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted-foreground">
               Nothing has been sent. This draft is not saved: copy it before you leave the page.
             </p>
           </section>

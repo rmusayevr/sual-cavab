@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 export function PageShell({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <main className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-4 px-4 py-6 [overflow-wrap:anywhere] sm:px-6">
-      {title && <h1 className="text-2xl font-semibold text-text">{title}</h1>}
+      {title && <h1 className="text-2xl font-semibold text-foreground">{title}</h1>}
       {children}
     </main>
   );

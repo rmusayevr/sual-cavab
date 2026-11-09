@@ -56,7 +56,7 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
   const id = (name: string) => `${idPrefix}-${name}`;
   const error = (name: string) =>
     errors[name] && (
-      <div role="alert" id={id(`${name}-error`)} className="text-sm text-error-fg">
+      <div role="alert" id={id(`${name}-error`)} className="text-sm text-primary">
         {errors[name]}
       </div>
     );

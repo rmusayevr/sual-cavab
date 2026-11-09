@@ -8,7 +8,9 @@ import { Button } from "./Button";
 import { Card } from "./Card";
 import { Field, Input, Select, Textarea } from "./Field";
 import { PageShell } from "./PageShell";
-import { StatusChip, type QuestionStatus } from "./StatusChip";
+import { STATUSES, statusDot, statusLabel, type QuestionStatus } from "@/lib/status";
+
+import { StatusChip } from "./StatusChip";
 
 describe("cx", () => {
   it("joins class names and skips empty ones", () => {
@@ -35,9 +37,8 @@ describe("Button", () => {
     expect(screen.getByRole("button")).toHaveClass("min-h-11");
   });
 
-  it("uses the page font and has a border of its own, because there is no browser reset", () => {
-    // Without Tailwind's reset a button keeps the browser's system font and its 2px outset border;
-    // every variant must set both (review of #62).
+  it("uses the page font, and the filled variants have a border of their own, because there is no browser reset", () => {
+    // Without Tailwind's reset a button keeps the browser's system font and its 2px outset border (review of #62).
     render(
       <>
         <Button variant="primary">One</Button>
@@ -46,10 +47,26 @@ describe("Button", () => {
       </>,
     );
 
-    for (const name of ["One", "Two", "Three"]) {
-      expect(screen.getByRole("button", { name })).toHaveClass("font-sans", "border");
+    for (const name of ["One", "Two", "Three"]) expect(screen.getByRole("button", { name })).toHaveClass("font-sans");
+    for (const name of ["One", "Three"]) {
+      expect(screen.getByRole("button", { name })).toHaveClass("border", "border-transparent");
     }
-    expect(screen.getByRole("button", { name: "One" })).toHaveClass("border-transparent");
+    // the outline variant draws its own border (the example's btn-ghost)
+    expect(screen.getByRole("button", { name: "Two" })).toHaveClass("btn-ghost");
+  });
+
+  it("takes its look from the design: red for the action, an outline for the rest, the destructive colour for dropping", () => {
+    render(
+      <>
+        <Button variant="primary">One</Button>
+        <Button variant="secondary">Two</Button>
+        <Button variant="danger">Three</Button>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "One" })).toHaveClass("btn-primary");
+    expect(screen.getByRole("button", { name: "Two" })).toHaveClass("btn-ghost");
+    expect(screen.getByRole("button", { name: "Three" })).toHaveClass("btn-danger");
   });
 
   it("looks different for each variant", () => {
@@ -144,7 +161,7 @@ describe("StatusChip", () => {
     for (const word of ["Open", "Asked", "Answered", "Dropped"]) expect(screen.getByText(word)).toBeInTheDocument();
   });
 
-  it("gives each status its own colours", () => {
+  it("shows each status as the word from the one table and a dot of the colour from the same table", () => {
     render(
       <>
         {all.map((status) => (
@@ -152,17 +169,30 @@ describe("StatusChip", () => {
         ))}
       </>,
     );
-    const classes = ["Open", "Asked", "Answered", "Dropped"].map((word) => screen.getByText(word).className);
 
-    expect(new Set(classes).size).toBe(4);
+    for (const status of all) {
+      const chip = screen.getByText(statusLabel[status]);
+      expect(chip.firstElementChild).toHaveClass(statusDot[status]);
+      expect(chip.firstElementChild).toHaveAttribute("aria-hidden", "true"); // the word carries the meaning
+    }
+    expect(new Set(all.map((s) => statusDot[s])).size).toBe(4);
+  });
+});
+
+describe("the status table", () => {
+  it("has the same four statuses for the words and for the dots", () => {
+    expect(Object.keys(statusLabel).sort()).toEqual([...STATUSES].sort());
+    expect(Object.keys(statusDot).sort()).toEqual([...STATUSES].sort());
   });
 });
 
 describe("Alert", () => {
-  it("announces an error at once", () => {
+  it("announces an error at once, in the red the design uses as emphasis (not the destructive colour)", () => {
     render(<Alert tone="error">Could not save</Alert>);
 
     expect(screen.getByRole("alert")).toHaveTextContent("Could not save");
+    expect(screen.getByRole("alert")).toHaveClass("border-primary", "text-primary");
+    expect(screen.getByRole("alert")).not.toHaveClass("text-destructive");
   });
 
   it("announces information politely", () => {
@@ -174,10 +204,11 @@ describe("Alert", () => {
 });
 
 describe("Card and PageShell", () => {
-  it("a card shows what it holds", () => {
+  it("a card shows what it holds, with the small radius and the one shadow of the design", () => {
     render(<Card>Inside</Card>);
 
-    expect(screen.getByText("Inside")).toBeInTheDocument();
+    expect(screen.getByText("Inside")).toHaveClass("rounded-md", "shadow-card", "bg-card");
+    expect(screen.getByText("Inside")).not.toHaveClass("rounded-xl", "rounded-2xl");
   });
 
   it("a page has one main area, and a heading when it has a title", () => {
@@ -216,7 +247,8 @@ describe("long words and the shared pieces (reviews of #56 and #57)", () => {
   it("an information message stands out from the card it sits in", () => {
     render(<Alert>Heads up</Alert>);
 
-    expect(screen.getByRole("status")).toHaveClass("bg-asked-bg", "text-asked-fg");
-    expect(screen.getByRole("status")).not.toHaveClass("bg-surface");
+    // the saffron rule of the example's message card, in the text colour (not the error red)
+    expect(screen.getByRole("status")).toHaveClass("border-l-4", "border-l-saffron", "text-foreground");
+    expect(screen.getByRole("status")).not.toHaveClass("text-primary");
   });
 });

@@ -534,7 +534,7 @@ describe("QuestionsManager look (#56)", () => {
     render(<QuestionsManager projectId="5" />);
 
     const item = await screen.findByTestId("question");
-    expect(within(item).getByText("Asked")).toHaveClass("rounded-full");
+    expect(within(item).getByText("Asked").firstElementChild).toHaveClass("bg-status-asked");
     expect(within(item).getByText("Invented question 1")).toBeInTheDocument();
   });
 
@@ -547,8 +547,8 @@ describe("QuestionsManager look (#56)", () => {
     for (const button of buttons) expect(button).toHaveClass("min-h-11");
     const drop = buttons.find((b) => /drop/i.test(b.textContent ?? ""));
     expect(drop).toBeDefined();
-    expect(drop).toHaveClass("bg-error-bg");
-    expect(within(item).getByRole("button", { name: "Edit" })).not.toHaveClass("bg-error-bg");
+    expect(drop).toHaveClass("btn-danger");
+    expect(within(item).getByRole("button", { name: "Edit" })).not.toHaveClass("btn-danger");
   });
 
   it("the add form uses the shared fields and keeps its labels tied to them", async () => {

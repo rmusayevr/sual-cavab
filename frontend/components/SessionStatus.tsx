@@ -58,7 +58,7 @@ export default function SessionStatus() {
 
   switch (state.kind) {
     case "loading":
-      return <p className="text-muted">Checking your session…</p>;
+      return <p className="text-muted-foreground">Checking your session…</p>;
     case "signed-in":
       return (
         <div className="grid gap-3">

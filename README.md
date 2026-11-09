@@ -145,23 +145,42 @@ stays on one origin. Checks: `npm run lint`, `npm run typecheck`,
 
 ### Design system
 
-Styling is Tailwind CSS 4 (build-time CSS, no runtime code) with Inter as the
-font (`next/font`, self-hosted at build time; the build needs network access
-once to fetch it). The colours are tokens in `frontend/app/globals.css`, one set
-for light and one for dark, chosen by the person's system setting. Shared pieces
-are in `frontend/components/ui/`: `Button`, `Field` with `Input`, `Textarea`
-and `Select`, `StatusChip`, `Card`, `Alert` and `PageShell`. A new screen uses
-them instead of inline `style={{ }}`.
+The look is the owner's design example (an Azerbaijani ledger: deep navy,
+pomegranate red as the one action colour, saffron as the accent, carpet-diamond
+strips as seams; the folder `sual-cavab-design/` has the full spec in
+`DESIGN.md`). Styling is Tailwind CSS 4 (build-time CSS, no runtime code). The
+colours are tokens in `frontend/app/globals.css`, in oklch and with the
+example's names (`bg-card`, `text-muted-foreground`, `bg-navy`, `text-saffron`,
+`bg-status-open`, ...); a component never writes a colour. The three fonts are
+Fraunces (headings), Manrope (text) and JetBrains Mono (ids, counts), through
+`next/font`, self-hosted at build time (the build needs network access once to
+fetch them). Shared pieces are in `frontend/components/ui/`: `Button` (the
+example's `btn-primary`, `btn-ghost`, and `btn-danger` for dropping a question),
+`Field` with `Input`, `Textarea` and `Select`, `StatusChip` (a dot and the word),
+`Card`, `Alert` and `PageShell`. The four statuses have ONE table of words and
+dot colours, `frontend/lib/status.ts`. A new screen uses these instead of inline
+`style={{ }}`.
 
-- Text colours were measured at 4.5:1 contrast or more, borders of controls and
-  focus rings at 3:1 or more; `app/design-tokens.test.ts` checks that again
-  from `globals.css`, so a changed colour that fails the check fails the tests.
-- Tailwind's reset ("preflight") is deliberately not imported. Every screen is
-  now on the shared pieces, but it was built without a browser to look at, and
-  the reset changes every element that has no class (headings, lists, form
-  controls). The components therefore set their own font, border and
-  `list-none` instead of relying on it. Add the reset only after someone has
-  clicked through every screen (#32).
+- Text colours are at 4.5:1 contrast or more, borders of controls and focus
+  rings at 3:1 or more; `app/design-tokens.test.ts` converts the oklch values and
+  checks that again from `globals.css`, and refuses a hardcoded colour or an
+  inline style in a component.
+- Where this differs from the example, on purpose: an extra token,
+  `control-border`, because the hairline `border` is 1.47:1 against a card and too
+  faint for an input; the focus ring is saffron on the navy surfaces (red is 2.7:1
+  there); errors use the pomegranate red as emphasis and `--destructive` is kept
+  for dropping a question; the amber "asked" dot is 2.6:1 on a card, so the word
+  always sits beside it; status words are plain small text as in the screenshots
+  (the example's rule file says monospace, its screenshots do not).
+- **There is no dark theme**: the example has none, so the app no longer follows
+  the system's dark setting (`color-scheme` is light).
+- **Manrope has no capital Ə (U+018F)**, checked in the built font files; Fraunces
+  and JetBrains Mono have every Azerbaijani letter tested. A capital Ə in body
+  text falls back to the next font in the stack.
+- Tailwind's reset ("preflight") is deliberately not imported: it changes every
+  element that has no class (headings, lists, form controls), and no one has yet
+  looked at every screen in a browser. The components set their own font, border
+  and `list-none` instead. Add the reset only after a click-through (#32).
 - Keep your own base CSS inside `@layer base`; unlayered CSS beats every
   utility class.
 

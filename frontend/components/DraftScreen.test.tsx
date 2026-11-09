@@ -331,7 +331,7 @@ describe("DraftScreen look (#57)", () => {
     fireEvent.click(write);
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveClass("bg-error-bg", "text-error-fg");
+    expect(alert).toHaveClass("border-primary", "text-primary");
     expect(alert).toHaveTextContent("The draft could not be written");
     // the same card as the button, and after it, so the message is not far below the fold on a phone
     expect(alert.closest("form")).toBe(write.closest("form"));
