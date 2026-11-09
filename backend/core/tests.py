@@ -19,7 +19,9 @@ class DatabaseTests(TestCase):
             cursor.execute("SELECT 1")
             self.assertEqual(cursor.fetchone(), (1,))
 
-    def test_the_database_in_use_has_this_processs_id_in_its_name(self):
+    def test_the_database_in_use_is_the_one_configured_for_this_run(self):
+        # The wiring: Django created and uses the database the settings name. That the name carries
+        # the process's own id is checked in a fresh process (core.tests.TestDatabaseNameTests).
         # A TestCase, so the test database exists whichever tests were selected (#42).
         # Compared with the configured name, not os.getpid(): a --parallel worker has its own
         # id and connects to a clone named <configured name>_<n> (review of #59).
@@ -114,9 +116,10 @@ class TestDatabaseNameTests(SimpleTestCase):
         result = subprocess.run(
             [sys.executable, "-c", code],
             cwd=Path(settings.BASE_DIR),
-            env={**os.environ, **env},
+            env={**{k: v for k, v in os.environ.items() if k != "DJANGO_DATABASE_URL"}, "PYTHONIOENCODING": "utf-8", **env},
             capture_output=True,
             text=True,
+            encoding="utf-8",
             timeout=120,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -135,15 +138,29 @@ class TestDatabaseNameTests(SimpleTestCase):
         # PostgreSQL cuts a name at 63 characters without a word; Django then refuses it,
         # and the cut name has lost the end of the process id (review of #59).
         name, pid = self.seen_by(POSTGRES_DB="sual_cavab_" + "x" * 44)
-        self.assertLessEqual(len(name), 63, name)
+        self.assertLessEqual(len(name), 63 - 4, name)  # 4: room for a --parallel clone's _<n>
         self.assertTrue(name.startswith("test_sual_cavab_x"), name)
+        self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
+
+    def test_the_limit_counts_bytes_not_characters(self):
+        # PostgreSQL's 63 is bytes: 44 letters of "ə" are 88 bytes.
+        name, pid = self.seen_by(POSTGRES_DB="sual_cavab_" + "ə" * 44)
+        self.assertLessEqual(len(name.encode()), 63 - 4, name)
         self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
 
     def test_keepdb_keeps_the_one_shared_name(self):
         # --keepdb exists to find last run's database; a name that changes every run never does.
-        for flag in ("--keepdb", "-k"):
+        # argparse accepts any unambiguous start of a long option, so --keep and --keepd are keepdb too.
+        for flag in ("--keepdb", "--keepd", "--keep", "--k"):
             with self.subTest(flag=flag):
                 self.assertEqual(self.seen_by(argv=f"['manage.py', 'test', '{flag}']")[0], "")
+
+    def test_k_is_a_test_name_filter_not_keepdb(self):
+        # In Django's test runner -k PATTERN selects tests by name; it does not keep the database.
+        for argv in ("['manage.py', 'test', '-k', 'test_health']", "['manage.py', 'test', '-ktest_health']"):
+            with self.subTest(argv=argv):
+                name, pid = self.seen_by(argv=argv)
+                self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
 
     def test_a_server_keeps_djangos_default_test_name(self):
         for command in ("runserver", "shell", "check", "migrate"):

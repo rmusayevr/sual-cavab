@@ -145,14 +145,18 @@ if sys.argv[1:2] == ["test"]:
     # errors in the first run when started 1.5 to 2.8 seconds apart, a failed
     # database creation when started together. A run that is killed leaves its
     # database behind (see the README for how to drop it).
-    # --keepdb (-k) keeps Django's one shared name: its whole point is to find last
-    # run's database again. A long configured name is cut so the whole name stays
-    # within PostgreSQL's 63 characters (which would otherwise cut it without a
-    # word, losing the end of the id); the id at the end is what makes it unique.
-    if "--keepdb" not in sys.argv and "-k" not in sys.argv:
+    # --keepdb keeps Django's one shared name: its whole point is to find last run's
+    # database again. It has no short form (-k is Django's test-name filter), and
+    # argparse accepts any unambiguous start of a long option, so --keep and --keepd
+    # count too. Otherwise a long configured name is cut so the whole name stays
+    # within PostgreSQL's 63 BYTES (it would cut a longer one without a word and lose
+    # the end of the id), with 4 left for the _<n> that Django adds to the name of a
+    # --parallel clone. The id at the end is what makes the name unique.
+    if not any(arg.startswith("--k") and "--keepdb".startswith(arg) for arg in sys.argv):
         _pid_suffix = f"_{os.getpid()}"
-        _room = 63 - len("test_") - len(_pid_suffix)
-        DATABASES["default"].setdefault("TEST", {})["NAME"] = f"test_{DATABASES['default']['NAME'][:_room]}{_pid_suffix}"
+        _room = 63 - len("test_") - len(_pid_suffix) - 4
+        _base = DATABASES["default"]["NAME"].encode()[:_room].decode(errors="ignore")
+        DATABASES["default"].setdefault("TEST", {})["NAME"] = f"test_{_base}{_pid_suffix}"
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Baku"
