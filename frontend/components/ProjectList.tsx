@@ -10,7 +10,7 @@ import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
 import { Field, Input } from "./ui/Field";
-import { CarpetStrip, EmptyState, Eyebrow, LedgerLoading } from "./ui/Ledger";
+import { EmptyState, Eyebrow, LedgerLoading } from "./ui/Ledger";
 
 type State =
   | { kind: "loading" }
@@ -41,7 +41,7 @@ export default function ProjectList() {
   if (state.kind === "loading") return <LedgerLoading label="Loading projects…" />;
   if (state.kind === "signed-out")
     return (
-      <EmptyState>
+      <EmptyState strip={false}>
         <p className="flex flex-wrap items-center gap-2">
           <Link href="/login" className={buttonClasses("primary")}>
             Sign in
@@ -58,8 +58,8 @@ export default function ProjectList() {
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_22rem] lg:items-start">
       {state.projects.length === 0 ? (
-        <EmptyState>
-          <p>You are not on any project yet. Create one below, or ask an owner to add you.</p>
+        <EmptyState strip={false}>
+          <p>You are not on any project yet. Create one with the form, or ask an owner to add you.</p>
         </EmptyState>
       ) : (
         <ul className="grid list-none gap-3">
@@ -68,12 +68,11 @@ export default function ProjectList() {
               <Card className="flex items-start gap-4">
                 <span className="pt-3 font-mono text-xs text-primary">{String(index + 1).padStart(2, "0")}</span>
                 <div className="grid min-w-0 flex-1 gap-0.5">
-                  <Link
-                    href={`/projects/${p.id}`}
-                    className="inline-flex min-h-11 items-center font-display text-xl font-semibold hover:underline"
-                  >
-                    {p.name}
-                  </Link>
+                  <h2 className="text-xl font-semibold">
+                    <Link href={`/projects/${p.id}`} className="inline-flex min-h-11 items-center hover:underline">
+                      {p.name}
+                    </Link>
+                  </h2>
                   <p className="text-sm text-muted-foreground">
                     {p.client_name}
                     {p.my_role === "owner" ? " (owner)" : ""} · {p.open_question_count} still open
@@ -124,8 +123,7 @@ function NewProjectForm({ onCreated }: { onCreated: (p: Project) => void }) {
   }
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-md border bg-card text-card-foreground shadow-card">
-      <CarpetStrip />
+    <section className="min-w-0 overflow-hidden rounded-md border border-t-4 border-t-saffron bg-card text-card-foreground shadow-card">
       <form onSubmit={onSubmit} className="grid gap-4 p-5">
         <div className="grid gap-1">
           <Eyebrow>New line</Eyebrow>

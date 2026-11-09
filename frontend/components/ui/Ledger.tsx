@@ -47,11 +47,23 @@ export function LedgerLoading({ label }: { label: string }) {
   );
 }
 
-/** An empty or missing thing: a card under a carpet strip that says what to do next. */
-export function EmptyState({ className, children }: { className?: string; children: ReactNode }) {
+/**
+ * An empty or missing thing: a card under a carpet strip that says what to do next. The example
+ * allows ONE carpet strip per screen: a page that already has one (a header seam) passes
+ * `strip={false}` (review of #76).
+ */
+export function EmptyState({
+  className,
+  strip = true,
+  children,
+}: {
+  className?: string;
+  strip?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className={cx("min-w-0 overflow-hidden rounded-md border bg-card text-card-foreground shadow-card", className)}>
-      <CarpetStrip />
+      {strip && <CarpetStrip />}
       <div className="grid gap-3 p-5 [overflow-wrap:anywhere]">{children}</div>
     </div>
   );

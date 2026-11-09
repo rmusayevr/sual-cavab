@@ -293,6 +293,13 @@ describe("ledger pieces (#72)", () => {
     expect(container.querySelector('[aria-hidden="true"]')).toHaveClass("motion-safe:animate-pulse");
   });
 
+  it("an empty state can leave out its strip when the page already has the one it is allowed", () => {
+    const { container } = render(<EmptyState strip={false}>Nothing here yet.</EmptyState>);
+
+    expect(container.querySelectorAll(".pattern-carpet")).toHaveLength(0);
+    expect(screen.getByText("Nothing here yet.")).toBeInTheDocument();
+  });
+
   it("an empty state is a card under a carpet strip, with what to do next", () => {
     const { container } = render(<EmptyState>Nothing here yet.</EmptyState>);
 

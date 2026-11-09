@@ -197,10 +197,12 @@ same language, inside its rules; each item is a choice the owner can reject:
 - **Projects** (`/projects`): numbered ledger lines (`01`, `02`, in red monospace),
   the name in the serif, the client and "N still open" under it, and a saffron
   count chip for a project that is still waiting (the example's rail does the
-  same). The new-project form is a card under a carpet strip.
+  same). The names are level-2 headings. The new-project form is a card with a
+  saffron rule on top (the page already has its one carpet strip, the header's).
 - **Empty and missing things** (no projects, no questions, nothing open, project
   not found, signed out): a card under a carpet strip with one sentence that says
-  what to do next (`EmptyState`).
+  what to do next (`EmptyState`). The example allows one carpet strip per screen,
+  so a page that has a header seam (the projects page) leaves the strip out.
 - **Loading**: the words that say what is loading, and three ledger rows that
   pulse (`motion-safe:`: still when the person asks for less motion), instead of
   a spinner (`LedgerLoading`).
