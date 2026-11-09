@@ -562,6 +562,15 @@ describe("QuestionsManager look (#56)", () => {
     expect(screen.getByLabelText("Question")).toHaveAttribute("id", "add-text");
   });
 
+  it("the one-line field stays one line: the shared text area has no four-line minimum", async () => {
+    backend({ [LIST]: () => json(200, []) });
+    render(<QuestionsManager projectId="5" />);
+
+    await screen.findByText(/no questions yet/i);
+    expect(screen.getByLabelText("What it blocks")).toHaveAttribute("rows", "1");
+    expect(screen.getByLabelText("What it blocks")).not.toHaveClass("min-h-24");
+  });
+
   it("the answer form uses the shared fields, a date input and a select, all easy to tap", async () => {
     backend({ [LIST]: () => json(200, [question(1)]) });
     render(<QuestionsManager projectId="5" />);
