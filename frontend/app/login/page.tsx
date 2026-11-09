@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 
 import LoginForm from "@/components/LoginForm";
+import { Card } from "@/components/ui/Card";
+import { PageShell } from "@/components/ui/PageShell";
 
 export const metadata: Metadata = { title: "Sign in · Sual-Cavab" };
 
 export default function LoginPage() {
   return (
-    <main style={{ padding: "2rem", maxWidth: "40rem" }}>
-      <h1>Sign in</h1>
-      <p>Accounts are created by an administrator.</p>
-      <LoginForm />
-    </main>
+    <PageShell title="Sign in">
+      <p className="text-muted">Accounts are created by an administrator.</p>
+      <Card className="max-w-sm">
+        <LoginForm />
+      </Card>
+    </PageShell>
   );
 }

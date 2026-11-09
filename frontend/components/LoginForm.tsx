@@ -5,6 +5,10 @@ import { useState, type FormEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
 
+import { Alert } from "./ui/Alert";
+import { Button } from "./ui/Button";
+import { Field, Input } from "./ui/Field";
+
 export default function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -33,26 +37,37 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.75rem", maxWidth: "20rem" }}>
-      <label>
-        Email
-        <input type="email" name="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-      </label>
-      <label>
-        Password
-        <input
-          type="password"
-          name="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </label>
-      {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={submitting}>
+    <form onSubmit={onSubmit} className="grid gap-4">
+      <Field label="Email">
+        {(props) => (
+          <Input
+            type="email"
+            name="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            {...props}
+          />
+        )}
+      </Field>
+      <Field label="Password">
+        {(props) => (
+          <Input
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            {...props}
+          />
+        )}
+      </Field>
+      {error && <Alert tone="error">{error}</Alert>}
+      <Button type="submit" disabled={submitting} className="w-full">
         {submitting ? "Signing in…" : "Sign in"}
-      </button>
+      </Button>
     </form>
   );
 }

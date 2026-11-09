@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 
 import { apiFetch, type CurrentUser } from "@/lib/api";
 
+import { Alert } from "./ui/Alert";
+import { Button, buttonClasses } from "./ui/Button";
+import { Card } from "./ui/Card";
+
 type State =
   | { kind: "loading" }
   | { kind: "signed-in"; user: CurrentUser }
@@ -54,26 +58,33 @@ export default function SessionStatus() {
 
   switch (state.kind) {
     case "loading":
-      return <p>Checking your session…</p>;
+      return <p className="text-muted">Checking your session…</p>;
     case "signed-in":
       return (
-        <>
-          <p>
-            Signed in as {state.user.name || state.user.email}. <Link href="/projects">Your projects</Link>{" "}
-            <button type="button" onClick={signOut}>
-              Sign out
-            </button>
-          </p>
-          {signOutFailed && <p role="alert">Sign-out failed. You are still signed in.</p>}
-        </>
+        <div className="grid gap-3">
+          <Card className="grid gap-3">
+            <p>Signed in as {state.user.name || state.user.email}.</p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/projects" className={buttonClasses("primary")}>
+                Your projects
+              </Link>
+              <Button variant="secondary" onClick={signOut}>
+                Sign out
+              </Button>
+            </div>
+          </Card>
+          {signOutFailed && <Alert tone="error">Sign-out failed. You are still signed in.</Alert>}
+        </div>
       );
     case "signed-out":
       return (
-        <p>
-          <Link href="/login">Sign in</Link>
-        </p>
+        <div>
+          <Link href="/login" className={buttonClasses("primary")}>
+            Sign in
+          </Link>
+        </div>
       );
     case "error":
-      return <p role="alert">Could not reach the server.</p>;
+      return <Alert tone="error">Could not reach the server.</Alert>;
   }
 }
