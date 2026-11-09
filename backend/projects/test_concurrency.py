@@ -1,9 +1,10 @@
 """The row locks, proved with real threads on the real database (#34).
 
-Each test widens the race window on purpose: a short sleep inside the write,
-after the lock is taken. Without the lock the bad outcome then happens every
-time, not once in a hundred runs. Every thread is joined with a timeout, so a
-deadlock fails the test instead of hanging the suite.
+Each test widens the race window on purpose: the request that holds the lock
+waits until the other request has really reached the lock, then holds it a
+little longer. Without the lock the bad outcome then happens every time, not
+once in a hundred runs, and not only when the machine is fast. A request that
+waits for something that never comes fails the test through a timeout.
 
 Lock order, from projects/permissions.py: the caller's membership row first,
 then the project or question row.
@@ -19,13 +20,15 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+import questions.views as question_views
 from questions.models import Answer, Question
 from questions.services import change_status as real_change_status
 
+from . import views as project_views
 from .models import Membership, Project
 
 PASSWORD = "invented-test-password"
-HOLD = 0.6  # seconds a write holds its locks, so the other request really waits
+HOLD = 0.3  # seconds the holder keeps its locks once the other request is waiting for them
 JOIN_TIMEOUT = 60
 
 
@@ -42,8 +45,10 @@ def as_user(user):
 def run_together(*calls):
     """Run each call in its own thread; return their results in call order.
 
-    A call that raised, or a thread still alive after the timeout (a deadlock),
-    fails the test here with what happened.
+    A call that raised, or a thread still alive after the timeout, fails the test
+    here with what happened. (A deadlocked thread can still hold its transaction,
+    and the flush at teardown then waits for it; PostgreSQL normally ends a real
+    deadlock within about a second with an error, which is reported here.)
     """
     results = [None] * len(calls)
     errors = []
@@ -83,9 +88,20 @@ class RowLockTests(TransactionTestCase):
     def test_two_owners_removing_each_other_leave_one_owner(self):
         self.add(self.other, Membership.Role.OWNER)
         real_delete = Membership.delete
+        real_lock = project_views.lock_memberships
         start = threading.Barrier(2)
+        reached, both_reached = [], threading.Event()
+
+        def noting_lock(project, user):
+            # Called once the request has passed its unlocked checks (get_object), just before it
+            # asks for the lock: when both have, one holds the rows and the other is about to wait.
+            reached.append(user.pk)
+            if len(reached) == 2:
+                both_reached.set()
+            return real_lock(project, user)
 
         def slow_delete(membership, *args, **kwargs):
+            both_reached.wait(10)
             time.sleep(HOLD)
             return real_delete(membership, *args, **kwargs)
 
@@ -93,7 +109,9 @@ class RowLockTests(TransactionTestCase):
             start.wait(10)
             return as_user(caller).delete(f"/api/projects/{self.project.pk}/members/{target.pk}/").status_code
 
-        with mock.patch.object(Membership, "delete", slow_delete):
+        with mock.patch.object(Membership, "delete", slow_delete), mock.patch.object(
+            project_views, "lock_memberships", noting_lock
+        ):
             codes = run_together(lambda: remove(self.owner, self.other), lambda: remove(self.other, self.owner))
 
         # One removal wins; the other caller is no longer a member, so it is a 404.
@@ -127,7 +145,10 @@ class RowLockTests(TransactionTestCase):
         with mock.patch("questions.views.change_status", slow_change_status):
             codes = run_together(lambda: answer(self.owner), lambda: answer(self.other))
 
-        # The second sees an answered question: answered -> answered is refused.
+        # The second sees an answered question: answered -> answered is refused (400). Without the
+        # question lock both pass that check, and the second insert hits the database's
+        # one-current-answer constraint: the data stays safe, but the request errors instead of
+        # getting this clean refusal (the test then fails on the error).
         self.assertEqual(sorted(codes), [200, 400])
         self.assertEqual(Answer.objects.filter(question=question).count(), 1)
 
@@ -135,10 +156,19 @@ class RowLockTests(TransactionTestCase):
         self.add(self.other, Membership.Role.MEMBER)
         question = self.question()
         real_delete = Membership.delete
-        removing = threading.Event()
+        real_lock = question_views.lock_caller_membership
+        removing, at_the_lock = threading.Event(), threading.Event()
+
+        def noting_lock(project, user):
+            # The member's request has passed its unlocked checks (the project lookup) and now asks
+            # for its membership row, which the owner's removal holds.
+            if user.pk == self.other.pk:
+                at_the_lock.set()
+            return real_lock(project, user)
 
         def slow_delete(membership, *args, **kwargs):
             removing.set()  # the owner now holds every membership row of the project
+            at_the_lock.wait(10)
             time.sleep(HOLD)
             return real_delete(membership, *args, **kwargs)
 
@@ -150,7 +180,9 @@ class RowLockTests(TransactionTestCase):
             url = f"/api/projects/{self.project.pk}/questions/{question.number}/transition/"
             return as_user(self.other).post(url, {"to": "asked"}, format="json").status_code
 
-        with mock.patch.object(Membership, "delete", slow_delete):
+        with mock.patch.object(Membership, "delete", slow_delete), mock.patch.object(
+            question_views, "lock_caller_membership", noting_lock
+        ):
             removed, changed = run_together(remove_member, change_status_as_member)
 
         # No 500 (no deadlock), and the removed member's write is refused, not allowed one more time.
