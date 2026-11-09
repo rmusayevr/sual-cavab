@@ -140,6 +140,12 @@ AUTH_PASSWORD_VALIDATORS = [
 # workers, and this switch needs another signal for them.
 if sys.argv[1:2] == ["test"]:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+    # Each test run gets its own database (#42). With one shared name, `--noinput`
+    # makes a second run delete the database the first run is using: 18 to 20
+    # errors in the first run when started 1.5 to 2.8 seconds apart, a failed
+    # database creation when started together. A run that is killed leaves its
+    # database behind (see the README for how to drop it).
+    DATABASES["default"]["TEST"] = {"NAME": f"test_{DATABASES['default']['NAME']}_{os.getpid()}"}
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Baku"

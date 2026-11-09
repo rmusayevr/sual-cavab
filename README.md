@@ -115,6 +115,12 @@ the database, then migrate again.
 Run the tests with `python manage.py test`. Environment variables already set
 in your shell win over `backend/.env`.
 
+Each test run creates its own database, named `test_<POSTGRES_DB>_<process id>`,
+so two runs at the same time do not delete each other's data. A run that is
+killed leaves its database behind. List them with
+`psql -h 127.0.0.1 -p <POSTGRES_PORT> -U <POSTGRES_USER> -d postgres -c "\l test_*"`
+and drop the old ones with `DROP DATABASE <name>;`.
+
 ## Run the frontend
 
 Needs Node.js 22.22.2 or newer on the 22 line, or 24.15+ (the minimum jsdom
