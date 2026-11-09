@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { ageText, daysOpen, type Question } from "@/lib/projects";
 
+import { Alert } from "./ui/Alert";
+import { Card } from "./ui/Card";
+import { StatusChip } from "./ui/StatusChip";
+
 type State = { kind: "loading" } | { kind: "ready"; questions: Question[] } | { kind: "error" };
 
 /**
@@ -31,31 +35,28 @@ export default function StillOpen({ projectId, now }: { projectId: string; now?:
     };
   }, [projectId]);
 
-  if (state.kind === "loading") return <p>Loading questions…</p>;
-  if (state.kind === "error") return <p role="alert">Could not load the questions.</p>;
+  if (state.kind === "loading") return <p className="text-muted">Loading questions…</p>;
+  if (state.kind === "error") return <Alert tone="error">Could not load the questions.</Alert>;
 
   const reference = now ?? new Date();
   return (
-    <section>
-      <h2>Still open ({state.questions.length})</h2>
+    <section className="grid gap-3">
+      <h2 className="text-lg font-semibold">Still open ({state.questions.length})</h2>
       {state.questions.length === 0 ? (
-        <p>Nothing is open. Every question on this project has an answer or was dropped.</p>
+        <p className="text-muted">Nothing is open. Every question on this project has an answer or was dropped.</p>
       ) : (
-        <ul>
+        <ul className="grid list-none gap-3">
           {state.questions.map((q) => (
             <li key={q.id}>
-              <strong>{q.label}</strong> {q.text}
-              <br />
-              <small>
-                {q.status === "asked" ? "asked · " : ""}
-                {ageText(daysOpen(q.created_at, reference))}
-              </small>
-              {q.blocks && (
-                <>
-                  <br />
-                  <small>Blocks: {q.blocks}</small>
-                </>
-              )}
+              <Card className="grid gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold">{q.label}</span>
+                  <StatusChip status={q.status} />
+                </div>
+                <p>{q.text}</p>
+                <p className="text-sm text-muted">{ageText(daysOpen(q.created_at, reference))}</p>
+                {q.blocks && <p className="text-sm text-muted">Blocks: {q.blocks}</p>}
+              </Card>
             </li>
           ))}
         </ul>

@@ -109,3 +109,57 @@ describe("ProjectDetail", () => {
     expect(screen.getByText("Loading project…")).toBeInTheDocument();
   });
 });
+
+describe("ProjectDetail look (#55)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("offers the two actions as links that are easy to tap", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url, json(200, project))));
+
+    render(<ProjectDetail />);
+
+    for (const name of ["Manage questions", "Draft a message"]) {
+      expect(await screen.findByRole("link", { name })).toHaveClass("min-h-11");
+    }
+  });
+
+  it("shows the question's status as a chip with the word in it", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url, json(200, project))));
+
+    render(<ProjectDetail />);
+
+    expect(await screen.findByText("Open")).toHaveClass("rounded-full");
+  });
+
+  it("a project that is not found says so and links back with a button-looking link, and is not an error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(404, {})));
+
+    render(<ProjectDetail />);
+
+    expect(await screen.findByText(/Project not found/)).toBeInTheDocument();
+    const back = screen.getByRole("link", { name: "Back to your projects" });
+    expect(back).toHaveAttribute("href", "/projects");
+    expect(back).toHaveClass("min-h-11");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+describe("ProjectDetail: no bullets (#55)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("the lists of open questions and of members have no bullet markers (there is no browser reset)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url, json(200, project))));
+
+    render(<ProjectDetail />);
+
+    await screen.findByText(/Which payment providers are allowed\?/); // the questions load after the members
+    await screen.findByText(/Olga Owner · owner/);
+    const lists = await screen.findAllByRole("list");
+    expect(lists).toHaveLength(2);
+    for (const list of lists) expect(list).toHaveClass("list-none");
+  });
+});
