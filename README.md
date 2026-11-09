@@ -120,7 +120,8 @@ Each test run creates its own database, named `test_<POSTGRES_DB>_<process id>`
 runs at the same time do not delete each other's data. With `--keepdb` (it has
 no short form; `-k` selects tests by name) the one shared name
 `test_<POSTGRES_DB>` is used, so the database can be found again; do not run two
-`--keepdb` runs at once. A run that is killed leaves its database behind. List
+`--keepdb` runs at once (that shared name is not cut, so a very long
+`POSTGRES_DB` is refused by Django under `--keepdb`). A run that is killed leaves its database behind. List
 them with
 `psql -h 127.0.0.1 -p <POSTGRES_PORT> -U <POSTGRES_USER> -d postgres -c "\l test_*"`
 and drop the old ones with `DROP DATABASE <name>;`.

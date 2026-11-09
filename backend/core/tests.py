@@ -111,7 +111,8 @@ class TestDatabaseNameTests(SimpleTestCase):
             "import os, sys; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); "
             f"sys.argv = {argv}; "
             "from django.conf import settings; "
-            "print(settings.DATABASES['default'].get('TEST', {}).get('NAME', ''), os.getpid())"
+            "print('TESTNAME=' + settings.DATABASES['default'].get('TEST', {}).get('NAME', '')); "
+            "print('PID=' + str(os.getpid()))"
         )
         result = subprocess.run(
             [sys.executable, "-c", code],
@@ -123,8 +124,9 @@ class TestDatabaseNameTests(SimpleTestCase):
             timeout=120,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        parts = result.stdout.split()
-        return (parts[0], parts[1]) if len(parts) == 2 else ("", parts[0])
+        # Looked up by prefix, so extra output or a space in a name cannot shift what is read.
+        lines = {line.split("=", 1)[0]: line.split("=", 1)[1] for line in result.stdout.splitlines() if "=" in line}
+        return lines["TESTNAME"], lines["PID"]
 
     def test_the_name_ends_with_the_processs_own_id(self):
         name, pid = self.seen_by()
@@ -141,6 +143,11 @@ class TestDatabaseNameTests(SimpleTestCase):
         self.assertLessEqual(len(name), 63 - 4, name)  # 4: room for a --parallel clone's _<n>
         self.assertTrue(name.startswith("test_sual_cavab_x"), name)
         self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
+
+    def test_a_name_with_a_space_is_read_whole(self):
+        # The probe once read output by splitting on spaces, so a name with one was taken for "no name".
+        name, pid = self.seen_by(POSTGRES_DB="has space")
+        self.assertEqual(name, f"test_has space_{pid}")
 
     def test_the_limit_counts_bytes_not_characters(self):
         # PostgreSQL's 63 is bytes: 44 letters of "ə" are 88 bytes.
