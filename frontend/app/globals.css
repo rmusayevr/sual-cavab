@@ -14,6 +14,8 @@
  * app/design-tokens.test.ts which checks it again from this file):
  *  - control-border: one extra token. The example's hairline `border` is 1.47:1
  *    against a card, too faint for the border of an input (3:1 is needed).
+ *  - primary-on-navy: a second extra token, the same red made lighter. The primary red
+ *    is 2.73:1 on navy, too faint even for the landing headline; this one is 4.93:1.
  *  - --destructive is used for dropping a question (a destructive action);
  *    errors use the pomegranate red, as emphasis.
  *  - There is no dark theme: the example has none. color-scheme is light.
@@ -49,6 +51,7 @@
   --input: oklch(0.86 0.025 75);
   --ring: oklch(0.5 0.19 27);
   --control-border: oklch(0.58 0.03 255);
+  --primary-on-navy: oklch(0.64 0.19 27);
 
   --navy: oklch(0.2 0.045 255);
   --navy-foreground: oklch(0.95 0.015 80);
@@ -90,6 +93,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-control-border: var(--control-border);
+  --color-primary-on-navy: var(--primary-on-navy);
   --color-navy: var(--navy);
   --color-navy-foreground: var(--navy-foreground);
   --color-saffron: var(--saffron);
@@ -210,6 +214,9 @@
   gap: 0.5rem;
   border-radius: var(--radius);
   border: 1px solid currentColor;
+  /* The example relies on Tailwind's reset for a transparent fill; without it a <button> is light grey
+     (cream text on grey was 1.02:1 on navy, review of #74). */
+  background: transparent;
   padding: 0.7rem 1.2rem;
   font-weight: 600;
   font-size: 0.875rem;
