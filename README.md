@@ -143,6 +143,25 @@ the frontend: Next.js forwards `/api/*` to the backend, so the session cookie
 stays on one origin. Checks: `npm run lint`, `npm run typecheck`,
 `npm test`, `npm run build`.
 
+### Design system
+
+Styling is Tailwind CSS 4 (build-time CSS, no runtime code) with Inter as the
+font (`next/font`, self-hosted at build time; the build needs network access
+once to fetch it). The colours are tokens in `frontend/app/globals.css`, one set
+for light and one for dark, chosen by the person's system setting. Shared pieces
+are in `frontend/components/ui/`: `Button`, `Field` with `Input`, `Textarea`
+and `Select`, `StatusChip`, `Card`, `Alert` and `PageShell`. A new screen uses
+them instead of inline `style={{ }}`.
+
+- Text colours were measured at 4.5:1 contrast or more, borders of controls and
+  focus rings at 3:1 or more; `app/design-tokens.test.ts` checks that again
+  from `globals.css`, so a changed colour that fails the check fails the tests.
+- Tailwind's reset ("preflight") is deliberately not imported yet: screens not
+  yet moved onto the shared pieces still rely on the browser's defaults. Add it
+  when the last screen is moved (#57).
+- Keep your own base CSS inside `@layer base`; unlayered CSS beats every
+  utility class.
+
 ## Who can see or change a project
 
 Decided by the owner (#5). Access is checked in the query itself, so a project
