@@ -48,7 +48,10 @@ describe("StillOpen", () => {
     expect(screen.getByText("Invented question 1")).toBeInTheDocument();
     expect(screen.getByText(/Blocks: Refund screen/)).toBeInTheDocument();
     expect(screen.getByText(/open for 5 days/)).toBeInTheDocument();
-    expect(screen.getByText(/asked · open for 1 day\b/)).toBeInTheDocument();
+    // The status is a chip with the word in it (it used to be the text prefix "asked · "); the age stays its own line.
+    expect(screen.getByText("Asked")).toBeInTheDocument();
+    expect(screen.getAllByText("Open")).toHaveLength(2);
+    expect(screen.getByText(/^open for 1 day\b/)).toBeInTheDocument();
     expect(screen.getByText(/open for less than a day/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /still open \(3\)/i })).toBeInTheDocument();
   });

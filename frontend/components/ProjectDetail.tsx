@@ -8,6 +8,9 @@ import { apiFetch } from "@/lib/api";
 import type { Member, Project } from "@/lib/projects";
 
 import StillOpen from "./StillOpen";
+import { Alert } from "./ui/Alert";
+import { buttonClasses } from "./ui/Button";
+import { Card } from "./ui/Card";
 
 type State =
   | { kind: "loading" }
@@ -41,34 +44,49 @@ export default function ProjectDetail() {
     };
   }, [id]);
 
-  if (state.kind === "loading") return <p>Loading project…</p>;
+  if (state.kind === "loading") return <p className="text-muted">Loading project…</p>;
   if (state.kind === "not-found")
     return (
-      <p>
-        Project not found. <Link href="/projects">Back to your projects</Link>
-      </p>
+      <div className="grid gap-3">
+        <p>Project not found.</p>
+        <div>
+          <Link href="/projects" className={buttonClasses("secondary")}>
+            Back to your projects
+          </Link>
+        </div>
+      </div>
     );
-  if (state.kind === "error") return <p role="alert">Could not load the project.</p>;
+  if (state.kind === "error") return <Alert tone="error">Could not load the project.</Alert>;
 
   const { project, members } = state;
   return (
-    <>
-      <h1>{project.name}</h1>
-      <p>Client: {project.client_name}</p>
-      {project.description && <p>{project.description}</p>}
-      <h2>Members</h2>
-      <ul>
-        {members.map((m) => (
-          <li key={m.user_id}>
-            {m.name || m.email} · {m.role}
-          </li>
-        ))}
-      </ul>
-      <p>
-        <Link href={`/projects/${id}/questions`}>Manage questions</Link> ·{" "}
-        <Link href={`/projects/${id}/draft`}>Draft a message</Link>
-      </p>
+    <div className="grid gap-6">
+      <div className="grid gap-1">
+        <h1 className="text-2xl font-semibold">{project.name}</h1>
+        <p className="text-muted">Client: {project.client_name}</p>
+        {project.description && <p>{project.description}</p>}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/projects/${id}/questions`} className={buttonClasses("primary")}>
+          Manage questions
+        </Link>
+        <Link href={`/projects/${id}/draft`} className={buttonClasses("secondary")}>
+          Draft a message
+        </Link>
+      </div>
       <StillOpen key={id} projectId={id} />
-    </>
+      <section className="grid gap-3">
+        <h2 className="text-lg font-semibold">Members</h2>
+        <Card>
+          <ul className="grid gap-2">
+            {members.map((m) => (
+              <li key={m.user_id}>
+                {m.name || m.email} · {m.role}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </section>
+    </div>
   );
 }

@@ -106,3 +106,36 @@ describe("ProjectList", () => {
     expect(screen.getByLabelText("Project name")).toHaveValue("x");
   });
 });
+
+describe("ProjectList look (#55)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the client, the role and the count under the project's name", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3)])));
+
+    render(<ProjectList />);
+
+    const link = await screen.findByRole("link", { name: "Ticketing" });
+    expect(link.closest("li")).toHaveTextContent("Invented Client (owner) · 3 still open");
+  });
+
+  it("the new-project form uses the shared fields and button", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [])));
+
+    render(<ProjectList />);
+
+    expect(await screen.findByLabelText("Project name")).toHaveClass("min-h-11");
+    expect(screen.getByLabelText("Client")).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Create project" })).toHaveClass("min-h-11");
+  });
+
+  it("the sign-in link for a signed-out visitor is easy to tap", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(403, {})));
+
+    render(<ProjectList />);
+
+    expect(await screen.findByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+  });
+});

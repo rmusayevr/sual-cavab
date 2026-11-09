@@ -6,6 +6,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch } from "@/lib/api";
 import type { Project } from "@/lib/projects";
 
+import { Alert } from "./ui/Alert";
+import { Button, buttonClasses } from "./ui/Button";
+import { Card } from "./ui/Card";
+import { Field, Input } from "./ui/Field";
+
 type State =
   | { kind: "loading" }
   | { kind: "ready"; projects: Project[] }
@@ -32,34 +37,44 @@ export default function ProjectList() {
     };
   }, []);
 
-  if (state.kind === "loading") return <p>Loading projects…</p>;
+  if (state.kind === "loading") return <p className="text-muted">Loading projects…</p>;
   if (state.kind === "signed-out")
     return (
-      <p>
-        <Link href="/login">Sign in</Link> to see your projects.
+      <p className="flex flex-wrap items-center gap-2">
+        <Link href="/login" className={buttonClasses("primary")}>
+          Sign in
+        </Link>
+        <span>to see your projects.</span>
       </p>
     );
-  if (state.kind === "error") return <p role="alert">Could not load projects.</p>;
+  if (state.kind === "error") return <Alert tone="error">Could not load projects.</Alert>;
 
   const added = (project: Project) =>
     setState((s) => (s.kind === "ready" ? { kind: "ready", projects: [...s.projects, project] } : s));
 
   return (
-    <>
+    <div className="grid gap-6">
       {state.projects.length === 0 ? (
-        <p>You are not on any project yet. Create one below, or ask an owner to add you.</p>
+        <p className="text-muted">You are not on any project yet. Create one below, or ask an owner to add you.</p>
       ) : (
-        <ul>
+        <ul className="grid gap-3">
           {state.projects.map((p) => (
             <li key={p.id}>
-              <Link href={`/projects/${p.id}`}>{p.name}</Link> · {p.client_name}
-              {p.my_role === "owner" ? " (owner)" : ""} · {p.open_question_count} still open
+              <Card className="grid gap-1">
+                <Link href={`/projects/${p.id}`} className="text-lg font-semibold text-primary hover:underline">
+                  {p.name}
+                </Link>
+                <p className="text-sm text-muted">
+                  {p.client_name}
+                  {p.my_role === "owner" ? " (owner)" : ""} · {p.open_question_count} still open
+                </p>
+              </Card>
             </li>
           ))}
         </ul>
       )}
       <NewProjectForm onCreated={added} />
-    </>
+    </div>
   );
 }
 
@@ -90,20 +105,20 @@ function NewProjectForm({ onCreated }: { onCreated: (p: Project) => void }) {
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: "0.5rem", maxWidth: "24rem", marginTop: "1.5rem" }}>
-      <h2>New project</h2>
-      <label>
-        Project name
-        <input required value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
-      <label>
-        Client
-        <input required value={clientName} onChange={(e) => setClientName(e.target.value)} />
-      </label>
-      {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={saving}>
-        {saving ? "Creating…" : "Create project"}
-      </button>
-    </form>
+    <Card className="max-w-sm">
+      <form onSubmit={onSubmit} className="grid gap-4">
+        <h2 className="text-lg font-semibold">New project</h2>
+        <Field label="Project name">
+          {(props) => <Input required value={name} onChange={(e) => setName(e.target.value)} {...props} />}
+        </Field>
+        <Field label="Client">
+          {(props) => <Input required value={clientName} onChange={(e) => setClientName(e.target.value)} {...props} />}
+        </Field>
+        {error && <Alert tone="error">{error}</Alert>}
+        <Button type="submit" disabled={saving} className="w-full">
+          {saving ? "Creating…" : "Create project"}
+        </Button>
+      </form>
+    </Card>
   );
 }

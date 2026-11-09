@@ -109,3 +109,36 @@ describe("ProjectDetail", () => {
     expect(screen.getByText("Loading project…")).toBeInTheDocument();
   });
 });
+
+describe("ProjectDetail look (#55)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("offers the two actions as links that are easy to tap", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url, json(200, project))));
+
+    render(<ProjectDetail />);
+
+    for (const name of ["Manage questions", "Draft a message"]) {
+      expect(await screen.findByRole("link", { name })).toHaveClass("min-h-11");
+    }
+  });
+
+  it("shows the question's status as a chip with the word in it", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => answer(url, json(200, project))));
+
+    render(<ProjectDetail />);
+
+    expect(await screen.findByText("Open")).toHaveClass("rounded-full");
+  });
+
+  it("a project that is not found says so and links back, as a message and not an error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(404, {})));
+
+    render(<ProjectDetail />);
+
+    expect(await screen.findByText(/Project not found/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to your projects" })).toHaveAttribute("href", "/projects");
+  });
+});
