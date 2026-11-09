@@ -1,297 +1,360 @@
 {
-  "harness": "0.2.0",
+  "harness": "0.3.0",
   "profile": "full",
   "command": "install --profile full",
-  "installedAt": "2026-11-08T17:00:23.218Z",
+  "installedAt": "2026-11-09T00:12:17.176Z",
   "source": "C:/Users/ADMIN/Desktop/Projects/claude-harness",
   "files": [
     {
       "to": ".claude/skills/add-a-feature-flag/SKILL.md",
       "from": "skills/add-a-feature-flag/SKILL.md",
       "kind": "skill",
-      "sha": "0b977910b3aa28bc"
+      "sha": "0b977910b3aa28bc",
+      "bodySha": "090be07b2aa434b5"
     },
     {
       "to": ".claude/skills/audit-permissions/SKILL.md",
       "from": "skills/audit-permissions/SKILL.md",
       "kind": "skill",
-      "sha": "422cdca0392ce153"
+      "sha": "422cdca0392ce153",
+      "bodySha": "ae0ea7278e9353ae"
     },
     {
       "to": ".claude/skills/bisect-the-change/SKILL.md",
       "from": "skills/bisect-the-change/SKILL.md",
       "kind": "skill",
-      "sha": "d50dd2149df4758b"
+      "sha": "d50dd2149df4758b",
+      "bodySha": "cc10b44de573bf9c"
     },
     {
       "to": ".claude/skills/check-the-edges/SKILL.md",
       "from": "skills/check-the-edges/SKILL.md",
       "kind": "skill",
-      "sha": "8677400f2b2b66f4"
+      "sha": "8677400f2b2b66f4",
+      "bodySha": "ae624fde2f03949f"
     },
     {
       "to": ".claude/skills/debug-in-production/SKILL.md",
       "from": "skills/debug-in-production/SKILL.md",
       "kind": "skill",
-      "sha": "9840d0f612184f7a"
+      "sha": "9840d0f612184f7a",
+      "bodySha": "dc88ce2c5128d219"
     },
     {
       "to": ".claude/skills/deprecate/SKILL.md",
       "from": "skills/deprecate/SKILL.md",
       "kind": "skill",
-      "sha": "24039884377d3ac1"
+      "sha": "24039884377d3ac1",
+      "bodySha": "000e849b0be9112f"
     },
     {
       "to": ".claude/skills/design-a-test/SKILL.md",
       "from": "skills/design-a-test/SKILL.md",
       "kind": "skill",
-      "sha": "05f33d647b3331de"
+      "sha": "05f33d647b3331de",
+      "bodySha": "9ca74604005d7ae6"
     },
     {
       "to": ".claude/skills/design-failure-behavior/SKILL.md",
       "from": "skills/design-failure-behavior/SKILL.md",
       "kind": "skill",
-      "sha": "018145cb1aaf03cb"
+      "sha": "018145cb1aaf03cb",
+      "bodySha": "4abe905e266c10ee"
     },
     {
       "to": ".claude/skills/diagnose-a-hang/SKILL.md",
       "from": "skills/diagnose-a-hang/SKILL.md",
       "kind": "skill",
-      "sha": "993d16c8554ad47d"
+      "sha": "993d16c8554ad47d",
+      "bodySha": "cb00b5cff9bdad40"
     },
     {
       "to": ".claude/skills/environment-divergence/SKILL.md",
       "from": "skills/environment-divergence/SKILL.md",
       "kind": "skill",
-      "sha": "cf514c5106f961c8"
+      "sha": "cf514c5106f961c8",
+      "bodySha": "e314ecb51b5bda75"
     },
     {
       "to": ".claude/skills/find-prior-art/SKILL.md",
       "from": "skills/find-prior-art/SKILL.md",
       "kind": "skill",
-      "sha": "5d8d1cd83f022596"
+      "sha": "5d8d1cd83f022596",
+      "bodySha": "3b0e5d460c183b4c"
     },
     {
       "to": ".claude/skills/fresh-eyes-review/SKILL.md",
       "from": "skills/fresh-eyes-review/SKILL.md",
       "kind": "skill",
-      "sha": "d30c1da9c95cffc5"
+      "sha": "d30c1da9c95cffc5",
+      "bodySha": "65fec9a3a7ecd0a8"
     },
     {
       "to": ".claude/skills/git-archaeology/SKILL.md",
       "from": "skills/git-archaeology/SKILL.md",
       "kind": "skill",
-      "sha": "ab3fde4e711ff6a9"
+      "sha": "ab3fde4e711ff6a9",
+      "bodySha": "a0a87c612bae813e"
     },
     {
       "to": ".claude/skills/handle-secrets/SKILL.md",
       "from": "skills/handle-secrets/SKILL.md",
       "kind": "skill",
-      "sha": "765b0953bc9af287"
+      "sha": "765b0953bc9af287",
+      "bodySha": "d0b7110271d89934"
     },
     {
       "to": ".claude/skills/handoff/SKILL.md",
       "from": "skills/handoff/SKILL.md",
       "kind": "skill",
-      "sha": "ae62175e1b3bd229"
+      "sha": "ae62175e1b3bd229",
+      "bodySha": "70c9bb79f42c238f"
     },
     {
       "to": ".claude/skills/harness-audit/SKILL.md",
       "from": "skills/harness-audit/SKILL.md",
       "kind": "skill",
-      "sha": "b29df3c36db8b804"
+      "sha": "b29df3c36db8b804",
+      "bodySha": "b29df3c36db8b804"
     },
     {
       "to": ".claude/skills/harness-status/SKILL.md",
       "from": "skills/harness-status/SKILL.md",
       "kind": "skill",
-      "sha": "baf5107ca390d417"
+      "sha": "baf5107ca390d417",
+      "bodySha": "baf5107ca390d417"
     },
     {
       "to": ".claude/skills/incident-writeup/SKILL.md",
       "from": "skills/incident-writeup/SKILL.md",
       "kind": "skill",
-      "sha": "29957992b7eeb562"
+      "sha": "29957992b7eeb562",
+      "bodySha": "dc3bd1d995df291a"
     },
     {
       "to": ".claude/skills/isolate-the-layer/SKILL.md",
       "from": "skills/isolate-the-layer/SKILL.md",
       "kind": "skill",
-      "sha": "e4705a29a9c252a6"
+      "sha": "e4705a29a9c252a6",
+      "bodySha": "d0cf7e69993d6529"
     },
     {
       "to": ".claude/skills/land-in-a-new-repo/SKILL.md",
       "from": "skills/land-in-a-new-repo/SKILL.md",
       "kind": "skill",
-      "sha": "ace89a599a5e885c"
+      "sha": "ace89a599a5e885c",
+      "bodySha": "b33ee9706e270f00"
     },
     {
       "to": ".claude/skills/locate-a-behavior/SKILL.md",
       "from": "skills/locate-a-behavior/SKILL.md",
       "kind": "skill",
-      "sha": "137e0f2d2ddc5494"
+      "sha": "137e0f2d2ddc5494",
+      "bodySha": "cda30d7829aad13a"
     },
     {
       "to": ".claude/skills/make-it-idempotent/SKILL.md",
       "from": "skills/make-it-idempotent/SKILL.md",
       "kind": "skill",
-      "sha": "124f36279c498694"
+      "sha": "124f36279c498694",
+      "bodySha": "48123381b4781649"
     },
     {
       "to": ".claude/skills/manage-a-rollout/SKILL.md",
       "from": "skills/manage-a-rollout/SKILL.md",
       "kind": "skill",
-      "sha": "0c157b77d3651e59"
+      "sha": "0c157b77d3651e59",
+      "bodySha": "b8b4f0e176e10213"
     },
     {
       "to": ".claude/skills/map-subsystem/SKILL.md",
       "from": "skills/map-subsystem/SKILL.md",
       "kind": "skill",
-      "sha": "887eb94aef91fd4c"
+      "sha": "887eb94aef91fd4c",
+      "bodySha": "887eb94aef91fd4c"
     },
     {
       "to": ".claude/skills/migrate-data/SKILL.md",
       "from": "skills/migrate-data/SKILL.md",
       "kind": "skill",
-      "sha": "cf9f56280af0e702"
+      "sha": "cf9f56280af0e702",
+      "bodySha": "c6719c58fa38d3fc"
     },
     {
       "to": ".claude/skills/mitigate-first/SKILL.md",
       "from": "skills/mitigate-first/SKILL.md",
       "kind": "skill",
-      "sha": "883a8508edc36fb7"
+      "sha": "883a8508edc36fb7",
+      "bodySha": "8f95d56a71f32b61"
     },
     {
       "to": ".claude/skills/profile-before-optimizing/SKILL.md",
       "from": "skills/profile-before-optimizing/SKILL.md",
       "kind": "skill",
-      "sha": "529dcaa29485eabc"
+      "sha": "529dcaa29485eabc",
+      "bodySha": "b73fbadbd03162b3"
     },
     {
       "to": ".claude/skills/promote-lesson/SKILL.md",
       "from": "skills/promote-lesson/SKILL.md",
       "kind": "skill",
-      "sha": "e9c3c9a589a4fa2f"
+      "sha": "e31c98acbd6e4e0d",
+      "bodySha": "e31c98acbd6e4e0d"
     },
     {
       "to": ".claude/skills/read-your-own-diff/SKILL.md",
       "from": "skills/read-your-own-diff/SKILL.md",
       "kind": "skill",
-      "sha": "3de5db0e0153ffcb"
+      "sha": "3de5db0e0153ffcb",
+      "bodySha": "a81cecf08d474b59"
     },
     {
       "to": ".claude/skills/recall-lessons/SKILL.md",
       "from": "skills/recall-lessons/SKILL.md",
       "kind": "skill",
-      "sha": "52d9e55b207c0290"
+      "sha": "52d9e55b207c0290",
+      "bodySha": "3a0e176a5874879d"
     },
     {
       "to": ".claude/skills/refactor-safely/SKILL.md",
       "from": "skills/refactor-safely/SKILL.md",
       "kind": "skill",
-      "sha": "96f9b0e87f45646f"
+      "sha": "96f9b0e87f45646f",
+      "bodySha": "c1d17fdf5af6ec38"
     },
     {
       "to": ".claude/skills/reproduce-first/SKILL.md",
       "from": "skills/reproduce-first/SKILL.md",
       "kind": "skill",
-      "sha": "94d020932227955c"
+      "sha": "94d020932227955c",
+      "bodySha": "c32ff80ae2cf81ba"
     },
     {
       "to": ".claude/skills/review-a-config-change/SKILL.md",
       "from": "skills/review-a-config-change/SKILL.md",
       "kind": "skill",
-      "sha": "bb1e7269d20c2cdd"
+      "sha": "bb1e7269d20c2cdd",
+      "bodySha": "ba993792e255889c"
     },
     {
       "to": ".claude/skills/review-a-dependency/SKILL.md",
       "from": "skills/review-a-dependency/SKILL.md",
       "kind": "skill",
-      "sha": "3a76247370129e72"
+      "sha": "3a76247370129e72",
+      "bodySha": "7dc646ba938f930f",
+      "incidents": [
+        "c6f5f038fa6d2431"
+      ]
     },
     {
       "to": ".claude/skills/review-an-interface/SKILL.md",
       "from": "skills/review-an-interface/SKILL.md",
       "kind": "skill",
-      "sha": "4187e2b8e4f96193"
+      "sha": "4187e2b8e4f96193",
+      "bodySha": "cb3e1785f99290c1"
     },
     {
       "to": ".claude/skills/review-for-data-loss/SKILL.md",
       "from": "skills/review-for-data-loss/SKILL.md",
       "kind": "skill",
-      "sha": "810cbeea72b48bfa"
+      "sha": "e0740a66db0bcbb4",
+      "bodySha": "f35ace05998414ad",
+      "incidents": [
+        "d310f519b1ed9487"
+      ]
     },
     {
       "to": ".claude/skills/risky-op/SKILL.md",
       "from": "skills/risky-op/SKILL.md",
       "kind": "skill",
-      "sha": "2fdb707377a9ee61"
+      "sha": "2fdb707377a9ee61",
+      "bodySha": "a5ff0d64dff008fe"
     },
     {
       "to": ".claude/skills/schedule-a-job/SKILL.md",
       "from": "skills/schedule-a-job/SKILL.md",
       "kind": "skill",
-      "sha": "cb69acccd9e2284a"
+      "sha": "cb69acccd9e2284a",
+      "bodySha": "985447777a22c549"
     },
     {
       "to": ".claude/skills/scope-change/SKILL.md",
       "from": "skills/scope-change/SKILL.md",
       "kind": "skill",
-      "sha": "f01d4b6a0e3d1ffa"
+      "sha": "f01d4b6a0e3d1ffa",
+      "bodySha": "acfb8c6317b4234a"
     },
     {
       "to": ".claude/skills/smoke-test-a-deploy/SKILL.md",
       "from": "skills/smoke-test-a-deploy/SKILL.md",
       "kind": "skill",
-      "sha": "7cc3cbe0d7345675"
+      "sha": "7cc3cbe0d7345675",
+      "bodySha": "675b0136e82d4a94"
     },
     {
       "to": ".claude/skills/split-a-big-change/SKILL.md",
       "from": "skills/split-a-big-change/SKILL.md",
       "kind": "skill",
-      "sha": "d3ac59b6fe492d9e"
+      "sha": "d3ac59b6fe492d9e",
+      "bodySha": "490ee62b000f0576"
     },
     {
       "to": ".claude/skills/start/SKILL.md",
       "from": "skills/start/SKILL.md",
       "kind": "skill",
-      "sha": "56a09e878d16bc43"
+      "sha": "56a09e878d16bc43",
+      "bodySha": "772f3722e310139f",
+      "incidents": [
+        "d8adb17f3d9dbeed"
+      ]
     },
     {
       "to": ".claude/skills/survive-a-dependency-outage/SKILL.md",
       "from": "skills/survive-a-dependency-outage/SKILL.md",
       "kind": "skill",
-      "sha": "515452bef7edc3db"
+      "sha": "515452bef7edc3db",
+      "bodySha": "e3e9e3f16d852eb9"
     },
     {
       "to": ".claude/skills/test-async-code/SKILL.md",
       "from": "skills/test-async-code/SKILL.md",
       "kind": "skill",
-      "sha": "3104c571a96ce495"
+      "sha": "3104c571a96ce495",
+      "bodySha": "77d7146427608810"
     },
     {
       "to": ".claude/skills/trace-a-failure/SKILL.md",
       "from": "skills/trace-a-failure/SKILL.md",
       "kind": "skill",
-      "sha": "23e6a5bcaeb3e734"
+      "sha": "23e6a5bcaeb3e734",
+      "bodySha": "231b7a1e37fddb00"
     },
     {
       "to": ".claude/skills/triage-review/SKILL.md",
       "from": "skills/triage-review/SKILL.md",
       "kind": "skill",
-      "sha": "4705038c56e71735"
+      "sha": "4705038c56e71735",
+      "bodySha": "8c1d730724858669",
+      "incidents": [
+        "926d5b6ee690316a"
+      ]
     },
     {
       "to": ".claude/skills/verify-a-data-change/SKILL.md",
       "from": "skills/verify-a-data-change/SKILL.md",
       "kind": "skill",
-      "sha": "03e2fcea26fdbf73"
+      "sha": "03e2fcea26fdbf73",
+      "bodySha": "6d629fffd266fe46"
     },
     {
       "to": ".claude/skills/verify-for-real/SKILL.md",
       "from": "skills/verify-for-real/SKILL.md",
       "kind": "skill",
-      "sha": "a7dbecde63f4f3f4"
+      "sha": "9a344a3d2a632d0d",
+      "bodySha": "9c97eb7cc7ba9ba7",
+      "incidents": [
+        "fcb9644dade090e8"
+      ]
     },
     {
       "to": ".claude/skills/work-the-queue/reference.md",
@@ -303,43 +366,59 @@
       "to": ".claude/skills/work-the-queue/SKILL.md",
       "from": "skills/work-the-queue/SKILL.md",
       "kind": "skill",
-      "sha": "69663d675301eaa7"
+      "sha": "7e4d0b49cefac69a",
+      "bodySha": "5bac74ac5b117c3d",
+      "incidents": [
+        "e3429c6ec78b0955",
+        "4b1eee92c1b34636",
+        "4115baa3f0f19bf9",
+        "3b15b8669b05a716",
+        "460875c174550e9d",
+        "136dd9c3d3352d2d",
+        "e0f7706627bbadfd"
+      ]
     },
     {
       "to": ".claude/skills/write-a-bug-report/SKILL.md",
       "from": "skills/write-a-bug-report/SKILL.md",
       "kind": "skill",
-      "sha": "0d4fbb2d57a23303"
+      "sha": "0d4fbb2d57a23303",
+      "bodySha": "838ad10ae7849f9e"
     },
     {
       "to": ".claude/skills/write-a-runbook/SKILL.md",
       "from": "skills/write-a-runbook/SKILL.md",
       "kind": "skill",
-      "sha": "7d4d93f5cd540bfb"
+      "sha": "7d4d93f5cd540bfb",
+      "bodySha": "1b963a83c73a7e9b"
     },
     {
       "to": ".claude/skills/write-an-adr/SKILL.md",
       "from": "skills/write-an-adr/SKILL.md",
       "kind": "skill",
-      "sha": "7989811b69df6790"
+      "sha": "7989811b69df6790",
+      "bodySha": "e5dd16d801088cf9"
     },
     {
       "to": ".claude/skills/write-commit/SKILL.md",
       "from": "skills/write-commit/SKILL.md",
       "kind": "skill",
-      "sha": "c6f7d03179dcf075"
+      "sha": "c6f7d03179dcf075",
+      "bodySha": "82e0f1fd06449f88"
     },
     {
       "to": ".claude/skills/stateful-markers/SKILL.md",
       "from": "rules/backend/stateful-markers/SKILL.md",
       "kind": "pack",
-      "sha": "f64105425a2d72de"
+      "sha": "f64105425a2d72de",
+      "bodySha": "f32422fe8352e1ef"
     },
     {
       "to": ".claude/skills/loading-and-empty/SKILL.md",
       "from": "rules/frontend/loading-and-empty/SKILL.md",
       "kind": "pack",
-      "sha": "4ae0571afb0ca548"
+      "sha": "4ae0571afb0ca548",
+      "bodySha": "d340269d1a915fd7"
     },
     {
       "to": ".claude/agents/fresh-eyes-reviewer.md",
@@ -369,19 +448,19 @@
       "to": ".claude/hooks/harness-usage.mjs",
       "from": "hooks/harness-usage.mjs",
       "kind": "hook",
-      "sha": "952e5970a2de8705"
+      "sha": "c9f7b1b7b74dc677"
     },
     {
       "to": ".claude/harness/scripts/vault.mjs",
       "from": "scripts/vault.mjs",
       "kind": "script",
-      "sha": "34919d0f86df0b7c"
+      "sha": "998f1ba3787cb4bd"
     },
     {
       "to": ".claude/harness/scripts/audit.mjs",
       "from": "scripts/audit.mjs",
       "kind": "script",
-      "sha": "53b82e77eabbef72"
+      "sha": "32ac636462aa0bfa"
     },
     {
       "to": ".claude/harness/scripts/listing-cost.mjs",
@@ -403,6 +482,6 @@
   "claudeMd": {
     "mode": "block",
     "path": "CLAUDE.md",
-    "sha": "859d3db37f10d492"
+    "sha": "bfca050cb111a70f"
   }
 }

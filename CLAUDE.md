@@ -17,7 +17,7 @@ asking them. Backend: Django + DRF in `backend/`. Frontend: Next.js in
 - Drafting never sends anything. It returns text for a person to review.
 - Who can see or change a project is a business rule: ask before changing it.
 
-<!-- BEGIN harness v0.2.0 -->
+<!-- BEGIN harness v0.3.0 -->
 <!-- Managed by the harness plugin. Edits inside this block are overwritten on
      update unless `install.mjs` detects them, in which case it refuses without
      --force. Write your own rules OUTSIDE this block. -->
@@ -40,6 +40,9 @@ every subagent.
   result — not only when asked.
 
 ### Changes
+
+- A project's own rules outrank a skill's defaults. If a skill says to use a
+  model, option or default the project's rules forbid, follow the project.
 
 - State what you will not touch before a multi-file change.
 - An improvement noticed mid-change goes in a separate commit or does not go in.
@@ -64,4 +67,4 @@ every subagent.
 - When something in this project costs real work through a mistake that was
   foreseeable, run `/harness:promote-lesson` rather than resolving to remember.
 
-<!-- END harness v0.2.0 -->
+<!-- END harness v0.3.0 -->
