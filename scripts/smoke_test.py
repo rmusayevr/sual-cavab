@@ -26,8 +26,10 @@ TICKETING = "Demo: Ticketing platform"
 BOOKING = "Demo: Booking portal"
 # What `load_demo_data` creates: questions still open or asked, per demo project.
 EXPECTED_STILL_OPEN = {TICKETING: 3, BOOKING: 2}
-# A free Render service sleeps after 15 minutes and takes about a minute to wake:
-# the first request gets a long timeout, the rest a normal one.
+# A free Render service sleeps after 15 minutes. Measured on 2026-11-09 (three samples after 20
+# idle minutes): the API took 82.6, 92.3 and 92.5 s to answer its first request and the web
+# service about 33 s; a warm request 0.1 s. The first request gets a long timeout (150 s is
+# above the slowest sample by more than 55 s), the rest a normal one.
 WAKE_TIMEOUT = 150
 
 

@@ -8,6 +8,7 @@ import { apiFetch, type CurrentUser } from "@/lib/api";
 import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
+import { WakingNote } from "./ui/WakingNote";
 
 type State =
   | { kind: "loading" }
@@ -15,7 +16,14 @@ type State =
   | { kind: "signed-out" }
   | { kind: "error" };
 
-export default function SessionStatus({ layout = "block" }: { layout?: "block" | "nav" } = {}) {
+/**
+ * `wakingNote={false}` is for a page whose body already shows the note while it loads (the projects
+ * page): both wait on the same sleeping server, and the same sentence twice reads twice.
+ */
+export default function SessionStatus({
+  layout = "block",
+  wakingNote = true,
+}: { layout?: "block" | "nav"; wakingNote?: boolean } = {}) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [signOutFailed, setSignOutFailed] = useState(false);
 
@@ -62,7 +70,12 @@ export default function SessionStatus({ layout = "block" }: { layout?: "block" |
 
   switch (state.kind) {
     case "loading":
-      return <p className={nav ? "text-sm opacity-80" : "text-muted-foreground"}>Checking your session…</p>;
+      return (
+        <div className="grid min-w-0 gap-1">
+          <p className={nav ? "text-sm opacity-80" : "text-muted-foreground"}>Checking your session…</p>
+          {wakingNote && <WakingNote active tone={nav ? "navy" : "paper"} />}
+        </div>
+      );
     case "signed-in":
       return (
         <div className="grid min-w-0 gap-3 [overflow-wrap:anywhere]">

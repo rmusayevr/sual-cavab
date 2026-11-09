@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import SessionStatus from "./SessionStatus";
+import { WAKING_TEXT } from "./ui/WakingNote";
 
 const respond = (status: number, body?: unknown) =>
   vi.fn(async () => new Response(body === undefined ? null : JSON.stringify(body), { status }));
@@ -177,4 +178,52 @@ describe("SessionStatus in the navy header (#74)", () => {
 
     expect(screen.getByText("Checking your session…")).toHaveClass("text-sm");
   });
+});
+
+describe("SessionStatus: a slow first answer (#38)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  for (const layout of ["block", "nav"] as const) {
+    it(`says why in the ${layout} layout once the wait passes five seconds, and not before`, () => {
+      vi.useFakeTimers();
+      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+      render(<SessionStatus layout={layout} />);
+
+      expect(screen.getByText("Checking your session…")).toBeInTheDocument();
+      expect(screen.queryByText(WAKING_TEXT)).not.toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(5000));
+      expect(screen.getByText(WAKING_TEXT)).toBeInTheDocument();
+    });
+  }
+
+  it("takes the note away as soon as a slow answer comes", async () => {
+    vi.useFakeTimers();
+    let answer!: (r: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => (answer = resolve))));
+
+    render(<SessionStatus />);
+    act(() => vi.advanceTimersByTime(6000));
+    expect(screen.getByText(WAKING_TEXT)).toBeInTheDocument();
+
+    await act(async () => answer(new Response("{}", { status: 403 })));
+
+    expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByText(WAKING_TEXT)).not.toBeInTheDocument();
+  });
+
+  it("can leave the note out, for a page whose body already shows it", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    render(<SessionStatus layout="nav" wakingNote={false} />);
+    act(() => vi.advanceTimersByTime(6000));
+
+    expect(screen.queryByText(WAKING_TEXT)).not.toBeInTheDocument();
+    expect(screen.getByText("Checking your session…")).toBeInTheDocument();
+  });
+
 });

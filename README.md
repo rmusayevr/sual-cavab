@@ -348,7 +348,7 @@ has no backups and is deleted 30 days after it is created.
 2. If Render shows different addresses for the two services (a name was taken),
    correct those two values in each service's **Environment** tab and deploy
    **both** again. `BACKEND_URL` is read when the frontend is built.
-3. The first request to a sleeping free service takes about a minute.
+3. The first request to a sleeping free service takes a minute or two (measured below).
 4. Check it from your machine (needs only Python):
 
    ```bash
@@ -385,6 +385,11 @@ has no backups and is deleted 30 days after it is created.
 ### Things to know (Render's free plan, from its documentation)
 
 - **Services sleep** after 15 minutes without traffic and restart at will.
+  **Measured** on 2026-11-09, three samples each after 20 idle minutes: the first
+  request took 82.6, 92.3 and 92.5 s on the API and 33.2, 33.1 and 33.3 s on the
+  web service; a warm request 0.1 s. The services wake one after the other, so a
+  visitor to a fully asleep site may wait about two minutes (not measured end to
+  end). The app says so after five seconds of waiting (`WakingNote`).
   Everything the API needs is done in its start command (`migrate`,
   `createcachetable`, `load_demo_data`), because free instances have no shell.
 - **The database expires 30 days after creation**, with 14 days to upgrade, then

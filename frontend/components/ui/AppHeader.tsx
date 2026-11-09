@@ -25,7 +25,7 @@ export function AppHeader({
         <Link href="/" aria-label="Sual-Cavab, home" className="font-display text-xl font-semibold">
           Sual<span className="text-saffron">·</span>Cavab
         </Link>
-        <SessionStatus layout="nav" />
+        <SessionStatus layout="nav" wakingNote={false} />
       </nav>
       <div className="mx-auto grid max-w-6xl gap-3 px-6 pb-12 pt-6">
         <Eyebrow tone="navy">{eyebrow}</Eyebrow>
