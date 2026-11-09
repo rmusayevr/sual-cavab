@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { statusDot, statusLabel } from "@/lib/status";
 
-import HomePage from "./page";
+import HomePage, { metadata } from "./page";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -62,9 +62,11 @@ describe("HomePage", () => {
 
     render(<HomePage />);
 
+    // level 2, right after the page's one h1 (the example's h3 skipped a level; review of #74)
     for (const title of ["Questions per project", "A clear status", "Open at a glance", "Drafted messages"]) {
-      expect(screen.getByRole("heading", { level: 3, name: title })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 2, name: title })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("heading", { level: 3 })).not.toBeInTheDocument();
     for (const n of ["01", "02", "03", "04"]) expect(screen.getByText(n)).toHaveClass("font-mono");
   });
 
@@ -95,6 +97,41 @@ describe("HomePage", () => {
     }
     expect(container.querySelectorAll(".pattern-lattice").length).toBe(1);
     expect(container.querySelector(".pattern-lattice")).toHaveClass("bg-navy");
+  });
+
+  it("has one main landmark that holds the features and the band, with the header and footer outside it", () => {
+    pending();
+
+    render(<HomePage />);
+
+    const main = screen.getByRole("main");
+    expect(within(main).getByRole("heading", { name: "Questions per project" })).toBeInTheDocument();
+    expect(within(main).getByRole("heading", { name: "You review it. You send it." })).toBeInTheDocument();
+    expect(within(main).queryByRole("navigation")).not.toBeInTheDocument();
+    expect(within(main).queryByRole("contentinfo")).not.toBeInTheDocument();
+  });
+
+  it("describes itself for search and sharing, as the example does", () => {
+    expect(String(metadata.title)).toMatch(/Sual-Cavab/);
+    expect(String(metadata.description)).toMatch(/question/i);
+    expect(metadata.openGraph?.title).toBeTruthy();
+  });
+
+  it("keeps the sample question numbers grey, as the example's landing card does (red is for the workspace)", () => {
+    pending();
+
+    render(<HomePage />);
+
+    expect(screen.getByText("Q1")).toHaveClass("font-mono", "text-muted-foreground");
+    expect(screen.getByRole("list", { name: "Sample questions" })).toHaveAttribute("role", "list");
+  });
+
+  it("keeps the wordmark at the top of the header when the session block grows to two rows", () => {
+    pending();
+
+    render(<HomePage />);
+
+    expect(screen.getByRole("navigation")).toHaveClass("items-start");
   });
 
   it("has a footer that names the licence", () => {

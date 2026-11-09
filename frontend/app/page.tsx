@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import SessionStatus from "@/components/SessionStatus";
@@ -23,11 +24,20 @@ const FEATURES: Array<[string, string, string]> = [
   ["04", "Drafted messages", "Short Azerbaijani text, technical terms kept in English."],
 ];
 
+export const metadata: Metadata = {
+  title: "Sual-Cavab — track the questions your project is waiting on",
+  description: "Keep every open client question in one place and draft short Azerbaijani messages with English tech terms.",
+  openGraph: {
+    title: "Sual-Cavab — track open project questions",
+    description: "Numbered questions, clear statuses, and drafted client messages in Azerbaijani.",
+  },
+};
+
 export default function HomePage() {
   return (
     <div className="min-h-screen">
       <header className="bg-navy pattern-lattice text-navy-foreground">
-        <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-5">
+        <nav className="mx-auto flex max-w-6xl flex-wrap items-start justify-between gap-x-6 gap-y-3 px-6 py-5">
           <Link href="/" aria-label="Sual-Cavab, home" className="font-display text-xl font-semibold">
             Sual<span className="text-saffron">·</span>Cavab
           </Link>
@@ -55,10 +65,10 @@ export default function HomePage() {
           </div>
           <div className="min-w-0 rounded-lg bg-card p-2 text-card-foreground shadow-card">
             <div aria-hidden="true" className="h-2 rounded-t pattern-carpet" />
-            <ul aria-label="Sample questions" className="list-none divide-y">
+            <ul role="list" aria-label="Sample questions" className="list-none divide-y">
               {SAMPLE_QUESTIONS.map((q) => (
                 <li key={q.id} className="flex items-start gap-3 px-4 py-3">
-                  <span className="font-mono text-xs text-primary">Q{q.id}</span>
+                  <span className="font-mono text-xs text-muted-foreground">Q{q.id}</span>
                   <span className="min-w-0 flex-1 text-sm">{q.text}</span>
                   <StatusChip status={q.status} className="shrink-0 text-muted-foreground" />
                 </li>
@@ -69,35 +79,37 @@ export default function HomePage() {
         <div aria-hidden="true" className="h-3 pattern-carpet" />
       </header>
 
-      <section className="mx-auto grid max-w-6xl gap-x-0 gap-y-10 px-6 py-24 md:grid-cols-4 md:gap-y-0">
-        {FEATURES.map(([n, title, description]) => (
-          <div key={n} className="border-t-2 border-primary pt-5 md:pr-6">
-            <span className="font-mono text-xs text-primary">{n}</span>
-            <h3 className="mt-2 text-2xl font-semibold">{title}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{description}</p>
-          </div>
-        ))}
-      </section>
+      <main>
+        <section className="mx-auto grid max-w-6xl gap-x-0 gap-y-10 px-6 py-24 md:grid-cols-4 md:gap-y-0">
+          {FEATURES.map(([n, title, description]) => (
+            <div key={n} className="border-t-2 border-primary pt-5 md:pr-6">
+              <span className="font-mono text-xs text-primary">{n}</span>
+              <h2 className="mt-2 text-2xl font-semibold">{title}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+            </div>
+          ))}
+        </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="grid gap-10 rounded-lg bg-navy p-10 text-navy-foreground md:grid-cols-2 md:items-center">
-          <div>
-            <h2 className="text-4xl font-semibold">You review it. You send it.</h2>
-            <p className="mt-4 opacity-80">
-              Pick the open questions — Sual-Cavab writes the message. Nothing leaves without you.
-            </p>
+        <section className="mx-auto max-w-6xl px-6 pb-24">
+          <div className="grid gap-10 rounded-lg bg-navy p-10 text-navy-foreground md:grid-cols-2 md:items-center">
+            <div>
+              <h2 className="text-4xl font-semibold">You review it. You send it.</h2>
+              <p className="mt-4 opacity-80">
+                Pick the open questions — Sual-Cavab writes the message. Nothing leaves without you.
+              </p>
+            </div>
+            <blockquote className="rounded-md border-l-4 border-saffron bg-card p-6 text-sm leading-relaxed text-card-foreground">
+              Salam, Leyla xanım! Bir neçə sualımız var:
+              <br />
+              1. Kim <b>refund</b> edə bilər — yalnız <b>admin</b>, yoxsa <b>support</b> da?
+              <br />
+              2. Bir sifarişdə maksimum neçə bilet ola bilər?
+              <br />
+              Təşəkkürlər!
+            </blockquote>
           </div>
-          <blockquote className="rounded-md border-l-4 border-saffron bg-card p-6 text-sm leading-relaxed text-card-foreground">
-            Salam, Leyla xanım! Bir neçə sualımız var:
-            <br />
-            1. Kim <b>refund</b> edə bilər — yalnız <b>admin</b>, yoxsa <b>support</b> da?
-            <br />
-            2. Bir sifarişdə maksimum neçə bilet ola bilər?
-            <br />
-            Təşəkkürlər!
-          </blockquote>
-        </div>
-      </section>
+        </section>
+      </main>
 
       <footer className="border-t py-8 text-center text-xs text-muted-foreground">Sual-Cavab · MIT</footer>
     </div>

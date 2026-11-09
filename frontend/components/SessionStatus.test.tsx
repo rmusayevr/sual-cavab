@@ -124,3 +124,57 @@ describe("SessionStatus look (#54)", () => {
     expect(screen.getByRole("button", { name: "Sign out" })).toHaveClass("min-h-11");
   });
 });
+
+describe("SessionStatus in the navy header (#74)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("signs out with a button that has a transparent outline look, so it reads on navy", async () => {
+    vi.stubGlobal("fetch", respond(200, { id: 1, email: "ada@example.com", name: "Ada Lovelace" }));
+
+    render(<SessionStatus layout="nav" />);
+
+    const button = await screen.findByRole("button", { name: "Sign out" });
+    expect(button).toHaveClass("btn-ghost", "text-inherit"); // btn-ghost has the transparent fill (tested on the CSS)
+    expect(button).not.toHaveClass("bg-card");
+  });
+
+  it("wraps a long email instead of widening the header past a phone screen", async () => {
+    vi.stubGlobal("fetch", respond(200, { id: 1, email: "ayselmammadovahuseynova.consulting@example.az", name: "" }));
+
+    const { container } = render(<SessionStatus layout="nav" />);
+
+    await screen.findByText(/Signed in as ayselmammadovahuseynova/);
+    expect(container.firstElementChild).toHaveClass("min-w-0", "[overflow-wrap:anywhere]");
+  });
+
+  it("says when sign-out failed, under the actions", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/auth/me/") return new Response(JSON.stringify({ id: 1, email: "ada@example.com", name: "Ada" }), { status: 200 });
+      if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+      return new Response(init?.method === "POST" ? "{}" : null, { status: 500 });
+    }));
+
+    render(<SessionStatus layout="nav" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sign-out failed. You are still signed in.");
+  });
+
+  it("says when the server cannot be reached", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("offline"))));
+
+    render(<SessionStatus layout="nav" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not reach the server.");
+  });
+
+  it("shows the loading words in a quiet style before the session is known", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    render(<SessionStatus layout="nav" />);
+
+    expect(screen.getByText("Checking your session…")).toHaveClass("text-sm");
+  });
+});

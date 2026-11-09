@@ -214,6 +214,9 @@
   gap: 0.5rem;
   border-radius: var(--radius);
   border: 1px solid currentColor;
+  /* The example relies on Tailwind's reset for a transparent fill; without it a <button> is light grey
+     (cream text on grey was 1.02:1 on navy, review of #74). */
+  background: transparent;
   padding: 0.7rem 1.2rem;
   font-weight: 600;
   font-size: 0.875rem;

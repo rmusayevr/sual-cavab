@@ -247,6 +247,11 @@ describe("globals.css cascade", () => {
     }
   });
 
+  it("the outline button has a transparent fill: without the browser reset a button is light grey, which made 'Sign out' unreadable on navy (review of #74)", () => {
+    const block = css.match(/@utility btn-ghost \{([\s\S]*?)\n\}/)![1];
+    expect(block).toMatch(/background:\s*transparent/);
+  });
+
   it("the danger button gets darker on hover, not lighter: its text is 5.1:1 at rest and a lighter fill would drop it below 4.5", () => {
     const block = css.match(/@utility btn-danger \{([\s\S]*?)\n\}/)![1];
     expect(block).toMatch(/brightness\(0\.\d+\)/);

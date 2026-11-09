@@ -65,7 +65,7 @@ export default function SessionStatus({ layout = "block" }: { layout?: "block" |
       return <p className={nav ? "text-sm opacity-80" : "text-muted-foreground"}>Checking your session…</p>;
     case "signed-in":
       return (
-        <div className="grid gap-3">
+        <div className="grid min-w-0 gap-3 [overflow-wrap:anywhere]">
           {nav ? (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <p className="text-sm opacity-80">Signed in as {state.user.name || state.user.email}.</p>
