@@ -2,6 +2,10 @@
 
 import { useRef, useState, type FormEvent } from "react";
 
+import { Alert } from "./ui/Alert";
+import { Button } from "./ui/Button";
+import { Textarea } from "./ui/Field";
+
 export type QuestionFields = { text: string; why_it_matters: string; blocks: string };
 
 /** What a form's submit handler returns: the messages to show, or null on success. */
@@ -56,21 +60,23 @@ export default function QuestionForm({
     }
   }
 
+  // Not the shared Field: the ids come from idPrefix and each message is an alert of its own
+  // (the tests and the order of the messages depend on it); only the look is shared.
   const field = (name: keyof QuestionFields, label: string, rows: number) => (
-    <div>
-      <label htmlFor={`${idPrefix}-${name}`}>{label}</label>
-      <br />
-      <textarea
+    <div className="grid gap-1">
+      <label htmlFor={`${idPrefix}-${name}`} className="text-sm font-medium">
+        {label}
+      </label>
+      <Textarea
         id={`${idPrefix}-${name}`}
         rows={rows}
-        style={{ width: "100%" }}
         value={values[name]}
         onChange={(e) => set(name)(e.target.value)}
         aria-invalid={errors[name] ? true : undefined}
         aria-describedby={errors[name] ? `${idPrefix}-${name}-error` : undefined}
       />
       {errors[name] && (
-        <div role="alert" id={`${idPrefix}-${name}-error`}>
+        <div role="alert" id={`${idPrefix}-${name}-error`} className="text-sm text-error-fg">
           {errors[name]}
         </div>
       )}
@@ -78,19 +84,19 @@ export default function QuestionForm({
   );
 
   return (
-    <form onSubmit={submit} style={{ display: "grid", gap: "0.5rem" }}>
+    <form onSubmit={submit} className="grid gap-4">
       {field("text", "Question", 3)}
       {field("why_it_matters", "Why it matters", 2)}
       {field("blocks", "What it blocks", 1)}
-      {errors.form && <p role="alert">{errors.form}</p>}
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <button type="submit" disabled={saving}>
+      {errors.form && <Alert tone="error">{errors.form}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={saving}>
           {saving ? busyLabel : submitLabel}
-        </button>
+        </Button>
         {onCancel && (
-          <button type="button" onClick={onCancel} disabled={saving}>
+          <Button variant="secondary" onClick={onCancel} disabled={saving}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </form>

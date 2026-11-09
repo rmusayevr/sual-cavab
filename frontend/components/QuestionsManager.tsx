@@ -9,6 +9,10 @@ import { TRANSITIONS, fieldErrors, transitionLabel, type Answer, type FullQuesti
 
 import AnswerForm, { type AnswerFields } from "./AnswerForm";
 import QuestionForm, { type QuestionFields, type SubmitResult } from "./QuestionForm";
+import { Alert } from "./ui/Alert";
+import { Button, buttonClasses } from "./ui/Button";
+import { Card } from "./ui/Card";
+import { StatusChip } from "./ui/StatusChip";
 
 type State =
   | { kind: "loading" }
@@ -38,14 +42,19 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
     };
   }, [base]);
 
-  if (state.kind === "loading") return <p>Loading questions…</p>;
+  if (state.kind === "loading") return <p className="text-muted">Loading questions…</p>;
   if (state.kind === "not-found")
     return (
-      <p>
-        Project not found. <Link href="/projects">Back to your projects</Link>
-      </p>
+      <div className="grid gap-3">
+        <p>Project not found.</p>
+        <div>
+          <Link href="/projects" className={buttonClasses("secondary")}>
+            Back to your projects
+          </Link>
+        </div>
+      </div>
     );
-  if (state.kind === "error") return <p role="alert">Could not load the questions.</p>;
+  if (state.kind === "error") return <Alert tone="error">Could not load the questions.</Alert>;
 
   const replace = (updated: FullQuestion) =>
     setState((s) =>
@@ -64,19 +73,21 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
   }
 
   return (
-    <>
+    <div className="grid gap-6">
       {state.questions.length === 0 ? (
-        <p>No questions yet. Add the first one below.</p>
+        <p className="text-muted">No questions yet. Add the first one below.</p>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: "1rem" }}>
+        <ul className="grid list-none gap-4">
           {state.questions.map((q) => (
             <QuestionItem key={q.id} question={q} base={base} onChanged={replace} />
           ))}
         </ul>
       )}
-      <h2>Add a question</h2>
-      <QuestionForm idPrefix="add" submitLabel="Add question" busyLabel="Adding…" clearOnSuccess onSubmit={add} />
-    </>
+      <Card className="grid gap-4">
+        <h2 className="text-lg font-semibold">Add a question</h2>
+        <QuestionForm idPrefix="add" submitLabel="Add question" busyLabel="Adding…" clearOnSuccess onSubmit={add} />
+      </Card>
+    </div>
   );
 }
 
@@ -184,92 +195,84 @@ function QuestionItem({
 
   const id = `q${question.id}`;
   return (
-    <li data-testid="question" style={{ border: "1px solid #8884", padding: "0.75rem", borderRadius: "0.25rem" }}>
-      {mode === "edit" ? (
-        <QuestionForm
-          idPrefix={`edit-${question.id}`}
-          initial={{ text: question.text, why_it_matters: question.why_it_matters, blocks: question.blocks }}
-          submitLabel="Save"
-          busyLabel="Saving…"
-          onSubmit={save}
-          onCancel={() => setMode("view")}
-        />
-      ) : (
-        <>
-          <strong>{question.label}</strong> <span>{question.text}</span>
-          <br />
-          <small>{question.status}</small>
-          {question.why_it_matters && (
-            <>
-              <br />
-              <small>Why it matters: {question.why_it_matters}</small>
-            </>
-          )}
-          {question.blocks && (
-            <>
-              <br />
-              <small>Blocks: {question.blocks}</small>
-            </>
-          )}
-          {question.current_answer && <AnswerView answer={question.current_answer} heading="Answer" />}
-          {question.previous_answers.map((a) => (
-            <AnswerView key={a.id} answer={a} heading="Earlier answer" />
-          ))}
-        </>
-      )}
+    <li data-testid="question">
+      <Card className="grid gap-3">
+        {mode === "edit" ? (
+          <QuestionForm
+            idPrefix={`edit-${question.id}`}
+            initial={{ text: question.text, why_it_matters: question.why_it_matters, blocks: question.blocks }}
+            submitLabel="Save"
+            busyLabel="Saving…"
+            onSubmit={save}
+            onCancel={() => setMode("view")}
+          />
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <strong>{question.label}</strong>
+              <StatusChip status={question.status} />
+            </div>
+            <p>{question.text}</p>
+            {question.why_it_matters && <p className="text-sm text-muted">Why it matters: {question.why_it_matters}</p>}
+            {question.blocks && <p className="text-sm text-muted">Blocks: {question.blocks}</p>}
+            {question.current_answer && <AnswerView answer={question.current_answer} heading="Answer" />}
+            {question.previous_answers.map((a) => (
+              <AnswerView key={a.id} answer={a} heading="Earlier answer" />
+            ))}
+          </>
+        )}
 
-      {mode === "answer" && (
-        <div style={{ marginTop: "0.5rem" }}>
+        {mode === "answer" && (
           <AnswerForm
             idPrefix={`${id}-answer`}
             onSubmit={(answer) => transition("answered", answer)}
             onCancel={() => setMode("view")}
           />
-        </div>
-      )}
+        )}
 
-      {mode === "view" && (
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.5rem" }}>
-          {TRANSITIONS[question.status].map((to) => (
-            <button
-              key={to}
-              type="button"
+        {mode === "view" && (
+          <div className="flex flex-wrap gap-2">
+            {TRANSITIONS[question.status].map((to) => (
+              <Button
+                key={to}
+                variant={to === "dropped" ? "danger" : "secondary"}
+                disabled={busy}
+                onClick={() => {
+                  if (to !== "answered") return void move(to);
+                  setMessage(null);
+                  setMode("answer");
+                }}
+              >
+                {transitionLabel(question.status, to)}
+              </Button>
+            ))}
+            <Button
+              variant="secondary"
               disabled={busy}
               onClick={() => {
-                if (to !== "answered") return void move(to);
                 setMessage(null);
-                setMode("answer");
+                setMode("edit");
               }}
             >
-              {transitionLabel(question.status, to)}
-            </button>
-          ))}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setMessage(null);
-              setMode("edit");
-            }}
-          >
-            Edit
-          </button>
-        </div>
-      )}
-      {message && <p role="alert">{message}</p>}
+              Edit
+            </Button>
+          </div>
+        )}
+        {message && <Alert tone="error">{message}</Alert>}
+      </Card>
     </li>
   );
 }
 
 function AnswerView({ answer, heading }: { answer: Answer; heading: string }) {
   return (
-    <p style={{ margin: "0.5rem 0 0" }}>
-      <em>{heading}:</em> {answer.text}
-      <br />
-      <small>
+    <div className="grid gap-1 rounded-lg bg-bg p-3">
+      <p className="text-sm font-medium text-muted">{heading}</p>
+      <p>{answer.text}</p>
+      <p className="text-sm text-muted">
         by {answer.answered_by} · {answer.channel}
         {answer.channel_note ? ` (${answer.channel_note})` : ""} · {answer.answered_on}
-      </small>
-    </p>
+      </p>
+    </div>
   );
 }
