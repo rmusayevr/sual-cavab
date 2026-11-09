@@ -1,11 +1,10 @@
 /*
  * Design system (#53, plan on #52).
  *
- * Tailwind CSS 4 is imported WITHOUT its reset ("preflight"): the screens are
- * still styled by hand and rely on the browser's defaults (headings, lists,
- * buttons), and a reset would change all of them before they are restyled. The
- * steps #54 to #57 move each screen onto the shared components in
- * components/ui; the reset can be added when the last one is done.
+ * Tailwind CSS 4 is imported WITHOUT its reset ("preflight"): the reset changes every
+ * element that has no class (headings, lists, form controls), and no one has yet
+ * looked at the screens in a browser. The shared components in components/ui set
+ * their own font, border and list style instead. The README says when to add it.
  *
  * Colours are tokens, defined once for light and once for dark (the person's
  * system setting decides). Text pairs were measured at 4.5:1 or more, borders

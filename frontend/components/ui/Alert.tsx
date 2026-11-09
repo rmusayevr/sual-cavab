@@ -20,7 +20,7 @@ export function Alert({
       role={tone === "error" ? "alert" : "status"}
       className={cx(
         "rounded-lg border px-3 py-2 text-sm",
-        tone === "error" ? "border-error-fg bg-error-bg text-error-fg" : "border-border bg-surface text-text",
+        tone === "error" ? "border-error-fg bg-error-bg text-error-fg" : "border-asked-fg bg-asked-bg text-asked-fg",
         className,
       )}
     >

@@ -193,3 +193,30 @@ describe("Card and PageShell", () => {
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
   });
 });
+
+describe("long words and the shared pieces (reviews of #56 and #57)", () => {
+  it("a page, and a card in it, let a long unbroken word (a pasted link) wrap instead of being clipped on a phone", () => {
+    render(
+      <PageShell title="T">
+        <Card>Inside</Card>
+      </PageShell>,
+    );
+
+    // grid-cols-1 lets the column shrink below the word; overflow-wrap:anywhere lets the word break.
+    expect(screen.getByRole("main")).toHaveClass("grid-cols-1", "[overflow-wrap:anywhere]");
+    expect(screen.getByText("Inside")).toHaveClass("[overflow-wrap:anywhere]", "min-w-0");
+  });
+
+  it("a text area is as tall as its rows say, not at least four lines", () => {
+    render(<Textarea aria-label="short" rows={1} />);
+
+    expect(screen.getByLabelText("short")).not.toHaveClass("min-h-24");
+  });
+
+  it("an information message stands out from the card it sits in", () => {
+    render(<Alert>Heads up</Alert>);
+
+    expect(screen.getByRole("status")).toHaveClass("bg-asked-bg", "text-asked-fg");
+    expect(screen.getByRole("status")).not.toHaveClass("bg-surface");
+  });
+});
