@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import ProjectList from "./ProjectList";
@@ -163,5 +163,77 @@ describe("ProjectList: no bullets (#55)", () => {
     render(<ProjectList />);
 
     expect(await screen.findByRole("list")).toHaveClass("list-none");
+  });
+});
+
+describe("ProjectList: the ledger (#72)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("numbers the projects like ledger lines, in monospace and red", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3), project(2, "Refunds")])));
+
+    render(<ProjectList />);
+
+    await screen.findByRole("link", { name: "Ticketing" });
+    expect(screen.getByText("01")).toHaveClass("font-mono", "text-xs", "text-primary");
+    expect(screen.getByText("02")).toHaveClass("font-mono");
+  });
+
+  it("marks a project that is still waiting with a saffron count, like the example's rail, and no mark for 0", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3), project(2, "Refunds", "member", 0)])));
+
+    const { container } = render(<ProjectList />);
+
+    await screen.findByRole("link", { name: "Ticketing" });
+    const chips = container.querySelectorAll(".bg-saffron");
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent("3");
+    expect(chips[0]).toHaveAttribute("aria-hidden", "true"); // the sentence under the name says it
+    expect(chips[0]).toHaveClass("font-mono", "text-accent-foreground");
+  });
+
+  it("an empty list is a card that says what to do next, true at every width, and adds no carpet strip (the page header has the one)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [])));
+
+    const { container } = render(<ProjectList />);
+
+    const message = await screen.findByText(/not on any project yet/);
+    expect(message).toHaveTextContent("Create one with the form"); // not "below": at desktop width the form is beside it
+    expect(message).not.toHaveTextContent("below");
+    expect(message.closest(".bg-card")).not.toBeNull();
+    expect(container.querySelectorAll(".pattern-carpet")).toHaveLength(0);
+  });
+
+  it("names each project in a level-2 heading that holds the link, so a screen reader can move between projects", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3), project(2, "Refunds")])));
+
+    render(<ProjectList />);
+
+    const heading = await screen.findByRole("heading", { level: 2, name: "Ticketing" });
+    expect(within(heading).getByRole("link", { name: "Ticketing" })).toHaveAttribute("href", "/projects/1");
+    expect(screen.getByRole("heading", { level: 2, name: "Refunds" })).toBeInTheDocument();
+  });
+
+  it("loading shows what is loading and ledger rows that fill in", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    const { container } = render(<ProjectList />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading projects…");
+    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass("motion-safe:animate-pulse");
+  });
+
+  it("the new-project card has a saffron rule on top (not a carpet strip: the page has one already), a monospace eyebrow and a heading", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [])));
+
+    const { container } = render(<ProjectList />);
+
+    const heading = await screen.findByRole("heading", { level: 2, name: "New project" });
+    const card = heading.closest("section")!;
+    expect(card).toHaveClass("border-t-4", "border-t-saffron");
+    expect(within(card).getByText("New line")).toHaveClass("font-mono", "uppercase");
+    expect(container.querySelectorAll(".pattern-carpet")).toHaveLength(0);
   });
 });

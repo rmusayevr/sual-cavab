@@ -12,6 +12,7 @@ import QuestionForm, { type QuestionFields, type SubmitResult } from "./Question
 import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
+import { EmptyState, LedgerLoading } from "./ui/Ledger";
 import { StatusChip } from "./ui/StatusChip";
 
 type State =
@@ -42,17 +43,17 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
     };
   }, [base]);
 
-  if (state.kind === "loading") return <p className="text-muted-foreground">Loading questions…</p>;
+  if (state.kind === "loading") return <LedgerLoading label="Loading questions…" />;
   if (state.kind === "not-found")
     return (
-      <div className="grid gap-3">
+      <EmptyState>
         <p>Project not found.</p>
         <div>
           <Link href="/projects" className={buttonClasses("secondary")}>
             Back to your projects
           </Link>
         </div>
-      </div>
+      </EmptyState>
     );
   if (state.kind === "error") return <Alert tone="error">Could not load the questions.</Alert>;
 
@@ -75,7 +76,9 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
   return (
     <div className="grid gap-6">
       {state.questions.length === 0 ? (
-        <p className="text-muted-foreground">No questions yet. Add the first one below.</p>
+        <EmptyState>
+          <p>No questions yet. Add the first one below.</p>
+        </EmptyState>
       ) : (
         <ul className="grid list-none gap-4">
           {state.questions.map((q) => (

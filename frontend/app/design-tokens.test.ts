@@ -147,8 +147,22 @@ describe("design tokens", () => {
     const offenders = sourceFiles(join(process.cwd(), "components"))
       .concat(sourceFiles(join(process.cwd(), "app")))
       .filter((f) => /\.tsx$/.test(f) && !/\.test\./.test(f))
-      .filter((f) => /text-saffron/.test(readFileSync(f, "utf8")) && !/bg-navy/.test(readFileSync(f, "utf8")));
+      .filter((f) => {
+        // saffron text is fine in a file that puts it on navy, or whose only saffron text is the exact
+        // navy-tone branch of Eyebrow (a comment that mentions the gate does not count; review of #76)
+        const source = readFileSync(f, "utf8");
+        return /text-saffron/.test(source) && !/bg-navy/.test(source) && !/tone === "navy" \? "text-saffron"/.test(source);
+      });
     expect(offenders).toEqual([]);
+  });
+
+  it("an Eyebrow in the navy tone is only used in a file that has a navy surface", () => {
+    const users = sourceFiles(join(process.cwd(), "components"))
+      .concat(sourceFiles(join(process.cwd(), "app")))
+      .filter((f) => /\.tsx$/.test(f) && !/\.test\./.test(f))
+      .filter((f) => /<Eyebrow tone="navy"/.test(readFileSync(f, "utf8")));
+    expect(users.length).toBeGreaterThan(0);
+    expect(users.filter((f) => !/bg-navy/.test(readFileSync(f, "utf8")))).toEqual([]);
   });
 });
 

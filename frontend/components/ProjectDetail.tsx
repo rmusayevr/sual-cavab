@@ -11,6 +11,7 @@ import StillOpen from "./StillOpen";
 import { Alert } from "./ui/Alert";
 import { buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
+import { EmptyState, LedgerLoading } from "./ui/Ledger";
 
 type State =
   | { kind: "loading" }
@@ -44,17 +45,17 @@ export default function ProjectDetail() {
     };
   }, [id]);
 
-  if (state.kind === "loading") return <p className="text-muted-foreground">Loading project…</p>;
+  if (state.kind === "loading") return <LedgerLoading label="Loading project…" />;
   if (state.kind === "not-found")
     return (
-      <div className="grid gap-3">
+      <EmptyState>
         <p>Project not found.</p>
         <div>
           <Link href="/projects" className={buttonClasses("secondary")}>
             Back to your projects
           </Link>
         </div>
-      </div>
+      </EmptyState>
     );
   if (state.kind === "error") return <Alert tone="error">Could not load the project.</Alert>;
 

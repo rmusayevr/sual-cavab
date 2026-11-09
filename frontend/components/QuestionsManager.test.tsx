@@ -594,3 +594,32 @@ describe("QuestionsManager look (#56)", () => {
     expect(screen.getByRole("button", { name: "Save answer" })).toHaveClass("min-h-11");
   });
 });
+
+describe("QuestionsManager: the states (#72)", () => {
+  it("loading says what is loading and shows ledger rows that fill in", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    const { container } = render(<QuestionsManager projectId="5" />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading questions…");
+    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass("motion-safe:animate-pulse");
+  });
+
+  it("a missing project is a card under a carpet strip, with the way back", async () => {
+    backend({ [LIST]: () => json(404, {}) });
+
+    render(<QuestionsManager projectId="5" />);
+
+    const message = await screen.findByText(/Project not found/);
+    expect(message.closest(".bg-card")!.firstElementChild).toHaveClass("pattern-carpet");
+  });
+
+  it("no questions yet is a card under a carpet strip that says what to do", async () => {
+    backend({ [LIST]: () => json(200, []) });
+
+    render(<QuestionsManager projectId="5" />);
+
+    const message = await screen.findByText(/no questions yet/i);
+    expect(message.closest(".bg-card")!.firstElementChild).toHaveClass("pattern-carpet");
+  });
+});

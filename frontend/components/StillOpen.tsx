@@ -7,6 +7,7 @@ import { ageText, daysOpen, type Question } from "@/lib/projects";
 
 import { Alert } from "./ui/Alert";
 import { Card } from "./ui/Card";
+import { EmptyState, LedgerLoading } from "./ui/Ledger";
 import { StatusChip } from "./ui/StatusChip";
 
 type State = { kind: "loading" } | { kind: "ready"; questions: Question[] } | { kind: "error" };
@@ -35,7 +36,7 @@ export default function StillOpen({ projectId, now }: { projectId: string; now?:
     };
   }, [projectId]);
 
-  if (state.kind === "loading") return <p className="text-muted-foreground">Loading questions…</p>;
+  if (state.kind === "loading") return <LedgerLoading label="Loading questions…" />;
   if (state.kind === "error") return <Alert tone="error">Could not load the questions.</Alert>;
 
   const reference = now ?? new Date();
@@ -43,7 +44,9 @@ export default function StillOpen({ projectId, now }: { projectId: string; now?:
     <section className="grid gap-3">
       <h2 className="text-lg font-semibold">Still open ({state.questions.length})</h2>
       {state.questions.length === 0 ? (
-        <p className="text-muted-foreground">Nothing is open. Every question on this project has an answer or was dropped.</p>
+        <EmptyState>
+          <p>Nothing is open. Every question on this project has an answer or was dropped.</p>
+        </EmptyState>
       ) : (
         <ul className="grid list-none gap-3">
           {state.questions.map((q) => (
