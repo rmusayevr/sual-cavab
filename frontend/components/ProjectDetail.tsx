@@ -44,7 +44,7 @@ export default function ProjectDetail() {
     };
   }, [id]);
 
-  if (state.kind === "loading") return <p className="text-muted">Loading project…</p>;
+  if (state.kind === "loading") return <p className="text-muted-foreground">Loading project…</p>;
   if (state.kind === "not-found")
     return (
       <div className="grid gap-3">
@@ -63,7 +63,7 @@ export default function ProjectDetail() {
     <div className="grid gap-6">
       <div className="grid gap-1">
         <h1 className="text-2xl font-semibold">{project.name}</h1>
-        <p className="text-muted">Client: {project.client_name}</p>
+        <p className="text-muted-foreground">Client: {project.client_name}</p>
         {project.description && <p>{project.description}</p>}
       </div>
       <div className="flex flex-wrap gap-2">

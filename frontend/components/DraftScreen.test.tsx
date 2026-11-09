@@ -311,6 +311,7 @@ describe("DraftScreen look (#57)", () => {
     const box = await screen.findByRole("checkbox", { name: /^Q1\b/ });
     expect(box.closest("label")).toHaveClass("min-h-11", "rounded-lg");
     expect(box.closest("label")).toHaveTextContent("Invented question 1");
+    expect(screen.getByText("Q1")).toHaveClass("font-mono", "text-xs", "text-primary"); // ids: monospace, red
   });
 
   it("the buttons are easy to tap", async () => {
@@ -331,7 +332,7 @@ describe("DraftScreen look (#57)", () => {
     fireEvent.click(write);
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveClass("bg-error-bg", "text-error-fg");
+    expect(alert).toHaveClass("border-primary", "text-primary");
     expect(alert).toHaveTextContent("The draft could not be written");
     // the same card as the button, and after it, so the message is not far below the fold on a phone
     expect(alert.closest("form")).toBe(write.closest("form"));

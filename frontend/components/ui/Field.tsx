@@ -8,8 +8,8 @@ export type FieldControlProps = { id: string; "aria-describedby"?: string; "aria
 // font-sans: form controls do not inherit the page font by themselves (a textarea is monospace),
 // and the browser reset is not imported (see globals.css; review of #62).
 const controlClasses =
-  "w-full min-h-11 rounded-lg border border-control-border bg-surface px-3 py-2 font-sans text-base text-text " +
-  "placeholder:text-muted aria-invalid:border-error-fg disabled:opacity-60";
+  "w-full min-h-11 rounded-lg border border-control-border bg-card px-3 py-2 font-sans text-base text-foreground " +
+  "placeholder:text-muted-foreground aria-invalid:border-primary disabled:opacity-60";
 
 export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cx(controlClasses, className)} {...rest} />;
@@ -53,17 +53,17 @@ export function Field({
 
   return (
     <div className="grid gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-text">
+      <label htmlFor={id} className="text-sm font-medium text-foreground">
         {label}
       </label>
       {children(props)}
       {hint && (
-        <p id={hintId} className="text-sm text-muted">
+        <p id={hintId} className="text-sm text-muted-foreground">
           {hint}
         </p>
       )}
       {error && (
-        <p id={errorId} className="text-sm text-error-fg">
+        <p id={errorId} className="text-sm text-primary">
           {error}
         </p>
       )}

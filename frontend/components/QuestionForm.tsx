@@ -76,7 +76,7 @@ export default function QuestionForm({
         aria-describedby={errors[name] ? `${idPrefix}-${name}-error` : undefined}
       />
       {errors[name] && (
-        <div role="alert" id={`${idPrefix}-${name}-error`} className="text-sm text-error-fg">
+        <div role="alert" id={`${idPrefix}-${name}-error`} className="text-sm text-primary">
           {errors[name]}
         </div>
       )}

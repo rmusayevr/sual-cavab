@@ -1,12 +1,20 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, JetBrains_Mono, Manrope } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 
-// Inter has the letters Azerbaijani needs (ə ğ ı ö ü ş ç); they live in the
-// latin-ext subset, so both subsets are loaded (#53). Self-hosted by Next.js at
-// build time: the browser makes no request to Google.
-const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter", display: "swap" });
+// The three fonts of the design (DESIGN.md): Fraunces for headings, Manrope for text, JetBrains
+// Mono for ids, counts and status words. The Azerbaijani letters (ə ğ ı ö ü ş ç) live in the
+// latin-ext subset, so both subsets are loaded. Self-hosted by Next.js at build time: the browser
+// makes no request to Google. No other font is used.
+const fraunces = Fraunces({ subsets: ["latin", "latin-ext"], axes: ["opsz"], variable: "--font-fraunces", display: "swap" });
+const manrope = Manrope({ subsets: ["latin", "latin-ext"], variable: "--font-manrope", display: "swap" });
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin", "latin-ext"],
+  weight: "500",
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Sual-Cavab",
@@ -15,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${fraunces.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
       <body>{children}</body>
     </html>
   );

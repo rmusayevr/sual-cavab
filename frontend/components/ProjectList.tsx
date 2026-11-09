@@ -37,7 +37,7 @@ export default function ProjectList() {
     };
   }, []);
 
-  if (state.kind === "loading") return <p className="text-muted">Loading projects…</p>;
+  if (state.kind === "loading") return <p className="text-muted-foreground">Loading projects…</p>;
   if (state.kind === "signed-out")
     return (
       <p className="flex flex-wrap items-center gap-2">
@@ -55,7 +55,7 @@ export default function ProjectList() {
   return (
     <div className="grid gap-6">
       {state.projects.length === 0 ? (
-        <p className="text-muted">You are not on any project yet. Create one below, or ask an owner to add you.</p>
+        <p className="text-muted-foreground">You are not on any project yet. Create one below, or ask an owner to add you.</p>
       ) : (
         <ul className="grid list-none gap-3">
           {state.projects.map((p) => (
@@ -64,7 +64,7 @@ export default function ProjectList() {
                 <Link href={`/projects/${p.id}`} className="inline-flex min-h-11 items-center text-lg font-semibold text-primary hover:underline">
                   {p.name}
                 </Link>
-                <p className="text-sm text-muted">
+                <p className="text-sm text-muted-foreground">
                   {p.client_name}
                   {p.my_role === "owner" ? " (owner)" : ""} · {p.open_question_count} still open
                 </p>

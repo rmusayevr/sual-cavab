@@ -147,7 +147,7 @@ describe("ProjectList look (#55)", () => {
     render(<ProjectList />);
 
     const link = await screen.findByRole("link", { name: "Ticketing" });
-    expect(link.closest("li")!.firstElementChild).toHaveClass("rounded-xl");
+    expect(link.closest("li")!.firstElementChild).toHaveClass("rounded-md", "shadow-card");
     expect(link).toHaveClass("min-h-11");
   });
 });

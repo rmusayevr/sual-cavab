@@ -534,7 +534,7 @@ describe("QuestionsManager look (#56)", () => {
     render(<QuestionsManager projectId="5" />);
 
     const item = await screen.findByTestId("question");
-    expect(within(item).getByText("Asked")).toHaveClass("rounded-full");
+    expect(within(item).getByText("Asked").firstElementChild).toHaveClass("bg-status-asked");
     expect(within(item).getByText("Invented question 1")).toBeInTheDocument();
   });
 
@@ -547,8 +547,18 @@ describe("QuestionsManager look (#56)", () => {
     for (const button of buttons) expect(button).toHaveClass("min-h-11");
     const drop = buttons.find((b) => /drop/i.test(b.textContent ?? ""));
     expect(drop).toBeDefined();
-    expect(drop).toHaveClass("bg-error-bg");
-    expect(within(item).getByRole("button", { name: "Edit" })).not.toHaveClass("bg-error-bg");
+    expect(drop).toHaveClass("btn-danger");
+    expect(within(item).getByRole("button", { name: "Edit" })).not.toHaveClass("btn-danger");
+  });
+
+  it("shows a question's number in monospace and red, and its answer as the example's green-ruled block", async () => {
+    backend({ [LIST]: () => json(200, [question(1, { status: "answered", current_answer: answerOf() })]) });
+    render(<QuestionsManager projectId="5" />);
+
+    const item = await screen.findByTestId("question");
+    expect(within(item).getByText("Q1")).toHaveClass("font-mono", "text-xs", "text-primary");
+    const block = within(item).getByText("30 days.").parentElement!;
+    expect(block).toHaveClass("border-l-4", "border-status-answered", "bg-muted");
   });
 
   it("the add form uses the shared fields and keeps its labels tied to them", async () => {

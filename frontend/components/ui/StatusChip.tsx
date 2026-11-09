@@ -1,22 +1,16 @@
 import { cx } from "@/lib/cx";
+import { statusDot, statusLabel, type QuestionStatus } from "@/lib/status";
 
-export type QuestionStatus = "open" | "asked" | "answered" | "dropped";
-
-const chips: Record<QuestionStatus, { label: string; classes: string }> = {
-  open: { label: "Open", classes: "bg-open-bg text-open-fg" },
-  asked: { label: "Asked", classes: "bg-asked-bg text-asked-fg" },
-  answered: { label: "Answered", classes: "bg-answered-bg text-answered-fg" },
-  dropped: { label: "Dropped", classes: "bg-dropped-bg text-dropped-fg" },
-};
-
-/** A question's status. The word is always shown: colour alone is never the signal. */
+/**
+ * A question's status: a coloured dot and the word (DESIGN.md, section 1). The word is always
+ * shown, so colour is never the only signal. The words and the dot colours come from ONE table
+ * (lib/status.ts).
+ */
 export function StatusChip({ status, className }: { status: QuestionStatus; className?: string }) {
-  const chip = chips[status];
   return (
-    <span
-      className={cx("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", chip.classes, className)}
-    >
-      {chip.label}
+    <span className={cx("inline-flex items-center gap-1.5 text-xs", className)}>
+      <span aria-hidden="true" className={cx("h-2 w-2 shrink-0 rounded-full", statusDot[status])} />
+      {statusLabel[status]}
     </span>
   );
 }

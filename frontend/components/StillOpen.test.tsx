@@ -51,6 +51,7 @@ describe("StillOpen", () => {
     // The status is a chip with the word in it (it used to be the text prefix "asked · "); the age stays its own
     // line. Each is tied to ITS question, which the old single regex did for Q2 only.
     const item = (label: string) => within(screen.getByText(label).closest("li")!);
+    expect(screen.getByText("Q1")).toHaveClass("font-mono", "text-xs", "text-primary"); // ids: monospace, red
     expect(item("Q1").getByText("Open")).toBeInTheDocument();
     expect(item("Q1").getByText(/^open for 5 days/)).toBeInTheDocument();
     expect(item("Q2").getByText("Asked")).toBeInTheDocument();

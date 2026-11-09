@@ -130,7 +130,8 @@ describe("ProjectDetail look (#55)", () => {
 
     render(<ProjectDetail />);
 
-    expect(await screen.findByText("Open")).toHaveClass("rounded-full");
+    // the word, with a coloured dot before it
+    expect((await screen.findByText("Open")).firstElementChild).toHaveClass("bg-status-open", "rounded-full");
   });
 
   it("a project that is not found says so and links back with a button-looking link, and is not an error", async () => {

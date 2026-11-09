@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Sign in · Sual-Cavab" };
 export default function LoginPage() {
   return (
     <PageShell title="Sign in">
-      <p className="text-muted">Accounts are created by an administrator.</p>
+      <p className="text-muted-foreground">Accounts are created by an administrator.</p>
       <Card className="max-w-sm">
         <LoginForm />
       </Card>

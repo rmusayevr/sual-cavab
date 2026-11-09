@@ -8,7 +8,7 @@ export default function ProjectPage() {
     <PageShell>
       {/* useParams() reads the URL at request time; with cacheComponents the
           build fails unless it sits inside Suspense. */}
-      <Suspense fallback={<p className="text-muted">Loading project…</p>}>
+      <Suspense fallback={<p className="text-muted-foreground">Loading project…</p>}>
         <ProjectDetail />
       </Suspense>
     </PageShell>
