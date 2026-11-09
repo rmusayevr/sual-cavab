@@ -83,8 +83,14 @@ operator's own work; they do not get written unprompted.
 ```
 node ${CLAUDE_PROJECT_DIR}/.claude/harness/scripts/vault.mjs record \
   --slug <slug> --title "<one line>" --layer <hook|claude-md|skill:<name>|vault> \
-  --body <file with the occurrence> --cost "<what it cost>" --project-dir <project>
+  --rule-file <file with the rule, one line> --body <file with the occurrence> \
+  --cost "<what it cost>" --project-dir <project>
 ```
+
+The rule goes in a file, like the body: a rule often quotes a command in
+backticks, which a shell would run. A second project may leave `--rule-file`
+out and starts from the rule already recorded; pass it to rewrite the rule so
+it covers both.
 
 Write the body as the incident, not as advice: *"CS-64 and CS-65 both shipped
 Redis markers nothing ever cleared; 3h incident each"* — not *"be careful with
@@ -94,7 +100,8 @@ graduates them. Repetition within one project never graduates.
 ## 6. Apply it where it was routed
 
 Editing the target layer is the actual point; recording it is bookkeeping. For a
-skill body, append to that skill's `## Incidents` section. For `CLAUDE.md`, add
+skill body, append a `- ` bullet to that skill's `## Incidents` section (the
+installer keeps only bullets through an update). For `CLAUDE.md`, add
 one line inside the harness block. For a hook, wait for approval per step 4.
 
 Then tell the user, in one line each: what was recorded, where it will fire, and
