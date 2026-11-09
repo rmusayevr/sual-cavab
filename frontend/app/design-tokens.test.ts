@@ -78,13 +78,14 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe("design tokens", () => {
-  it("defines every token of the design, and the one extra", () => {
+  it("defines every token of the design, and the two extra", () => {
     const wanted = [
       "background", "foreground", "card", "card-foreground", "primary", "primary-foreground", "secondary",
       "secondary-foreground", "muted", "muted-foreground", "accent", "accent-foreground", "destructive",
       "destructive-foreground", "border", "input", "ring", "navy", "navy-foreground", "saffron", "pomegranate",
       "status-open", "status-asked", "status-answered", "status-dropped",
       "control-border", // not in the example: the hairline border is too faint for a form field
+      "primary-on-navy", // not in the example: the primary red is 2.73:1 on navy, too faint for text
     ];
     for (const name of wanted) expect(tokens[name], `--${name}`).toBeDefined();
   });
@@ -111,6 +112,7 @@ describe("design tokens", () => {
     ["destructive-foreground", "destructive"], // dropping a question
     ["navy-foreground", "navy"], // the rail and the bands
     ["saffron", "navy"], // eyebrows and counts, only ever on navy
+    ["primary-on-navy", "navy"], // the red words of the landing headline (the primary red is 2.73:1 on navy)
     ["accent-foreground", "saffron"], // the count chip
   ];
   for (const [fg, bg] of text) {
