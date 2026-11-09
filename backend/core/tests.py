@@ -19,6 +19,12 @@ class DatabaseTests(TestCase):
             cursor.execute("SELECT 1")
             self.assertEqual(cursor.fetchone(), (1,))
 
+    def test_the_database_in_use_has_this_processs_id_in_its_name(self):
+        # A TestCase, so the test database exists whichever tests were selected (#42).
+        name = connection.settings_dict["NAME"]
+        self.assertTrue(name.startswith("test_"), name)
+        self.assertTrue(name.endswith(f"_{os.getpid()}"), name)
+
 
 class HealthEndpointTests(SimpleTestCase):
     def test_get_returns_ok_status(self):
@@ -84,6 +90,42 @@ class PasswordHasherTests(SimpleTestCase):
             "from django.conf import settings; print(settings.PASSWORD_HASHERS[0])"
         )
         self.assertEqual(self.first_hasher_when_loaded_by(code), "django.contrib.auth.hashers.PBKDF2PasswordHasher")
+
+
+class TestDatabaseNameTests(SimpleTestCase):
+    """Each `manage.py test` process has its own test database (#42).
+
+    With one shared name, `--noinput` makes a second run delete the database the
+    first run is using: 18 to 20 errors in the first run when started 1.5 to 2.8
+    seconds apart, a failed database creation when started together.
+    """
+
+    def name_seen_by(self, argv="['manage.py', 'test']"):
+        code = (
+            "import os, sys; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); "
+            f"sys.argv = {argv}; "
+            "from django.conf import settings; "
+            "print(settings.DATABASES['default'].get('TEST', {}).get('NAME', ''))"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code], cwd=Path(settings.BASE_DIR), capture_output=True, text=True, timeout=120
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.strip()
+
+    def test_two_test_runs_get_different_database_names(self):
+        first = self.name_seen_by()
+        second = self.name_seen_by()
+        self.assertTrue(first.startswith("test_"), first)
+        self.assertNotEqual(first, second)
+
+    def test_a_server_keeps_djangos_default_test_name(self):
+        for command in ("runserver", "shell", "check", "migrate"):
+            with self.subTest(command=command):
+                self.assertEqual(self.name_seen_by(argv=f"['manage.py', '{command}']"), "")
+
+    def test_a_test_word_later_in_the_command_line_does_not_count(self):
+        self.assertEqual(self.name_seen_by(argv="['manage.py', 'shell', 'test']"), "")
 
 
 class DeployCheckTests(SimpleTestCase):
