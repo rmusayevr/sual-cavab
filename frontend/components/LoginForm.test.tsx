@@ -79,6 +79,7 @@ describe("LoginForm look (#54)", () => {
     expect(screen.getByLabelText("Email")).toHaveClass("min-h-11");
     expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
     expect(screen.getByLabelText("Password")).toBeRequired();
+    expect(screen.getByLabelText("Password")).toHaveClass("min-h-11");
     expect(screen.getByRole("button", { name: "Sign in" })).toHaveAttribute("type", "submit");
     expect(screen.getByRole("button", { name: "Sign in" })).toHaveClass("min-h-11");
   });
