@@ -148,7 +148,7 @@ export default function DraftScreen() {
                 return (
                   <label
                     key={q.id}
-                    className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-bg"
+                    className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-bg has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 has-[:disabled]:hover:bg-transparent"
                   >
                     <input
                       type="checkbox"
@@ -157,7 +157,7 @@ export default function DraftScreen() {
                       disabled={!isPicked && picked.length >= MAX_QUESTIONS}
                       onChange={() => toggle(q.number)}
                     />
-                    <span>
+                    <span className="min-w-0">
                       <strong>{q.label}</strong> {q.text}
                     </span>
                   </label>

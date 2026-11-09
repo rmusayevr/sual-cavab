@@ -333,8 +333,9 @@ describe("DraftScreen look (#57)", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveClass("bg-error-bg", "text-error-fg");
     expect(alert).toHaveTextContent("The draft could not be written");
-    // the same card as the button, so the message is not far below the fold on a phone
+    // the same card as the button, and after it, so the message is not far below the fold on a phone
     expect(alert.closest("form")).toBe(write.closest("form"));
+    expect(write.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("the draft box is the shared text area, tied to its label", async () => {
@@ -343,7 +344,9 @@ describe("DraftScreen look (#57)", () => {
     await pick("Q1");
     fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
 
-    expect(await screen.findByLabelText(/draft \(edit it/i)).toHaveClass("min-h-24", "font-sans");
+    const box = await screen.findByLabelText(/draft \(edit it/i);
+    expect(box).toHaveClass("font-sans");
+    expect(box).toHaveAttribute("rows", "10");
   });
 
   it("still has no way to send anything", async () => {
@@ -354,6 +357,28 @@ describe("DraftScreen look (#57)", () => {
     await screen.findByLabelText(/draft \(edit it/i);
 
     expect(screen.queryByRole("button", { name: /send|email|share|post/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /send|email|share|post|mailto/i })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
     expect(screen.getByText(/nothing has been sent/i)).toBeInTheDocument();
+  });
+
+  it("once ten are ticked, the other rows look unavailable, not only their checkbox", async () => {
+    backend({
+      [LIST]: () => json(200, Array.from({ length: MAX_QUESTIONS + 1 }, (_, i) => question(i + 1))),
+    });
+    render(<DraftScreen />);
+    await pick(...Array.from({ length: MAX_QUESTIONS }, (_, i) => `Q${i + 1}`));
+
+    const row = screen.getByRole("checkbox", { name: /^Q11\b/ }).closest("label")!;
+    expect(row).toHaveClass("has-[:disabled]:cursor-not-allowed", "has-[:disabled]:opacity-60");
+    expect(screen.getByRole("checkbox", { name: /^Q1\b/ }).closest("label")).toHaveClass("cursor-pointer");
+  });
+
+  it("a long question without spaces can shrink inside its row", async () => {
+    backend({ [LIST]: () => json(200, [question(1, { text: "https://example.invalid/" + "a".repeat(80) })]) });
+    render(<DraftScreen />);
+
+    const text = (await screen.findByText(/^https:\/\/example\.invalid/)).closest("span")!;
+    expect(text).toHaveClass("min-w-0");
   });
 });
