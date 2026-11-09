@@ -16,7 +16,14 @@ type State =
   | { kind: "signed-out" }
   | { kind: "error" };
 
-export default function SessionStatus({ layout = "block" }: { layout?: "block" | "nav" } = {}) {
+/**
+ * `wakingNote={false}` is for a page whose body already shows the note while it loads (the projects
+ * page): both wait on the same sleeping server, and the same sentence twice reads twice.
+ */
+export default function SessionStatus({
+  layout = "block",
+  wakingNote = true,
+}: { layout?: "block" | "nav"; wakingNote?: boolean } = {}) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [signOutFailed, setSignOutFailed] = useState(false);
 
@@ -66,7 +73,7 @@ export default function SessionStatus({ layout = "block" }: { layout?: "block" |
       return (
         <div className="grid min-w-0 gap-1">
           <p className={nav ? "text-sm opacity-80" : "text-muted-foreground"}>Checking your session…</p>
-          <WakingNote active tone={nav ? "navy" : "paper"} />
+          {wakingNote && <WakingNote active tone={nav ? "navy" : "paper"} />}
         </div>
       );
     case "signed-in":

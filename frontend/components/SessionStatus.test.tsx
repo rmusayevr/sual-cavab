@@ -200,12 +200,30 @@ describe("SessionStatus: a slow first answer (#38)", () => {
     });
   }
 
-  it("takes the note away as soon as the answer comes", async () => {
-    vi.stubGlobal("fetch", respond(403, {}));
+  it("takes the note away as soon as a slow answer comes", async () => {
+    vi.useFakeTimers();
+    let answer!: (r: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => (answer = resolve))));
 
     render(<SessionStatus />);
+    act(() => vi.advanceTimersByTime(6000));
+    expect(screen.getByText(WAKING_TEXT)).toBeInTheDocument();
 
-    expect(await screen.findByRole("link", { name: "Sign in" })).toBeInTheDocument();
+    await act(async () => answer(new Response("{}", { status: 403 })));
+
+    expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.queryByText(WAKING_TEXT)).not.toBeInTheDocument();
   });
+
+  it("can leave the note out, for a page whose body already shows it", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    render(<SessionStatus layout="nav" wakingNote={false} />);
+    act(() => vi.advanceTimersByTime(6000));
+
+    expect(screen.queryByText(WAKING_TEXT)).not.toBeInTheDocument();
+    expect(screen.getByText("Checking your session…")).toBeInTheDocument();
+  });
+
 });

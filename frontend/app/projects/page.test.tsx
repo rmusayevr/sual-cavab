@@ -1,5 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { WAKING_TEXT } from "@/components/ui/WakingNote";
 
 import ProjectsPage from "./page";
 
@@ -89,5 +91,21 @@ describe("ProjectsPage", () => {
     const header = container.querySelector("header")!;
     expect(within(header).getByRole("link", { name: /Sual.?Cavab/ })).toHaveAttribute("href", "/");
     expect(await within(header).findByRole("button", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  // Review of #78: the header's session check and the body's list wait on the same sleeping server,
+  // and each showed the note, so the same sentence stood twice on one screen.
+  it("says the site may be waking up once, not in the header and again in the body", () => {
+    vi.useFakeTimers();
+    try {
+      quiet();
+      render(<ProjectsPage />);
+
+      act(() => vi.advanceTimersByTime(5000));
+
+      expect(screen.getAllByText(WAKING_TEXT)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
