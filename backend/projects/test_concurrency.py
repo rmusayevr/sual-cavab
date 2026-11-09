@@ -1,10 +1,11 @@
 """The row locks, proved with real threads on the real database (#34).
 
-Each test widens the race window on purpose: the request that holds the lock
-waits until the other request has really reached the lock, then holds it a
-little longer. Without the lock the bad outcome then happens every time, not
-once in a hundred runs, and not only when the machine is fast. A request that
-waits for something that never comes fails the test through a timeout.
+How the race is forced: the request that holds a lock stops inside its write
+until PostgreSQL itself reports another session of this database waiting for a
+lock (`pg_stat_activity`, `wait_event_type = 'Lock'`), and only then goes on. So the second request is
+provably blocked at the lock, whatever the speed of the machine. Without the
+lock nothing ever blocks, the wait ends at its timeout, both requests go on, and
+the bad outcome happens (and the test asserts that something was blocked).
 
 Lock order, from projects/permissions.py: the caller's membership row first,
 then the project or question row.
@@ -15,20 +16,18 @@ import time
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.db import connections
+from django.db import connection, connections
 from django.test import TransactionTestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-import questions.views as question_views
 from questions.models import Answer, Question
 from questions.services import change_status as real_change_status
 
-from . import views as project_views
 from .models import Membership, Project
 
 PASSWORD = "invented-test-password"
-HOLD = 0.3  # seconds the holder keeps its locks once the other request is waiting for them
+BLOCK_TIMEOUT = 10  # a correct lock blocks the other request at once; this only ends a wait that never comes
 JOIN_TIMEOUT = 60
 
 
@@ -40,6 +39,28 @@ def as_user(user):
     client = APIClient()
     client.force_authenticate(user)
     return client
+
+
+def wait_until_a_session_waits_for_a_lock():
+    """Poll PostgreSQL until a session of this database waits for a lock; True if one does.
+
+    Scoped to the current database, so another test run on the same server cannot
+    answer for it. Runs on the calling thread's own connection (read-only, inside
+    the request's transaction), so it does not disturb the locks it is watching.
+    """
+    deadline = time.monotonic() + BLOCK_TIMEOUT
+    with connection.cursor() as cursor:
+        while time.monotonic() < deadline:
+            # pg_stat_activity is a snapshot PostgreSQL keeps for the whole transaction; without
+            # this the first look is the only look, and a request that starts waiting later is missed.
+            cursor.execute("SELECT pg_stat_clear_snapshot()")
+            cursor.execute(
+                "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'"
+            )
+            if cursor.fetchone()[0]:
+                return True
+            time.sleep(0.02)
+    return False
 
 
 def run_together(*calls):
@@ -88,33 +109,23 @@ class RowLockTests(TransactionTestCase):
     def test_two_owners_removing_each_other_leave_one_owner(self):
         self.add(self.other, Membership.Role.OWNER)
         real_delete = Membership.delete
-        real_lock = project_views.lock_memberships
         start = threading.Barrier(2)
-        reached, both_reached = [], threading.Event()
+        was_blocked = []
 
-        def noting_lock(project, user):
-            # Called once the request has passed its unlocked checks (get_object), just before it
-            # asks for the lock: when both have, one holds the rows and the other is about to wait.
-            reached.append(user.pk)
-            if len(reached) == 2:
-                both_reached.set()
-            return real_lock(project, user)
-
-        def slow_delete(membership, *args, **kwargs):
-            both_reached.wait(10)
-            time.sleep(HOLD)
+        def delete_once_the_other_request_waits(membership, *args, **kwargs):
+            was_blocked.append(wait_until_a_session_waits_for_a_lock())
             return real_delete(membership, *args, **kwargs)
 
         def remove(caller, target):
             start.wait(10)
             return as_user(caller).delete(f"/api/projects/{self.project.pk}/members/{target.pk}/").status_code
 
-        with mock.patch.object(Membership, "delete", slow_delete), mock.patch.object(
-            project_views, "lock_memberships", noting_lock
-        ):
+        with mock.patch.object(Membership, "delete", delete_once_the_other_request_waits):
             codes = run_together(lambda: remove(self.owner, self.other), lambda: remove(self.other, self.owner))
 
-        # One removal wins; the other caller is no longer a member, so it is a 404.
+        # One removal wins and the other request was waiting for the lock meanwhile; once it
+        # has the rows, its caller is no longer a member, so it is a 404.
+        self.assertEqual(was_blocked, [True])
         self.assertEqual(sorted(codes), [204, 404])
         owners = Membership.objects.filter(project=self.project, role=Membership.Role.OWNER)
         self.assertEqual(owners.count(), 1)
@@ -123,9 +134,14 @@ class RowLockTests(TransactionTestCase):
         self.add(self.other, Membership.Role.MEMBER)
         question = self.question()
         start = threading.Barrier(2)
+        calls, was_blocked, first = [], [], threading.Lock()
 
-        def slow_change_status(*args, **kwargs):
-            time.sleep(HOLD)
+        def change_status_once_the_other_request_waits(*args, **kwargs):
+            with first:  # only the request that got the question first waits for the other
+                calls.append(1)
+                is_first = len(calls) == 1
+            if is_first:
+                was_blocked.append(wait_until_a_session_waits_for_a_lock())
             return real_change_status(*args, **kwargs)
 
         def answer(caller):
@@ -142,13 +158,14 @@ class RowLockTests(TransactionTestCase):
             url = f"/api/projects/{self.project.pk}/questions/{question.number}/transition/"
             return as_user(caller).post(url, body, format="json").status_code
 
-        with mock.patch("questions.views.change_status", slow_change_status):
+        with mock.patch("questions.views.change_status", change_status_once_the_other_request_waits):
             codes = run_together(lambda: answer(self.owner), lambda: answer(self.other))
 
         # The second sees an answered question: answered -> answered is refused (400). Without the
         # question lock both pass that check, and the second insert hits the database's
         # one-current-answer constraint: the data stays safe, but the request errors instead of
         # getting this clean refusal (the test then fails on the error).
+        self.assertEqual(was_blocked, [True])
         self.assertEqual(sorted(codes), [200, 400])
         self.assertEqual(Answer.objects.filter(question=question).count(), 1)
 
@@ -156,20 +173,12 @@ class RowLockTests(TransactionTestCase):
         self.add(self.other, Membership.Role.MEMBER)
         question = self.question()
         real_delete = Membership.delete
-        real_lock = question_views.lock_caller_membership
-        removing, at_the_lock = threading.Event(), threading.Event()
+        removing = threading.Event()
+        was_blocked = []
 
-        def noting_lock(project, user):
-            # The member's request has passed its unlocked checks (the project lookup) and now asks
-            # for its membership row, which the owner's removal holds.
-            if user.pk == self.other.pk:
-                at_the_lock.set()
-            return real_lock(project, user)
-
-        def slow_delete(membership, *args, **kwargs):
+        def delete_once_the_member_waits(membership, *args, **kwargs):
             removing.set()  # the owner now holds every membership row of the project
-            at_the_lock.wait(10)
-            time.sleep(HOLD)
+            was_blocked.append(wait_until_a_session_waits_for_a_lock())
             return real_delete(membership, *args, **kwargs)
 
         def remove_member():
@@ -180,12 +189,12 @@ class RowLockTests(TransactionTestCase):
             url = f"/api/projects/{self.project.pk}/questions/{question.number}/transition/"
             return as_user(self.other).post(url, {"to": "asked"}, format="json").status_code
 
-        with mock.patch.object(Membership, "delete", slow_delete), mock.patch.object(
-            question_views, "lock_caller_membership", noting_lock
-        ):
+        with mock.patch.object(Membership, "delete", delete_once_the_member_waits):
             removed, changed = run_together(remove_member, change_status_as_member)
 
-        # No 500 (no deadlock), and the removed member's write is refused, not allowed one more time.
+        # The member's request waited for its membership row; when the removal committed, the row
+        # was gone: refused (404), not allowed one more change, and no 500 (no deadlock).
+        self.assertEqual(was_blocked, [True])
         self.assertEqual((removed, changed), (204, 404))
         question.refresh_from_db()
         self.assertEqual(question.status, Question.Status.OPEN)
