@@ -61,7 +61,7 @@ export default function ProjectList() {
           {state.projects.map((p) => (
             <li key={p.id}>
               <Card className="grid gap-1">
-                <Link href={`/projects/${p.id}`} className="text-lg font-semibold text-primary hover:underline">
+                <Link href={`/projects/${p.id}`} className="inline-flex min-h-11 items-center text-lg font-semibold text-primary hover:underline">
                   {p.name}
                 </Link>
                 <p className="text-sm text-muted">

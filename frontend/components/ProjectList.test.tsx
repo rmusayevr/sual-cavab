@@ -136,11 +136,23 @@ describe("ProjectList look (#55)", () => {
 
     render(<ProjectList />);
 
-    expect(await screen.findByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    const link = await screen.findByRole("link", { name: "Sign in" });
+    expect(link).toHaveAttribute("href", "/login");
+    expect(link).toHaveClass("min-h-11");
+  });
+
+  it("each project is a card, and its name is a link that is easy to tap", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3)])));
+
+    render(<ProjectList />);
+
+    const link = await screen.findByRole("link", { name: "Ticketing" });
+    expect(link.closest("li")!.firstElementChild).toHaveClass("rounded-xl");
+    expect(link).toHaveClass("min-h-11");
   });
 });
 
-describe("ProjectList: no bullets (#57)", () => {
+describe("ProjectList: no bullets (#55)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });

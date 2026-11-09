@@ -133,17 +133,20 @@ describe("ProjectDetail look (#55)", () => {
     expect(await screen.findByText("Open")).toHaveClass("rounded-full");
   });
 
-  it("a project that is not found says so and links back, as a message and not an error", async () => {
+  it("a project that is not found says so and links back with a button-looking link, and is not an error", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json(404, {})));
 
     render(<ProjectDetail />);
 
     expect(await screen.findByText(/Project not found/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to your projects" })).toHaveAttribute("href", "/projects");
+    const back = screen.getByRole("link", { name: "Back to your projects" });
+    expect(back).toHaveAttribute("href", "/projects");
+    expect(back).toHaveClass("min-h-11");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
 
-describe("ProjectDetail: no bullets (#57)", () => {
+describe("ProjectDetail: no bullets (#55)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });

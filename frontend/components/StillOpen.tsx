@@ -51,7 +51,7 @@ export default function StillOpen({ projectId, now }: { projectId: string; now?:
               <Card className="grid gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold">{q.label}</span>
-                  <StatusChip status={q.status === "asked" ? "asked" : "open"} />
+                  <StatusChip status={q.status} />
                 </div>
                 <p>{q.text}</p>
                 <p className="text-sm text-muted">{ageText(daysOpen(q.created_at, reference))}</p>

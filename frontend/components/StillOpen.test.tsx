@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import StillOpen from "./StillOpen";
@@ -48,10 +48,15 @@ describe("StillOpen", () => {
     expect(screen.getByText("Invented question 1")).toBeInTheDocument();
     expect(screen.getByText(/Blocks: Refund screen/)).toBeInTheDocument();
     expect(screen.getByText(/open for 5 days/)).toBeInTheDocument();
-    // The status is a chip with the word in it (it used to be the text prefix "asked · "); the age stays its own line.
-    expect(screen.getByText("Asked")).toBeInTheDocument();
-    expect(screen.getAllByText("Open")).toHaveLength(2);
-    expect(screen.getByText(/^open for 1 day\b/)).toBeInTheDocument();
+    // The status is a chip with the word in it (it used to be the text prefix "asked · "); the age stays its own
+    // line. Each is tied to ITS question, which the old single regex did for Q2 only.
+    const item = (label: string) => within(screen.getByText(label).closest("li")!);
+    expect(item("Q1").getByText("Open")).toBeInTheDocument();
+    expect(item("Q1").getByText(/^open for 5 days/)).toBeInTheDocument();
+    expect(item("Q2").getByText("Asked")).toBeInTheDocument();
+    expect(item("Q2").getByText(/^open for 1 day\b/)).toBeInTheDocument();
+    expect(item("Q3").getByText("Open")).toBeInTheDocument();
+    expect(item("Q3").getByText(/^open for less than a day/)).toBeInTheDocument();
     expect(screen.getByText(/open for less than a day/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /still open \(3\)/i })).toBeInTheDocument();
   });
@@ -80,5 +85,13 @@ describe("StillOpen", () => {
     vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("offline"))));
     render(<StillOpen projectId="5" now={NOW} />);
     expect(await screen.findByRole("alert")).toBeInTheDocument();
+  });
+
+  it("shows a question's own status, whatever it is (the list is filtered by the server, not by this component)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [question(1, { status: "answered" })])));
+    render(<StillOpen projectId="5" now={NOW} />);
+
+    expect(await screen.findByText("Answered")).toBeInTheDocument();
+    expect(screen.queryByText("Open")).not.toBeInTheDocument();
   });
 });
