@@ -2,7 +2,7 @@
   "harness": "0.3.0",
   "profile": "full",
   "command": "install --profile full",
-  "installedAt": "2026-11-09T11:16:26.882Z",
+  "installedAt": "2026-11-09T16:57:27.582Z",
   "source": "c:/Users/ADMIN/Desktop/Projects/claude-harness",
   "files": [
     {
@@ -53,6 +53,22 @@
       "kind": "skill",
       "sha": "05f33d647b3331de",
       "bodySha": "9ca74604005d7ae6"
+    },
+    {
+      "to": ".claude/skills/design-direction/design.template.md",
+      "from": "skills/design-direction/design.template.md",
+      "kind": "skill",
+      "sha": "a16890dd56fe37f9"
+    },
+    {
+      "to": ".claude/skills/design-direction/SKILL.md",
+      "from": "skills/design-direction/SKILL.md",
+      "kind": "skill",
+      "sha": "9ba54d734d3ab45e",
+      "bodySha": "ff4ee9acd5760024",
+      "incidents": [
+        "5338b5abca93a4e9"
+      ]
     },
     {
       "to": ".claude/skills/design-failure-behavior/SKILL.md",
@@ -366,8 +382,8 @@
       "to": ".claude/skills/work-the-queue/SKILL.md",
       "from": "skills/work-the-queue/SKILL.md",
       "kind": "skill",
-      "sha": "7e4d0b49cefac69a",
-      "bodySha": "5bac74ac5b117c3d",
+      "sha": "0e205ffcebd629ac",
+      "bodySha": "cb12a433791d070f",
       "incidents": [
         "e3429c6ec78b0955",
         "4b1eee92c1b34636",
@@ -482,6 +498,6 @@
   "claudeMd": {
     "mode": "block",
     "path": "CLAUDE.md",
-    "sha": "d32d573d3d617ab3"
+    "sha": "82a16bdb9548bbbb"
   }
 }
