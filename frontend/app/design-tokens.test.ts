@@ -147,7 +147,11 @@ describe("design tokens", () => {
     const offenders = sourceFiles(join(process.cwd(), "components"))
       .concat(sourceFiles(join(process.cwd(), "app")))
       .filter((f) => /\.tsx$/.test(f) && !/\.test\./.test(f))
-      .filter((f) => /text-saffron/.test(readFileSync(f, "utf8")) && !/bg-navy/.test(readFileSync(f, "utf8")));
+      .filter((f) => {
+        // saffron text is fine in a file that puts it on navy, or gates it behind the navy tone (Eyebrow)
+        const source = readFileSync(f, "utf8");
+        return /text-saffron/.test(source) && !/bg-navy/.test(source) && !/tone === "navy"/.test(source);
+      });
     expect(offenders).toEqual([]);
   });
 });

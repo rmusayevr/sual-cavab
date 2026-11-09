@@ -164,3 +164,28 @@ describe("ProjectDetail: no bullets (#55)", () => {
     for (const list of lists) expect(list).toHaveClass("list-none");
   });
 });
+
+describe("ProjectDetail: the states (#72)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("loading says what is loading and shows ledger rows that fill in", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    const { container } = render(<ProjectDetail />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading project…");
+    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass("motion-safe:animate-pulse");
+  });
+
+  it("a project that is not found is a card under a carpet strip, with the way back", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(404, {})));
+
+    render(<ProjectDetail />);
+
+    const message = await screen.findByText(/Project not found/);
+    expect(message.closest(".bg-card")!.firstElementChild).toHaveClass("pattern-carpet");
+    expect(screen.getByRole("link", { name: "Back to your projects" })).toHaveAttribute("href", "/projects");
+  });
+});

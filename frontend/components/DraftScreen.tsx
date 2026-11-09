@@ -11,6 +11,7 @@ import { fieldErrors } from "@/lib/questions";
 import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
+import { EmptyState, LedgerLoading } from "./ui/Ledger";
 import { Textarea } from "./ui/Field";
 
 /** The most questions one draft can cover; the backend refuses more. */
@@ -71,17 +72,17 @@ export default function DraftScreen() {
     };
   }, [id]);
 
-  if (load.kind === "loading") return <p className="text-muted-foreground">Loading questions…</p>;
+  if (load.kind === "loading") return <LedgerLoading label="Loading questions…" />;
   if (load.kind === "not-found")
     return (
-      <div className="grid gap-3">
+      <EmptyState>
         <p>Project not found.</p>
         <div>
           <Link href="/projects" className={buttonClasses("secondary")}>
             Back to your projects
           </Link>
         </div>
-      </div>
+      </EmptyState>
     );
   if (load.kind === "error") return <Alert tone="error">Could not load the questions.</Alert>;
 
@@ -135,9 +136,9 @@ export default function DraftScreen() {
       <h1 className="text-2xl font-semibold">Draft a message</h1>
 
       {load.questions.length === 0 ? (
-        <p className="text-muted-foreground">
-          Nothing is open, so there is nothing to ask. Questions that are open or asked appear here.
-        </p>
+        <EmptyState>
+          <p>Nothing is open, so there is nothing to ask. Questions that are open or asked appear here.</p>
+        </EmptyState>
       ) : (
         <Card>
           <form onSubmit={write} className="grid gap-4">

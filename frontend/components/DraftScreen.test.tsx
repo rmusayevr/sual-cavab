@@ -383,3 +383,23 @@ describe("DraftScreen look (#57)", () => {
     expect(text).toHaveClass("min-w-0");
   });
 });
+
+describe("DraftScreen: the states (#72)", () => {
+  it("loading says what is loading and shows ledger rows that fill in", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    const { container } = render(<DraftScreen />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading questions…");
+    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass("motion-safe:animate-pulse");
+  });
+
+  it("nothing open is a card under a carpet strip", async () => {
+    backend({ [LIST]: () => json(200, []) });
+
+    render(<DraftScreen />);
+
+    const message = await screen.findByText(/nothing is open/i);
+    expect(message.closest(".bg-card")!.firstElementChild).toHaveClass("pattern-carpet");
+  });
+});

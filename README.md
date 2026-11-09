@@ -184,6 +184,29 @@ dot colours, `frontend/lib/status.ts`. A new screen uses these instead of inline
 - Keep your own base CSS inside `@layer base`; unlayered CSS beats every
   utility class.
 
+#### What was invented where the example shows nothing (#72)
+
+The example has a landing page and a workspace. For the rest I designed in the
+same language, inside its rules; each item is a choice the owner can reject:
+
+- **Sign-in** (`/login`): a navy lattice page with the wordmark, and the form on a
+  cream card topped by a carpet strip, with the eyebrow "Access".
+- **Header band** (`components/ui/AppHeader.tsx`): the landing header made
+  reusable (wordmark, session actions, eyebrow, title, a sentence, carpet seam);
+  the projects page uses it.
+- **Projects** (`/projects`): numbered ledger lines (`01`, `02`, in red monospace),
+  the name in the serif, the client and "N still open" under it, and a saffron
+  count chip for a project that is still waiting (the example's rail does the
+  same). The new-project form is a card under a carpet strip.
+- **Empty and missing things** (no projects, no questions, nothing open, project
+  not found, signed out): a card under a carpet strip with one sentence that says
+  what to do next (`EmptyState`).
+- **Loading**: the words that say what is loading, and three ledger rows that
+  pulse (`motion-safe:`: still when the person asks for less motion), instead of
+  a spinner (`LedgerLoading`).
+- **404**: "This page is not in the ledger." and the missing page as question
+  `Q404`.
+
 ## Who can see or change a project
 
 Decided by the owner (#5). Access is checked in the query itself, so a project

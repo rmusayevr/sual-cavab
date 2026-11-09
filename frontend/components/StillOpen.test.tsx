@@ -96,3 +96,27 @@ describe("StillOpen", () => {
     expect(screen.queryByText("Open")).not.toBeInTheDocument();
   });
 });
+
+describe("StillOpen: the states (#72)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("loading says what is loading and shows ledger rows that fill in", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    const { container } = render(<StillOpen projectId="5" now={NOW} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading questions…");
+    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass("motion-safe:animate-pulse");
+  });
+
+  it("nothing open is a card under a carpet strip", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, [])));
+
+    render(<StillOpen projectId="5" now={NOW} />);
+
+    const message = await screen.findByText(/nothing is open/i);
+    expect(message.closest(".bg-card")!.firstElementChild).toHaveClass("pattern-carpet");
+  });
+});

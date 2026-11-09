@@ -6,6 +6,7 @@ import { cx } from "@/lib/cx";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { Card } from "./Card";
+import { CarpetStrip, EmptyState, Eyebrow, LedgerLoading } from "./Ledger";
 import { Field, Input, Select, Textarea } from "./Field";
 import { PageShell } from "./PageShell";
 import { STATUSES, statusDot, statusLabel, type QuestionStatus } from "@/lib/status";
@@ -258,5 +259,45 @@ describe("long words and the shared pieces (reviews of #56 and #57)", () => {
     // the saffron rule of the example's message card, in the text colour (not the error red)
     expect(screen.getByRole("status")).toHaveClass("border-l-4", "border-l-saffron", "text-foreground");
     expect(screen.getByRole("status")).not.toHaveClass("text-primary");
+  });
+});
+
+describe("ledger pieces (#72)", () => {
+  it("a carpet strip is a thin decoration that screen readers skip", () => {
+    const { container } = render(<CarpetStrip />);
+
+    const strip = container.firstElementChild!;
+    expect(strip).toHaveAttribute("aria-hidden", "true");
+    expect(strip).toHaveClass("h-2", "pattern-carpet");
+  });
+
+  it("an eyebrow is small monospace capitals: red on paper, saffron on navy", () => {
+    render(
+      <>
+        <Eyebrow>Paper</Eyebrow>
+        <Eyebrow tone="navy">Navy</Eyebrow>
+      </>,
+    );
+
+    expect(screen.getByText("Paper")).toHaveClass("font-mono", "text-xs", "uppercase", "text-primary");
+    expect(screen.getByText("Navy")).toHaveClass("font-mono", "uppercase", "text-saffron");
+    expect(screen.getByText("Paper")).not.toHaveClass("text-saffron"); // saffron is 2:1 on paper
+  });
+
+  it("the loading state says what is loading, and shows ledger rows that fill in (not a spinner)", () => {
+    const { container } = render(<LedgerLoading label="Loading things…" />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading things…");
+    const rows = container.querySelectorAll('[aria-hidden="true"] > div');
+    expect(rows.length).toBe(3);
+    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass("motion-safe:animate-pulse");
+  });
+
+  it("an empty state is a card under a carpet strip, with what to do next", () => {
+    const { container } = render(<EmptyState>Nothing here yet.</EmptyState>);
+
+    expect(screen.getByText("Nothing here yet.")).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveClass("rounded-md", "shadow-card", "bg-card");
+    expect(container.firstElementChild!.firstElementChild).toHaveClass("pattern-carpet");
   });
 });
