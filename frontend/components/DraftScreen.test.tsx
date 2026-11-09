@@ -302,3 +302,83 @@ describe("DraftScreen: copying", () => {
     expect(await screen.findByText(/could not copy/i)).toBeInTheDocument();
   });
 });
+
+describe("DraftScreen look (#57)", () => {
+  it("each question is a row that is easy to tap, with the checkbox and the whole text in one label", async () => {
+    draftBackend();
+    render(<DraftScreen />);
+
+    const box = await screen.findByRole("checkbox", { name: /^Q1\b/ });
+    expect(box.closest("label")).toHaveClass("min-h-11", "rounded-lg");
+    expect(box.closest("label")).toHaveTextContent("Invented question 1");
+  });
+
+  it("the buttons are easy to tap", async () => {
+    draftBackend({ [DRAFT]: () => json(200, { draft: "Salam!", model: "m" }) });
+    render(<DraftScreen />);
+    await pick("Q1");
+
+    expect(screen.getByRole("button", { name: "Write a draft" })).toHaveClass("min-h-11");
+    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
+    expect(await screen.findByRole("button", { name: "Copy" })).toHaveClass("min-h-11");
+  });
+
+  it("a failed draft is shown as an error message right under the button, in the error colours", async () => {
+    draftBackend({ [DRAFT]: () => json(502, {}) });
+    render(<DraftScreen />);
+    await pick("Q1");
+    const write = screen.getByRole("button", { name: "Write a draft" });
+    fireEvent.click(write);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveClass("bg-error-bg", "text-error-fg");
+    expect(alert).toHaveTextContent("The draft could not be written");
+    // the same card as the button, and after it, so the message is not far below the fold on a phone
+    expect(alert.closest("form")).toBe(write.closest("form"));
+    expect(write.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("the draft box is the shared text area, tied to its label", async () => {
+    draftBackend({ [DRAFT]: () => json(200, { draft: "Salam!", model: "m" }) });
+    render(<DraftScreen />);
+    await pick("Q1");
+    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
+
+    const box = await screen.findByLabelText(/draft \(edit it/i);
+    expect(box).toHaveClass("font-sans");
+    expect(box).toHaveAttribute("rows", "10");
+  });
+
+  it("still has no way to send anything", async () => {
+    draftBackend({ [DRAFT]: () => json(200, { draft: "Salam!", model: "m" }) });
+    render(<DraftScreen />);
+    await pick("Q1");
+    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
+    await screen.findByLabelText(/draft \(edit it/i);
+
+    expect(screen.queryByRole("button", { name: /send|email|share|post/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /send|email|share|post|mailto/i })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
+    expect(screen.getByText(/nothing has been sent/i)).toBeInTheDocument();
+  });
+
+  it("once ten are ticked, the other rows look unavailable, not only their checkbox", async () => {
+    backend({
+      [LIST]: () => json(200, Array.from({ length: MAX_QUESTIONS + 1 }, (_, i) => question(i + 1))),
+    });
+    render(<DraftScreen />);
+    await pick(...Array.from({ length: MAX_QUESTIONS }, (_, i) => `Q${i + 1}`));
+
+    const row = screen.getByRole("checkbox", { name: /^Q11\b/ }).closest("label")!;
+    expect(row).toHaveClass("has-[:disabled]:cursor-not-allowed", "has-[:disabled]:opacity-60");
+    expect(screen.getByRole("checkbox", { name: /^Q1\b/ }).closest("label")).toHaveClass("cursor-pointer");
+  });
+
+  it("a long question without spaces can shrink inside its row", async () => {
+    backend({ [LIST]: () => json(200, [question(1, { text: "https://example.invalid/" + "a".repeat(80) })]) });
+    render(<DraftScreen />);
+
+    const text = (await screen.findByText(/^https:\/\/example\.invalid/)).closest("span")!;
+    expect(text).toHaveClass("min-w-0");
+  });
+});
