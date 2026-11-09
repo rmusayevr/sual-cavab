@@ -2,8 +2,8 @@
   "harness": "0.3.0",
   "profile": "full",
   "command": "install --profile full",
-  "installedAt": "2026-11-09T00:12:17.176Z",
-  "source": "C:/Users/ADMIN/Desktop/Projects/claude-harness",
+  "installedAt": "2026-11-09T11:16:26.882Z",
+  "source": "c:/Users/ADMIN/Desktop/Projects/claude-harness",
   "files": [
     {
       "to": ".claude/skills/add-a-feature-flag/SKILL.md",
@@ -436,13 +436,13 @@
       "to": ".claude/hooks/guard-prod-ddl.mjs",
       "from": "hooks/guard-prod-ddl.mjs",
       "kind": "hook",
-      "sha": "bafbe0d628eb1c5d"
+      "sha": "7fa4bb0807c60425"
     },
     {
       "to": ".claude/hooks/guard-risky-ops.mjs",
       "from": "hooks/guard-risky-ops.mjs",
       "kind": "hook",
-      "sha": "ad7158d15c222bde"
+      "sha": "fb916a035debb21d"
     },
     {
       "to": ".claude/hooks/harness-usage.mjs",
@@ -482,6 +482,6 @@
   "claudeMd": {
     "mode": "block",
     "path": "CLAUDE.md",
-    "sha": "bfca050cb111a70f"
+    "sha": "d32d573d3d617ab3"
   }
 }
