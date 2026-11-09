@@ -27,6 +27,27 @@ function ratio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/** The selector or at-rule of every block at the top level of a stylesheet (comments and statements skipped). */
+function topLevelRules(source: string): string[] {
+  const text = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  const rules: string[] = [];
+  let depth = 0;
+  let prelude = "";
+  for (const ch of text) {
+    if (ch === "{") {
+      if (depth === 0) rules.push(prelude.trim().replace(/\s+/g, " "));
+      depth++;
+      prelude = "";
+    } else if (ch === "}") {
+      depth--;
+    } else if (depth === 0) {
+      if (ch === ";") prelude = "";
+      else prelude += ch;
+    }
+  }
+  return rules;
+}
+
 describe("design tokens", () => {
   it("defines every token in both themes", () => {
     expect(Object.keys(themes.dark).sort()).toEqual(Object.keys(themes.light).sort());
@@ -47,6 +68,8 @@ describe("design tokens", () => {
         ["answered-fg", "answered-bg"],
         ["dropped-fg", "dropped-bg"],
         ["error-fg", "error-bg"],
+        ["error-fg", "bg"], // a field's error message, on the page or on a card
+        ["error-fg", "surface"],
       ];
       for (const [fg, bg] of text) {
         it(`${fg} on ${bg} is readable (4.5:1)`, () => {
@@ -58,6 +81,8 @@ describe("design tokens", () => {
         ["control-border", "surface"],
         ["control-border", "bg"],
         ["primary", "bg"], // the focus ring
+        ["primary", "surface"], // the focus ring inside a card
+        ["error-fg", "surface"], // the border of an invalid control
       ];
       for (const [fg, bg] of controls) {
         it(`${fg} against ${bg} is visible (3:1)`, () => {
@@ -74,10 +99,17 @@ describe("globals.css cascade", () => {
     expect(css).not.toMatch(/@import\s+["']tailwindcss["']/);
   });
 
-  it("keeps its own base rules in a layer, or they would beat every utility class", () => {
-    const outsideLayers = css.replace(/@layer base\s*\{[\s\S]*\n\}\n?$/, "");
-    expect(outsideLayers).not.toMatch(/^\s*\*\s*\{/m);
-    expect(outsideLayers).not.toMatch(/^\s*body\s*\{/m);
+  it("has nothing at the top level except tokens, the theme and the base layer", () => {
+    // Unlayered CSS beats every utility class, so a stray `body {}` or `* {}` anywhere is refused.
+    const allowed = ["@layer base", "@media (prefers-color-scheme: dark)", "@theme inline", ":root"];
+    expect(topLevelRules(css).filter((rule) => !allowed.includes(rule))).toEqual([]);
+  });
+
+  it("the check above does catch an unlayered rule, wherever it sits", () => {
+    const inLayer = "@layer base { a { color: red } }";
+    expect(topLevelRules([inLayer, "body { color: red }"].join("\n"))).toEqual(["@layer base", "body"]);
+    expect(topLevelRules(["body { color: red }", inLayer].join("\n"))).toEqual(["body", "@layer base"]);
+    expect(topLevelRules([inLayer, "* { margin: 0 }", inLayer].join("\n"))).toEqual(["@layer base", "*", "@layer base"]);
   });
 
   it("makes keyboard focus visible", () => {

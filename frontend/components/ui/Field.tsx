@@ -5,8 +5,10 @@ import { cx } from "@/lib/cx";
 /** What a control needs to be tied to its label, hint and error message. */
 export type FieldControlProps = { id: string; "aria-describedby"?: string; "aria-invalid"?: true };
 
+// font-sans: form controls do not inherit the page font by themselves (a textarea is monospace),
+// and there is no browser reset yet (review of #62).
 const controlClasses =
-  "w-full min-h-11 rounded-lg border border-control-border bg-surface px-3 py-2 text-base text-text " +
+  "w-full min-h-11 rounded-lg border border-control-border bg-surface px-3 py-2 font-sans text-base text-text " +
   "placeholder:text-muted aria-invalid:border-error-fg disabled:opacity-60";
 
 export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {

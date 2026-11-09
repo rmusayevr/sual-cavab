@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { Card } from "./Card";
-import { Field, Input, Textarea } from "./Field";
+import { Field, Input, Select, Textarea } from "./Field";
 import { PageShell } from "./PageShell";
 import { StatusChip, type QuestionStatus } from "./StatusChip";
 
@@ -33,6 +33,23 @@ describe("Button", () => {
     render(<Button>Tap</Button>);
 
     expect(screen.getByRole("button")).toHaveClass("min-h-11");
+  });
+
+  it("uses the page font and has a border of its own, because there is no browser reset", () => {
+    // Without Tailwind's reset a button keeps the browser's system font and its 2px outset border;
+    // every variant must set both (review of #62).
+    render(
+      <>
+        <Button variant="primary">One</Button>
+        <Button variant="secondary">Two</Button>
+        <Button variant="danger">Three</Button>
+      </>,
+    );
+
+    for (const name of ["One", "Two", "Three"]) {
+      expect(screen.getByRole("button", { name })).toHaveClass("font-sans", "border");
+    }
+    expect(screen.getByRole("button", { name: "One" })).toHaveClass("border-transparent");
   });
 
   it("looks different for each variant", () => {
@@ -85,6 +102,19 @@ describe("Field", () => {
 
     expect(control).not.toHaveAttribute("aria-invalid");
     expect(control).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("every control uses the page font, because there is no browser reset", () => {
+    // Form controls do not inherit the page font by themselves (a textarea is monospace).
+    render(
+      <>
+        <Input aria-label="a" />
+        <Textarea aria-label="b" />
+        <Select aria-label="c" />
+      </>,
+    );
+
+    for (const label of ["a", "b", "c"]) expect(screen.getByLabelText(label)).toHaveClass("font-sans");
   });
 
   it("gives two fields their own ids", () => {
