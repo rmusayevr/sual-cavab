@@ -69,3 +69,18 @@ describe("LoginForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Too many attempts");
   });
 });
+
+describe("LoginForm look (#54)", () => {
+  it("uses the shared fields and button: typed, required, easy to tap", () => {
+    render(<LoginForm />);
+
+    expect(screen.getByLabelText("Email")).toHaveAttribute("type", "email");
+    expect(screen.getByLabelText("Email")).toBeRequired();
+    expect(screen.getByLabelText("Email")).toHaveClass("min-h-11");
+    expect(screen.getByLabelText("Password")).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText("Password")).toBeRequired();
+    expect(screen.getByLabelText("Password")).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Sign in" })).toHaveAttribute("type", "submit");
+    expect(screen.getByRole("button", { name: "Sign in" })).toHaveClass("min-h-11");
+  });
+});

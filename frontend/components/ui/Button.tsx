@@ -11,7 +11,9 @@ const variants: Record<ButtonVariant, string> = {
 };
 
 /**
- * A button. At least 44 px tall, so it can be tapped on a phone.
+ * The classes of a button, also for a link that should look like one (a link is
+ * not a button, so it stays an <a>). At least 44 px tall, so it can be tapped on
+ * a phone.
  *
  * Every variant sets the font and a border itself: there is no browser reset
  * (see globals.css), and a button keeps the system font and a 2px outset border
@@ -19,22 +21,21 @@ const variants: Record<ButtonVariant, string> = {
  * a caller's class that conflicts with a built-in one is decided by the order of
  * the CSS, not of the names.
  */
+export function buttonClasses(variant: ButtonVariant = "primary", className?: string): string {
+  return cx(
+    "inline-flex min-h-11 items-center justify-center rounded-lg border px-4 py-2 font-sans text-sm font-medium transition",
+    "disabled:cursor-not-allowed disabled:opacity-60",
+    variants[variant],
+    className,
+  );
+}
+
+/** A button. Plain `type="button"` by default, so it never submits a form by accident. */
 export function Button({
   variant = "primary",
   type = "button",
   className,
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
-  return (
-    <button
-      type={type}
-      className={cx(
-        "inline-flex min-h-11 items-center justify-center rounded-lg border px-4 py-2 font-sans text-sm font-medium transition",
-        "disabled:cursor-not-allowed disabled:opacity-60",
-        variants[variant],
-        className,
-      )}
-      {...rest}
-    />
-  );
+  return <button type={type} className={buttonClasses(variant, className)} {...rest} />;
 }

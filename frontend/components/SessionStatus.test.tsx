@@ -97,3 +97,30 @@ describe("SessionStatus", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not reach the server.");
   });
 });
+
+describe("SessionStatus look (#54)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("the sign-in link looks like a button and stays a link", async () => {
+    vi.stubGlobal("fetch", respond(403, { detail: "Authentication credentials were not provided." }));
+
+    render(<SessionStatus />);
+
+    const link = await screen.findByRole("link", { name: "Sign in" });
+    expect(link).toHaveAttribute("href", "/login");
+    expect(link).toHaveClass("min-h-11", "bg-primary");
+  });
+
+  it("when signed in, offers the projects as a link and sign-out as a button, both easy to tap", async () => {
+    vi.stubGlobal("fetch", respond(200, { id: 1, email: "ada@example.com", name: "Ada Lovelace" }));
+
+    render(<SessionStatus />);
+
+    const projects = await screen.findByRole("link", { name: "Your projects" });
+    expect(projects).toHaveAttribute("href", "/projects");
+    expect(projects).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Sign out" })).toHaveClass("min-h-11");
+  });
+});
