@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { cx } from "@/lib/cx";
 
+import { WakingNote } from "./WakingNote";
+
 /**
  * Small pieces of the ledger look, for the screens the design example does not show (#72).
  * They follow the example's rules: the carpet is a thin strip and never a background, an eyebrow
@@ -38,6 +40,7 @@ export function LedgerLoading({ label }: { label: string }) {
   return (
     <div role="status" className="grid gap-3">
       <p className="text-muted-foreground">{label}</p>
+      <WakingNote active />
       <div aria-hidden="true" className="grid gap-2 motion-safe:animate-pulse">
         {[0, 1, 2].map((row) => (
           <div key={row} className="h-14 rounded-md border bg-card" />

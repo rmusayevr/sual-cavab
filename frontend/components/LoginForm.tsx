@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { Alert } from "./ui/Alert";
 import { Button } from "./ui/Button";
 import { Field, Input } from "./ui/Field";
+import { WakingNote } from "./ui/WakingNote";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -68,6 +69,7 @@ export default function LoginForm() {
       <Button type="submit" disabled={submitting} className="w-full">
         {submitting ? "Signing in…" : "Sign in"}
       </Button>
+      <WakingNote active={submitting} />
     </form>
   );
 }

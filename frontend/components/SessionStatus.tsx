@@ -8,6 +8,7 @@ import { apiFetch, type CurrentUser } from "@/lib/api";
 import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
+import { WakingNote } from "./ui/WakingNote";
 
 type State =
   | { kind: "loading" }
@@ -62,7 +63,12 @@ export default function SessionStatus({ layout = "block" }: { layout?: "block" |
 
   switch (state.kind) {
     case "loading":
-      return <p className={nav ? "text-sm opacity-80" : "text-muted-foreground"}>Checking your session…</p>;
+      return (
+        <div className="grid min-w-0 gap-1">
+          <p className={nav ? "text-sm opacity-80" : "text-muted-foreground"}>Checking your session…</p>
+          <WakingNote active tone={nav ? "navy" : "paper"} />
+        </div>
+      );
     case "signed-in":
       return (
         <div className="grid min-w-0 gap-3 [overflow-wrap:anywhere]">

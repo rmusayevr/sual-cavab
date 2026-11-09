@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import LoginForm from "./LoginForm";
+import { WAKING_TEXT } from "./ui/WakingNote";
 
 const replace = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
@@ -82,5 +83,33 @@ describe("LoginForm look (#54)", () => {
     expect(screen.getByLabelText("Password")).toHaveClass("min-h-11");
     expect(screen.getByRole("button", { name: "Sign in" })).toHaveAttribute("type", "submit");
     expect(screen.getByRole("button", { name: "Sign in" })).toHaveClass("min-h-11");
+  });
+});
+
+describe("LoginForm: a slow sign-in (#38)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("says why when signing in takes more than five seconds, and not before", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    render(<LoginForm />);
+    submit();
+
+    expect(screen.queryByText(WAKING_TEXT)).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(5000));
+    expect(screen.getByText(WAKING_TEXT)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Signing in…" })).toBeDisabled(); // still the same busy state
+  });
+
+  it("shows no note when nothing has been submitted", () => {
+    vi.useFakeTimers();
+    render(<LoginForm />);
+
+    act(() => vi.advanceTimersByTime(60_000));
+
+    expect(screen.queryByText(WAKING_TEXT)).not.toBeInTheDocument();
   });
 });
