@@ -209,7 +209,7 @@ function QuestionItem({
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <strong>{question.label}</strong>
+              <span className="font-mono text-xs text-primary">{question.label}</span>
               <StatusChip status={question.status} />
             </div>
             <p>{question.text}</p>
@@ -266,7 +266,7 @@ function QuestionItem({
 
 function AnswerView({ answer, heading }: { answer: Answer; heading: string }) {
   return (
-    <div className="grid gap-1 rounded-lg bg-background p-3">
+    <div className="grid gap-1 border-l-4 border-status-answered bg-muted p-3">
       <p className="text-sm font-medium text-muted-foreground">{heading}</p>
       <p>{answer.text}</p>
       <p className="text-sm text-muted-foreground">

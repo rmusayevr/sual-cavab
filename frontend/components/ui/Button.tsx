@@ -6,7 +6,7 @@ export type ButtonVariant = "primary" | "secondary" | "danger";
 
 const variants: Record<ButtonVariant, string> = {
   primary: "btn-primary border border-transparent",
-  secondary: "btn-ghost text-foreground",
+  secondary: "btn-ghost text-inherit",
   danger: "btn-danger border border-transparent",
 };
 

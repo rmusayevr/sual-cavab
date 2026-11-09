@@ -55,6 +55,14 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Two" })).toHaveClass("btn-ghost");
   });
 
+  it("the outline button takes the colour of what it sits on, so it reads on paper and on navy", () => {
+    render(<Button variant="secondary">Two</Button>);
+
+    // a button does not inherit colour by itself; the outline is currentColor (the example's btn-ghost)
+    expect(screen.getByRole("button", { name: "Two" })).toHaveClass("btn-ghost", "text-inherit");
+    expect(screen.getByRole("button", { name: "Two" })).not.toHaveClass("text-foreground");
+  });
+
   it("takes its look from the design: red for the action, an outline for the rest, the destructive colour for dropping", () => {
     render(
       <>

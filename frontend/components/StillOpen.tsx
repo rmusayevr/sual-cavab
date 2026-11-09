@@ -50,7 +50,7 @@ export default function StillOpen({ projectId, now }: { projectId: string; now?:
             <li key={q.id}>
               <Card className="grid gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold">{q.label}</span>
+                  <span className="font-mono text-xs text-primary">{q.label}</span>
                   <StatusChip status={q.status} />
                 </div>
                 <p>{q.text}</p>

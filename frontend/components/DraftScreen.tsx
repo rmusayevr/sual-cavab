@@ -158,7 +158,7 @@ export default function DraftScreen() {
                       onChange={() => toggle(q.number)}
                     />
                     <span className="min-w-0">
-                      <strong>{q.label}</strong> {q.text}
+                      <span className="font-mono text-xs text-primary">{q.label}</span> {q.text}
                     </span>
                   </label>
                 );

@@ -104,7 +104,7 @@ describe("design tokens", () => {
     ["card-foreground", "card"],
     ["muted-foreground", "background"],
     ["muted-foreground", "card"],
-    ["muted-foreground", "muted"], // the caption inside an answer block
+    ["muted-foreground", "muted"], // the caption inside an answer block (the example puts the block on `muted`)
     ["primary-foreground", "primary"], // the red button
     ["primary", "background"], // red text: ids and error messages
     ["primary", "card"],
@@ -155,10 +155,42 @@ describe("components use tokens only", () => {
     .concat(sourceFiles(join(process.cwd(), "app")))
     .filter((f) => /\.tsx?$/.test(f) && !/\.test\./.test(f));
 
-  it("has no hardcoded colour: no hex, rgb(), oklch(), white or black utility", () => {
-    const bad = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\boklch\(|\b(?:bg|text|border|ring|fill|stroke)-(?:white|black)\b|\[#/;
-    const offenders = files.filter((f) => bad.test(readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "")));
+  // A hardcoded colour, however it is written. Tailwind's theme is imported whole, so its default palette
+  // (red-600, slate-300, ...) would be generated and work: those are refused too (review of #73).
+  const PALETTE = "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone";
+  const PROPS = "bg|text|border|ring|outline|fill|stroke|from|via|to|accent|caret|decoration|divide|placeholder";
+  const hardcodedColour = new RegExp(
+    [
+      "#[0-9a-fA-F]{3,8}\\b", // a hex colour
+      "\\b(?:rgba?|hsla?|hwb|lab|lch|oklch|oklab|color)\\(", // a colour function
+      "\\[(?:#|rgb|hsl|hwb|lab|lch|oklch|oklab|color:)", // an arbitrary value: bg-[#fff], text-[hsl(...)]
+      `\\b(?:${PROPS})-(?:white|black)\\b`,
+      `\\b(?:${PROPS})-(?:${PALETTE})-\\d{2,3}\\b`,
+    ].join("|"),
+  );
+
+  it("has no hardcoded colour: no hex, colour function, arbitrary value, white, black or default-palette utility", () => {
+    const offenders = files.filter((f) => hardcodedColour.test(readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "")));
     expect(offenders).toEqual([]);
+  });
+
+  it("the check above does catch the ways around it", () => {
+    for (const s of ["bg-[#fff]", "text-red-600", "bg-amber-100", "border-slate-300", "hover:bg-indigo-500", "text-[hsl(10_10%_10%)]", "bg-[color:red]", "text-white", "from-indigo-500", "#abc"]) {
+      expect(hardcodedColour.test(s), s).toBe(true);
+    }
+    for (const s of ["bg-card", "text-muted-foreground", "border-status-open", "bg-navy", "text-primary-foreground", "border-l-saffron"]) {
+      expect(hardcodedColour.test(s), s).toBe(false);
+    }
+  });
+
+  it("uses no second shadow, no big radius, no gradient, no blur (DESIGN.md section 8)", () => {
+    const source = files.map((f) => readFileSync(f, "utf8")).join("\n");
+    expect(source).not.toMatch(/\bshadow-(?:xs|sm|md|lg|xl|2xl|inner)\b|\brounded-(?:xl|2xl|3xl)\b|\bbg-(?:gradient|linear|radial|conic)|\bbackdrop-blur|\bblur-/);
+  });
+
+  it("uses rounded-full only for the status dot: nothing is a pill", () => {
+    const users = files.filter((f) => /\brounded-full\b/.test(readFileSync(f, "utf8")));
+    expect(users.map((f) => f.replace(/\\/g, "/").split("/").pop())).toEqual(["StatusChip.tsx"]);
   });
 
   it("has no inline style (everything is a class)", () => {
@@ -201,7 +233,22 @@ describe("globals.css cascade", () => {
 
   it("makes keyboard focus visible, in saffron on the navy surfaces", () => {
     expect(css).toMatch(/:focus-visible\s*\{[^}]*outline/);
-    expect(css).toMatch(/\.bg-navy :focus-visible\s*\{[^}]*saffron/);
+    // only for controls directly on navy: inside a cream card on a navy panel saffron is 2:1 (review of #73)
+    expect(css).toMatch(/\.bg-navy :focus-visible:not\(\.bg-card \*\)\s*\{[^}]*saffron/);
+  });
+
+  it("buttons lift and brighten only where hovering exists and only when they are enabled", () => {
+    for (const name of ["btn-primary", "btn-ghost", "btn-danger"]) {
+      const block = css.match(new RegExp(`@utility ${name} \\{([\\s\\S]*?)\\n\\}`))![1];
+      expect(block, name).toMatch(/@media \(hover: hover\)/);
+      expect(block, name).toMatch(/:hover:not\(:disabled\)/);
+    }
+  });
+
+  it("the danger button gets darker on hover, not lighter: its text is 5.1:1 at rest and a lighter fill would drop it below 4.5", () => {
+    const block = css.match(/@utility btn-danger \{([\s\S]*?)\n\}/)![1];
+    expect(block).toMatch(/brightness\(0\.\d+\)/);
+    expect(block).not.toMatch(/brightness\(1\.\d+\)/);
   });
 
   it("keeps patterns to the two the example allows", () => {

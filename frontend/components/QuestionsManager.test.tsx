@@ -551,6 +551,16 @@ describe("QuestionsManager look (#56)", () => {
     expect(within(item).getByRole("button", { name: "Edit" })).not.toHaveClass("btn-danger");
   });
 
+  it("shows a question's number in monospace and red, and its answer as the example's green-ruled block", async () => {
+    backend({ [LIST]: () => json(200, [question(1, { status: "answered", current_answer: answerOf() })]) });
+    render(<QuestionsManager projectId="5" />);
+
+    const item = await screen.findByTestId("question");
+    expect(within(item).getByText("Q1")).toHaveClass("font-mono", "text-xs", "text-primary");
+    const block = within(item).getByText("30 days.").parentElement!;
+    expect(block).toHaveClass("border-l-4", "border-status-answered", "bg-muted");
+  });
+
   it("the add form uses the shared fields and keeps its labels tied to them", async () => {
     backend({ [LIST]: () => json(200, []) });
     render(<QuestionsManager projectId="5" />);

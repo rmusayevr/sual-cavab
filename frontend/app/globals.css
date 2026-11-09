@@ -145,12 +145,13 @@
     letter-spacing: -0.02em;
   }
 
-  /* Keyboard focus is always visible: red on paper, saffron on the navy surfaces (red is 2.7:1 there). */
+  /* Keyboard focus is always visible: red on paper, saffron on controls sitting directly on navy (red is 2.7:1 there;
+     saffron on a cream card inside a navy panel is 2:1, so those keep the red ring). */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
-  .bg-navy :focus-visible {
+  .bg-navy :focus-visible:not(.bg-card *) {
     outline-color: var(--saffron);
   }
 }
@@ -195,9 +196,11 @@
   transition:
     transform 0.15s,
     filter 0.15s;
-  &:hover {
-    filter: brightness(1.08);
-    transform: translateY(-1px);
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
   }
 }
 
@@ -211,12 +214,17 @@
   font-weight: 600;
   font-size: 0.875rem;
   opacity: 0.9;
-  &:hover {
-    opacity: 1;
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      opacity: 1;
+    }
   }
 }
 
-/* For dropping a question: the example reserves --destructive for destructive actions. */
+/*
+ * For dropping a question: the example reserves --destructive for destructive actions. It gets
+ * DARKER on hover: its text is 5.1:1 at rest, and brightening the fill by 8% would take it to 4.5:1.
+ */
 @utility btn-danger {
   display: inline-flex;
   align-items: center;
@@ -230,8 +238,10 @@
   transition:
     transform 0.15s,
     filter 0.15s;
-  &:hover {
-    filter: brightness(1.08);
-    transform: translateY(-1px);
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      filter: brightness(0.92);
+      transform: translateY(-1px);
+    }
   }
 }

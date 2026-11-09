@@ -311,6 +311,7 @@ describe("DraftScreen look (#57)", () => {
     const box = await screen.findByRole("checkbox", { name: /^Q1\b/ });
     expect(box.closest("label")).toHaveClass("min-h-11", "rounded-lg");
     expect(box.closest("label")).toHaveTextContent("Invented question 1");
+    expect(screen.getByText("Q1")).toHaveClass("font-mono", "text-xs", "text-primary"); // ids: monospace, red
   });
 
   it("the buttons are easy to tap", async () => {
