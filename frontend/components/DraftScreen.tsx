@@ -8,6 +8,11 @@ import { apiFetch } from "@/lib/api";
 import type { Question } from "@/lib/projects";
 import { fieldErrors } from "@/lib/questions";
 
+import { Alert } from "./ui/Alert";
+import { Button, buttonClasses } from "./ui/Button";
+import { Card } from "./ui/Card";
+import { Textarea } from "./ui/Field";
+
 /** The most questions one draft can cover; the backend refuses more. */
 export const MAX_QUESTIONS = 10;
 
@@ -66,14 +71,19 @@ export default function DraftScreen() {
     };
   }, [id]);
 
-  if (load.kind === "loading") return <p>Loading questions…</p>;
+  if (load.kind === "loading") return <p className="text-muted">Loading questions…</p>;
   if (load.kind === "not-found")
     return (
-      <p>
-        Project not found. <Link href="/projects">Back to your projects</Link>
-      </p>
+      <div className="grid gap-3">
+        <p>Project not found.</p>
+        <div>
+          <Link href="/projects" className={buttonClasses("secondary")}>
+            Back to your projects
+          </Link>
+        </div>
+      </div>
     );
-  if (load.kind === "error") return <p role="alert">Could not load the questions.</p>;
+  if (load.kind === "error") return <Alert tone="error">Could not load the questions.</Alert>;
 
   const toggle = (number: number) =>
     setPicked((current) => (current.includes(number) ? current.filter((n) => n !== number) : [...current, number]));
@@ -116,77 +126,88 @@ export default function DraftScreen() {
   }
 
   return (
-    <>
-      <p>
-        <Link href={`/projects/${id}`}>Back to the project</Link>
-      </p>
-      <h1>Draft a message</h1>
+    <div className="grid gap-4">
+      <div>
+        <Link href={`/projects/${id}`} className={buttonClasses("secondary")}>
+          Back to the project
+        </Link>
+      </div>
+      <h1 className="text-2xl font-semibold">Draft a message</h1>
 
       {load.questions.length === 0 ? (
-        <p>Nothing is open, so there is nothing to ask. Questions that are open or asked appear here.</p>
+        <p className="text-muted">
+          Nothing is open, so there is nothing to ask. Questions that are open or asked appear here.
+        </p>
       ) : (
-        <form onSubmit={write} style={{ display: "grid", gap: "0.75rem" }}>
-          <fieldset style={{ display: "grid", gap: "0.5rem" }}>
-            <legend>Questions to ask (up to {MAX_QUESTIONS})</legend>
-            {load.questions.map((q) => {
-              const isPicked = picked.includes(q.number);
-              return (
-                <label key={q.id} style={{ display: "flex", gap: "0.5rem", alignItems: "baseline" }}>
-                  <input
-                    type="checkbox"
-                    checked={isPicked}
-                    disabled={!isPicked && picked.length >= MAX_QUESTIONS}
-                    onChange={() => toggle(q.number)}
-                  />
-                  <span>
-                    <strong>{q.label}</strong> {q.text}
-                  </span>
-                </label>
-              );
-            })}
-          </fieldset>
-          <p>
-            <small>
-              The text of the selected questions (the question, why it matters and what it blocks) is sent to Claude
-              to write the draft. Nothing else about the project or the client is sent. The app never sends the message
+        <Card>
+          <form onSubmit={write} className="grid gap-4">
+            <fieldset className="m-0 grid min-w-0 gap-2 border-0 p-0">
+              <legend className="mb-2 text-sm font-medium">Questions to ask (up to {MAX_QUESTIONS})</legend>
+              {load.questions.map((q) => {
+                const isPicked = picked.includes(q.number);
+                return (
+                  <label
+                    key={q.id}
+                    className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-bg"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
+                      checked={isPicked}
+                      disabled={!isPicked && picked.length >= MAX_QUESTIONS}
+                      onChange={() => toggle(q.number)}
+                    />
+                    <span>
+                      <strong>{q.label}</strong> {q.text}
+                    </span>
+                  </label>
+                );
+              })}
+            </fieldset>
+            <p className="text-sm text-muted">
+              The text of the selected questions (the question, why it matters and what it blocks) is sent to Claude to
+              write the draft. Nothing else about the project or the client is sent. The app never sends the message
               anywhere: you copy it and send it yourself.
-            </small>
-          </p>
-          <div>
-            <button type="submit" disabled={writing || picked.length === 0}>
-              {writing ? "Writing…" : draft !== null ? "Write a new draft (replaces the one below)" : "Write a draft"}
-            </button>
-          </div>
-        </form>
+            </p>
+            <div>
+              <Button type="submit" disabled={writing || picked.length === 0}>
+                {writing ? "Writing…" : draft !== null ? "Write a new draft (replaces the one below)" : "Write a draft"}
+              </Button>
+            </div>
+            {error && <Alert tone="error">{error}</Alert>}
+          </form>
+        </Card>
       )}
-
-      {error && <p role="alert">{error}</p>}
 
       {draft !== null && (
-        <section style={{ marginTop: "1.5rem", display: "grid", gap: "0.5rem" }}>
-          <label htmlFor="draft-text">Draft (edit it before you send it)</label>
-          {draftIsStale && <p role="status">The ticked questions have changed since this draft was written.</p>}
-          <textarea
-            id="draft-text"
-            rows={10}
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              setCopied(null); // "Copied." no longer describes what is in the box
-            }}
-          />
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            <button type="button" onClick={copy}>
-              Copy
-            </button>
-            {copied === "yes" && <span role="status">Copied.</span>}
-            {copied === "failed" && <span role="status">Could not copy. Select the text and copy it yourself.</span>}
-          </div>
-          <p>
-            <small>Nothing has been sent. This draft is not saved: copy it before you leave the page.</small>
-          </p>
-        </section>
+        <Card>
+          <section className="grid gap-3">
+            <label htmlFor="draft-text" className="text-sm font-medium">
+              Draft (edit it before you send it)
+            </label>
+            {draftIsStale && <Alert>The ticked questions have changed since this draft was written.</Alert>}
+            <Textarea
+              id="draft-text"
+              rows={10}
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setCopied(null); // "Copied." no longer describes what is in the box
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="secondary" onClick={copy}>
+                Copy
+              </Button>
+              {copied === "yes" && <span role="status">Copied.</span>}
+              {copied === "failed" && <span role="status">Could not copy. Select the text and copy it yourself.</span>}
+            </div>
+            <p className="text-sm text-muted">
+              Nothing has been sent. This draft is not saved: copy it before you leave the page.
+            </p>
+          </section>
+        </Card>
       )}
-    </>
+    </div>
   );
 }

@@ -156,9 +156,12 @@ them instead of inline `style={{ }}`.
 - Text colours were measured at 4.5:1 contrast or more, borders of controls and
   focus rings at 3:1 or more; `app/design-tokens.test.ts` checks that again
   from `globals.css`, so a changed colour that fails the check fails the tests.
-- Tailwind's reset ("preflight") is deliberately not imported yet: screens not
-  yet moved onto the shared pieces still rely on the browser's defaults. Add it
-  when the last screen is moved (#57).
+- Tailwind's reset ("preflight") is deliberately not imported. Every screen is
+  now on the shared pieces, but it was built without a browser to look at, and
+  the reset changes every element that has no class (headings, lists, form
+  controls). The components therefore set their own font, border and
+  `list-none` instead of relying on it. Add the reset only after someone has
+  clicked through every screen (#32).
 - Keep your own base CSS inside `@layer base`; unlayered CSS beats every
   utility class.
 
