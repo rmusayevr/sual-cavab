@@ -145,7 +145,14 @@ if sys.argv[1:2] == ["test"]:
     # errors in the first run when started 1.5 to 2.8 seconds apart, a failed
     # database creation when started together. A run that is killed leaves its
     # database behind (see the README for how to drop it).
-    DATABASES["default"]["TEST"] = {"NAME": f"test_{DATABASES['default']['NAME']}_{os.getpid()}"}
+    # --keepdb (-k) keeps Django's one shared name: its whole point is to find last
+    # run's database again. A long configured name is cut so the whole name stays
+    # within PostgreSQL's 63 characters (which would otherwise cut it without a
+    # word, losing the end of the id); the id at the end is what makes it unique.
+    if "--keepdb" not in sys.argv and "-k" not in sys.argv:
+        _pid_suffix = f"_{os.getpid()}"
+        _room = 63 - len("test_") - len(_pid_suffix)
+        DATABASES["default"].setdefault("TEST", {})["NAME"] = f"test_{DATABASES['default']['NAME'][:_room]}{_pid_suffix}"
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Baku"

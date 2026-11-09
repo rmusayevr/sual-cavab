@@ -21,9 +21,12 @@ class DatabaseTests(TestCase):
 
     def test_the_database_in_use_has_this_processs_id_in_its_name(self):
         # A TestCase, so the test database exists whichever tests were selected (#42).
+        # Compared with the configured name, not os.getpid(): a --parallel worker has its own
+        # id and connects to a clone named <configured name>_<n> (review of #59).
         name = connection.settings_dict["NAME"]
-        self.assertTrue(name.startswith("test_"), name)
-        self.assertTrue(name.endswith(f"_{os.getpid()}"), name)
+        default = settings.DATABASES["default"]
+        configured = default.get("TEST", {}).get("NAME") or default["NAME"]  # under --keepdb Django's own name
+        self.assertTrue(name == configured or name.startswith(configured + "_"), (name, configured))
 
 
 class HealthEndpointTests(SimpleTestCase):
@@ -100,32 +103,55 @@ class TestDatabaseNameTests(SimpleTestCase):
     seconds apart, a failed database creation when started together.
     """
 
-    def name_seen_by(self, argv="['manage.py', 'test']"):
+    def seen_by(self, argv="['manage.py', 'test']", **env):
+        """The test database name a fresh process gets, and that process's id."""
         code = (
             "import os, sys; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); "
             f"sys.argv = {argv}; "
             "from django.conf import settings; "
-            "print(settings.DATABASES['default'].get('TEST', {}).get('NAME', ''))"
+            "print(settings.DATABASES['default'].get('TEST', {}).get('NAME', ''), os.getpid())"
         )
         result = subprocess.run(
-            [sys.executable, "-c", code], cwd=Path(settings.BASE_DIR), capture_output=True, text=True, timeout=120
+            [sys.executable, "-c", code],
+            cwd=Path(settings.BASE_DIR),
+            env={**os.environ, **env},
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        return result.stdout.strip()
+        parts = result.stdout.split()
+        return (parts[0], parts[1]) if len(parts) == 2 else ("", parts[0])
+
+    def test_the_name_ends_with_the_processs_own_id(self):
+        name, pid = self.seen_by()
+        self.assertTrue(name.startswith("test_"), name)
+        self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
 
     def test_two_test_runs_get_different_database_names(self):
-        first = self.name_seen_by()
-        second = self.name_seen_by()
-        self.assertTrue(first.startswith("test_"), first)
-        self.assertNotEqual(first, second)
+        self.assertNotEqual(self.seen_by()[0], self.seen_by()[0])
+
+    def test_a_long_database_name_still_fits_postgresql_and_keeps_the_id(self):
+        # PostgreSQL cuts a name at 63 characters without a word; Django then refuses it,
+        # and the cut name has lost the end of the process id (review of #59).
+        name, pid = self.seen_by(POSTGRES_DB="sual_cavab_" + "x" * 44)
+        self.assertLessEqual(len(name), 63, name)
+        self.assertTrue(name.startswith("test_sual_cavab_x"), name)
+        self.assertTrue(name.endswith(f"_{pid}"), (name, pid))
+
+    def test_keepdb_keeps_the_one_shared_name(self):
+        # --keepdb exists to find last run's database; a name that changes every run never does.
+        for flag in ("--keepdb", "-k"):
+            with self.subTest(flag=flag):
+                self.assertEqual(self.seen_by(argv=f"['manage.py', 'test', '{flag}']")[0], "")
 
     def test_a_server_keeps_djangos_default_test_name(self):
         for command in ("runserver", "shell", "check", "migrate"):
             with self.subTest(command=command):
-                self.assertEqual(self.name_seen_by(argv=f"['manage.py', '{command}']"), "")
+                self.assertEqual(self.seen_by(argv=f"['manage.py', '{command}']")[0], "")
 
     def test_a_test_word_later_in_the_command_line_does_not_count(self):
-        self.assertEqual(self.name_seen_by(argv="['manage.py', 'shell', 'test']"), "")
+        self.assertEqual(self.seen_by(argv="['manage.py', 'shell', 'test']")[0], "")
 
 
 class DeployCheckTests(SimpleTestCase):
