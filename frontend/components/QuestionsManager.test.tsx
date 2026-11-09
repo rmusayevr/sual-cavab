@@ -98,8 +98,8 @@ describe("QuestionsManager: the list", () => {
     render(<QuestionsManager projectId="5" />);
     const items = await screen.findAllByTestId("question");
     expect(items).toHaveLength(3);
-    expect(within(items[1]).getByText(/answered/)).toBeInTheDocument();
-    expect(within(items[2]).getByText(/dropped/)).toBeInTheDocument();
+    expect(within(items[1]).getByText("Answered")).toBeInTheDocument();
+    expect(within(items[2]).getByText("Dropped")).toBeInTheDocument();
   });
 
   it("shows the current answer and the history of older ones", async () => {
@@ -525,5 +525,53 @@ describe("QuestionsManager: record an answer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByLabelText("Answer")).not.toBeInTheDocument();
     expect(calls.filter((c) => c.method === "POST")).toHaveLength(0);
+  });
+});
+
+describe("QuestionsManager look (#56)", () => {
+  it("shows a question's status as a chip with the word in it, and its text on its own line", async () => {
+    backend({ [LIST]: () => json(200, [question(1, { status: "asked" })]) });
+    render(<QuestionsManager projectId="5" />);
+
+    const item = await screen.findByTestId("question");
+    expect(within(item).getByText("Asked")).toHaveClass("rounded-full");
+    expect(within(item).getByText("Invented question 1")).toBeInTheDocument();
+  });
+
+  it("every action on a question is easy to tap, and dropping looks different from the rest", async () => {
+    backend({ [LIST]: () => json(200, [question(1)]) });
+    render(<QuestionsManager projectId="5" />);
+
+    const item = await screen.findByTestId("question");
+    const buttons = within(item).getAllByRole("button");
+    for (const button of buttons) expect(button).toHaveClass("min-h-11");
+    const drop = buttons.find((b) => /drop/i.test(b.textContent ?? ""));
+    expect(drop).toBeDefined();
+    expect(drop).toHaveClass("bg-error-bg");
+    expect(within(item).getByRole("button", { name: "Edit" })).not.toHaveClass("bg-error-bg");
+  });
+
+  it("the add form uses the shared fields and keeps its labels tied to them", async () => {
+    backend({ [LIST]: () => json(200, []) });
+    render(<QuestionsManager projectId="5" />);
+
+    await screen.findByText(/no questions yet/i);
+    for (const label of ["Question", "Why it matters", "What it blocks"]) {
+      expect(screen.getByLabelText(label)).toHaveClass("min-h-11");
+    }
+    expect(screen.getByLabelText("Question")).toHaveAttribute("id", "add-text");
+  });
+
+  it("the answer form uses the shared fields, a date input and a select, all easy to tap", async () => {
+    backend({ [LIST]: () => json(200, [question(1)]) });
+    render(<QuestionsManager projectId="5" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /mark answered|answer/i }));
+
+    expect(await screen.findByLabelText("Date")).toHaveAttribute("type", "date");
+    for (const label of ["Answer", "Answered by", "Date", "Where", "Note (optional)"]) {
+      expect(screen.getByLabelText(label)).toHaveClass("min-h-11");
+    }
+    expect(screen.getByRole("button", { name: "Save answer" })).toHaveClass("min-h-11");
   });
 });

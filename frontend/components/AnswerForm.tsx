@@ -5,6 +5,9 @@ import { useRef, useState, type FormEvent } from "react";
 import { CHANNELS, today, type Channel } from "@/lib/questions";
 
 import type { SubmitResult } from "./QuestionForm";
+import { Alert } from "./ui/Alert";
+import { Button } from "./ui/Button";
+import { Input, Select, Textarea } from "./ui/Field";
 
 export type AnswerFields = {
   text: string;
@@ -53,33 +56,37 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
   const id = (name: string) => `${idPrefix}-${name}`;
   const error = (name: string) =>
     errors[name] && (
-      <div role="alert" id={id(`${name}-error`)}>
+      <div role="alert" id={id(`${name}-error`)} className="text-sm text-error-fg">
         {errors[name]}
       </div>
     );
   /** Ties an input to its message, so tabbing back to the field announces it. */
   const invalid = (name: string) =>
     errors[name] ? { "aria-invalid": true as const, "aria-describedby": id(`${name}-error`) } : {};
+  const label = (name: string, text: string) => (
+    <label htmlFor={id(name)} className="text-sm font-medium">
+      {text}
+    </label>
+  );
 
+  // Not the shared Field: the ids come from idPrefix and each message is an alert of its own
+  // (the tests depend on it); only the look is shared.
   return (
-    <form onSubmit={submit} style={{ display: "grid", gap: "0.5rem" }}>
-      <div>
-        <label htmlFor={id("text")}>Answer</label>
-        <br />
-        <textarea
+    <form onSubmit={submit} className="grid gap-4">
+      <div className="grid gap-1">
+        {label("text", "Answer")}
+        <Textarea
           id={id("text")}
           rows={3}
-          style={{ width: "100%" }}
           value={values.text}
           onChange={(e) => setValues({ ...values, text: e.target.value })}
           {...invalid("text")}
         />
         {error("text")}
       </div>
-      <div>
-        <label htmlFor={id("by")}>Answered by</label>
-        <br />
-        <input
+      <div className="grid gap-1">
+        {label("by", "Answered by")}
+        <Input
           id={id("by")}
           value={values.answered_by}
           onChange={(e) => setValues({ ...values, answered_by: e.target.value })}
@@ -87,10 +94,9 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
         />
         {error("answered_by")}
       </div>
-      <div>
-        <label htmlFor={id("on")}>Date</label>
-        <br />
-        <input
+      <div className="grid gap-1">
+        {label("on", "Date")}
+        <Input
           id={id("on")}
           type="date"
           value={values.answered_on}
@@ -99,10 +105,9 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
         />
         {error("answered_on")}
       </div>
-      <div>
-        <label htmlFor={id("channel")}>Where</label>
-        <br />
-        <select
+      <div className="grid gap-1">
+        {label("channel", "Where")}
+        <Select
           id={id("channel")}
           value={values.channel}
           onChange={(e) => setValues({ ...values, channel: e.target.value as Channel })}
@@ -113,13 +118,12 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
               {c.label}
             </option>
           ))}
-        </select>
+        </Select>
         {error("channel")}
       </div>
-      <div>
-        <label htmlFor={id("note")}>Note (optional)</label>
-        <br />
-        <input
+      <div className="grid gap-1">
+        {label("note", "Note (optional)")}
+        <Input
           id={id("note")}
           value={values.channel_note}
           onChange={(e) => setValues({ ...values, channel_note: e.target.value })}
@@ -127,14 +131,14 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
         />
         {error("channel_note")}
       </div>
-      {errors.form && <p role="alert">{errors.form}</p>}
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <button type="submit" disabled={saving}>
+      {errors.form && <Alert tone="error">{errors.form}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save answer"}
-        </button>
-        <button type="button" onClick={onCancel} disabled={saving}>
+        </Button>
+        <Button variant="secondary" onClick={onCancel} disabled={saving}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
