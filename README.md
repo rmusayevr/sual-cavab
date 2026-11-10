@@ -210,28 +210,41 @@ same language, inside its rules; each item is a choice the owner can reject:
 
 ### A known `npm audit` finding (accepted, 2026-11-10: #50)
 
-`npm audit` in `frontend/` reports **7 moderate** findings. They are one advisory,
+`npm audit` in `frontend/` reports **7 moderate** findings: one advisory,
 [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) (a denial of service in
-`minimatch` 7.0.0 to 11.0.0, from a glob pattern an attacker controls), reported once for every package
-on the chain `eslint-config-next` 16.4.3 -> `typescript-eslint` 8.72.1 -> `@typescript-eslint/typescript-estree`
--> `minimatch` 10.2.6. **It is accepted, not fixed**, for these reasons (each was checked on 2026-11-10):
+`minimatch` `>=7.0.0 <11.0.1`, from a glob pattern an attacker controls), reported for `minimatch` itself (10.2.6
+here) and for the six packages that depend on it: `typescript-eslint` and its `typescript-estree`, `parser`,
+`utils`, `type-utils` and `eslint-plugin`. `eslint-config-next` 16.4.3 pulls them in (it is the root and is not
+itself reported). **It is accepted, not fixed**, for these reasons (checked on 2026-11-10, by hand and by an
+independent review that also read the code and tried the alternatives):
 
-- **It is development tooling only.** `npm audit --omit=dev` reports 0 vulnerabilities and `minimatch` is not
-  in the production dependency tree: it is not in the built app.
-- **The vulnerable call is not reached.** `typescript-estree` calls `minimatch` in one place, to match
-  `allowDefaultProject` patterns (`useProgramFromProjectService.js`), and neither `frontend/eslint.config.mjs`
-  nor the `eslint-config-next` presets set `allowDefaultProject` or `projectService`. The advisory needs
-  patterns an attacker controls; the only patterns that could reach it would come from our own config.
-- **Updating the tooling cannot clear it today.** Every `typescript-estree` release up to the newest (8.72.2,
-  published 2026-11-09) depends on `minimatch ^10.2.2`; the first patched `minimatch` is 11.0.1. The only way to
-  clear the finding now is an npm `overrides` entry forcing a major version (11) into a package built for 10:
-  an untested combination, and a hidden coupling to remove later, to silence a finding that cannot be
-  triggered here. Not done on purpose.
+- **Development tooling only.** `npm audit --omit=dev` reports 0 and `minimatch` is not in npm's production
+  dependency tree. (Next.js bundles its own copies of some libraries inside `next/dist/compiled`, including a
+  `minimatch` in `@vercel/nft`, which `npm audit` cannot see; it traces files during `next build` from our own
+  code and config, and it was not found in the built output.)
+- **The vulnerable code cannot be reached here, for three independent reasons.** (1) `typescript-estree` calls
+  `minimatch` in one place, to match `allowDefaultProject` patterns, and neither `frontend/eslint.config.mjs` nor
+  the `eslint-config-next` presets set `allowDefaultProject` or `projectService`. (2) The advisory is in
+  `firstPhasePreProcess()` "when `optimizationLevel >= 2`"; `minimatch` defaults to 1 and `typescript-estree`
+  passes only `{ dot: true }`. (3) The amplification needs a `**/../` pattern, and `typescript-eslint` refuses an
+  `allowDefaultProject` glob that contains `**`.
+- **The fix exists upstream; only its age is in the way.** `typescript-eslint` 8.72.3-alpha.1 to alpha.7 (canary,
+  published 2026-11-10) depend on `minimatch ^11.0.1`. The newest stable, 8.72.2 (2026-11-09), still depends on
+  `^10.2.2`, and nothing is two weeks old yet.
+- **`npm audit fix` does not help**, although `npm audit` prints "fix available": a dry run still reported 7.
+- **An npm `overrides` entry would work** (scoped: `"@typescript-eslint/typescript-estree": { "minimatch":
+  "11.0.1" }`; the review's trial cleared the audit and ESLint ran, with the code path forced both to match and not
+  to match), and it is the lever for a clean `npm audit` before the stable release. It was not done: for a
+  finding that cannot be triggered here it adds an entry that must be removed later, and the stable fix is
+  expected within days to weeks. The owner can ask for it. (`minimatch` 11.0.1 was published 2026-10-27, so it
+  passes the two-week rule from the evening of 2026-11-10.)
 
-**Revisit when** `npm view @typescript-eslint/typescript-estree dependencies.minimatch` shows `11.0.1` or newer:
-update `eslint-config-next` (or `typescript-eslint`) to a release at least two weeks old that carries it (check
-it with the `review-a-dependency` skill first), and delete this section. If `npm audit --omit=dev` ever reports
-anything, that is a different matter: it would be in the built app.
+**Revisit when** `npm view @typescript-eslint/typescript-estree dependencies.minimatch` prints `^11.0.1` or
+newer for the `latest` release: then, once that release is at least two weeks old (check it with the
+`review-a-dependency` skill), run `npm update typescript-eslint` in `frontend/` (it is not a direct dependency:
+the lockfile re-resolves it under `eslint-config-next`, which allows `typescript-eslint ^8.56.0` and needs no
+update), and delete this section. Anything `npm audit --omit=dev` reports would be a different matter: it would be
+in the built app.
 
 ## Who can see or change a project
 
