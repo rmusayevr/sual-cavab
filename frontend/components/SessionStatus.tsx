@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { apiFetch, type CurrentUser } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";
@@ -26,6 +27,7 @@ export default function SessionStatus({
 }: { layout?: "block" | "nav"; wakingNote?: boolean } = {}) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [signOutFailed, setSignOutFailed] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +74,7 @@ export default function SessionStatus({
     case "loading":
       return (
         <div className="grid min-w-0 gap-1">
-          <p className={nav ? "text-sm opacity-80" : "text-muted-foreground"}>Checking your session…</p>
+          <p className={nav ? "text-sm opacity-80" : "text-muted-foreground"}>{t("session.checking")}</p>
           {wakingNote && <WakingNote active tone={nav ? "navy" : "paper"} />}
         </div>
       );
@@ -81,39 +83,39 @@ export default function SessionStatus({
         <div className="grid min-w-0 gap-3 [overflow-wrap:anywhere]">
           {nav ? (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <p className="text-sm opacity-80">Signed in as {state.user.name || state.user.email}.</p>
+              <p className="text-sm opacity-80">{t("session.signedInAs", { who: state.user.name || state.user.email })}</p>
               <Link href="/projects" className={buttonClasses("primary")}>
-                Your projects
+                {t("session.yourProjects")}
               </Link>
               <Button variant="secondary" onClick={signOut}>
-                Sign out
+                {t("session.signOut")}
               </Button>
             </div>
           ) : (
             <Card className="grid gap-3">
-              <p>Signed in as {state.user.name || state.user.email}.</p>
+              <p>{t("session.signedInAs", { who: state.user.name || state.user.email })}</p>
               <div className="flex flex-wrap gap-2">
                 <Link href="/projects" className={buttonClasses("primary")}>
-                  Your projects
+                  {t("session.yourProjects")}
                 </Link>
                 <Button variant="secondary" onClick={signOut}>
-                  Sign out
+                  {t("session.signOut")}
                 </Button>
               </div>
             </Card>
           )}
-          {signOutFailed && <Alert tone="error">Sign-out failed. You are still signed in.</Alert>}
+          {signOutFailed && <Alert tone="error">{t("session.signOutFailed")}</Alert>}
         </div>
       );
     case "signed-out":
       return (
         <div>
           <Link href="/login" className={buttonClasses("primary")}>
-            Sign in
+            {t("session.signIn")}
           </Link>
         </div>
       );
     case "error":
-      return <Alert tone="error">Could not reach the server.</Alert>;
+      return <Alert tone="error">{t("error.server")}</Alert>;
   }
 }

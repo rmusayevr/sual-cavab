@@ -326,6 +326,17 @@ Set up (see `backend/.env.example`):
 Not checked by any test: a real call to the API (tests use a fake client). The
 first real draft has to be made by hand once the key is set.
 
+## Language (English, Azerbaijani)
+
+The interface is English by default, with Azerbaijani as a second language (#71). An `EN | AZ` switch sits in the headers of the landing, sign-in, projects and workspace pages and at the top of the older pages; the choice is kept in the browser's local storage. `<html lang>` follows the choice on every page.
+
+- **Where the words live:** `frontend/lib/i18n/en.ts` (the master list of keys) and `az.ts` (same keys; a missing one is a compile error and a test failure). No library. Use `useT()` in a client component, or `<T k="..." />` in a server page. `{name}` in a text is filled in at run time.
+- **First paint is always English**: the server cannot know the choice, and the markup must match. A person who chose Azerbaijani sees it as soon as the page has loaded, after a brief English flash (accepted for v1).
+- **Never translated:** what a person typed (questions, answers) and the drafted message. The draft prompt already asks for Azerbaijani.
+- **Status words** come from the dictionaries (`status.open` and so on), one set per language, next to the one table of colours (`lib/status.ts`). They follow the language on every page, including pages whose other words are still English.
+- **The Azerbaijani wording was written by Claude, not by a native speaker; the owner reviews it.** Technical terms stay in English.
+- **Translated so far:** the workspace shell and its draft panel (`/projects/[id]`), the session status in every header, the sign-in page and form, the home link's name, the status words and the waking-up note. **Not yet, so these stay English next to the translated parts:** the selected-question card in the workspace's right pane (its buttons and labels, and the add-a-question form), the landing page body, the projects list, the old `/questions`, `/draft` and `/overview` pages, the 404, the Still open list, page titles, and the messages the drafting hook returns.
+
 ## Staging on Render
 
 A staging site for looking at the app with **invented demo data**. It is

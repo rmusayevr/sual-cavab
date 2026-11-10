@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { useT, type Key } from "@/lib/i18n";
 
 import { Alert } from "./ui/Alert";
 import { Button } from "./ui/Button";
@@ -12,9 +13,10 @@ import { WakingNote } from "./ui/WakingNote";
 
 export default function LoginForm() {
   const router = useRouter();
+  const t = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Key | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -27,11 +29,11 @@ export default function LoginForm() {
         router.replace("/");
         return;
       }
-      if (response.status === 429) setError("Too many attempts. Wait a minute and try again.");
-      else if (response.status === 400) setError("Email or password is incorrect.");
-      else setError("Sign-in failed. Try again.");
+      if (response.status === 429) setError("login.tooMany");
+      else if (response.status === 400) setError("login.incorrect");
+      else setError("login.failed");
     } catch {
-      setError("Could not reach the server.");
+      setError("error.server");
     } finally {
       setSubmitting(false);
     }
@@ -39,7 +41,7 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
-      <Field label="Email">
+      <Field label={t("login.email")}>
         {(props) => (
           <Input
             type="email"
@@ -52,7 +54,7 @@ export default function LoginForm() {
           />
         )}
       </Field>
-      <Field label="Password">
+      <Field label={t("login.password")}>
         {(props) => (
           <Input
             type="password"
@@ -65,9 +67,9 @@ export default function LoginForm() {
           />
         )}
       </Field>
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && <Alert tone="error">{t(error)}</Alert>}
       <Button type="submit" disabled={submitting} className="w-full">
-        {submitting ? "Signing in…" : "Sign in"}
+        {submitting ? t("login.submitting") : t("login.submit")}
       </Button>
       <WakingNote active={submitting} />
     </form>

@@ -151,9 +151,20 @@ describe("design tokens", () => {
         // saffron text is fine in a file that puts it on navy, or whose only saffron text is the exact
         // navy-tone branch of Eyebrow (a comment that mentions the gate does not count; review of #76)
         const source = readFileSync(f, "utf8");
+        // the Wordmark's saffron dot is the same case: it is only used where a navy surface is (next test)
+        if (/[\\/]Wordmark\.tsx$/.test(f)) return false;
         return /text-saffron/.test(source) && !/bg-navy/.test(source) && !/tone === "navy" \? "text-saffron"/.test(source);
       });
     expect(offenders).toEqual([]);
+  });
+
+  it("the Wordmark (saffron dot) is only used in a file that has a navy surface", () => {
+    const users = sourceFiles(join(process.cwd(), "components"))
+      .concat(sourceFiles(join(process.cwd(), "app")))
+      .filter((f) => /\.tsx$/.test(f) && !/\.test\./.test(f) && !/[\\/]Wordmark\.tsx$/.test(f))
+      .filter((f) => /<Wordmark/.test(readFileSync(f, "utf8")));
+    expect(users.length).toBeGreaterThan(0);
+    expect(users.filter((f) => !/bg-navy/.test(readFileSync(f, "utf8")))).toEqual([]);
   });
 
   it("an Eyebrow in the navy tone is only used in a file that has a navy surface", () => {

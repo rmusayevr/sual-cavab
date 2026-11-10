@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, JetBrains_Mono, Manrope } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { LanguageSync } from "@/lib/i18n";
 
 // The three fonts of the design (DESIGN.md): Fraunces for headings, Manrope for text, JetBrains
 // Mono for ids, counts and status words. The Azerbaijani letters (ə ğ ı ö ü ş ç) live in the
@@ -24,7 +25,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${fraunces.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <LanguageSync />
+        {children}
+      </body>
     </html>
   );
 }
