@@ -24,6 +24,21 @@ Sual-Cavab ("question-answer" in Azerbaijani) keeps them in one place:
 
 Django + Django REST Framework (backend), Next.js (frontend), PostgreSQL.
 
+### What was tested, and what was not
+
+This says only what has been run (#43). "Not run" is not "does not work": it is "nobody has looked".
+
+| | Run | Not run |
+| --- | --- | --- |
+| **Python** | 3.14 (CI, and the author's machine) | 3.12 and 3.13. Django 6.1 itself supports 3.12 and newer, so the code is written for that, but nothing here has run on it. The Python Render uses was never read from the service (`render.yaml` sets none; Render's default was assumed to be 3.14.x). |
+| **Node.js** | A current Node 22 chosen by the CI runner (`node-version: "22"`, no exact pin); 22.20.0 on the author's machine (lint, typecheck, the tests and the build: PRs #14, #62, #74, #76, #82); 22.22.2 on Render, where `npm ci`, `next build` and `next start` ran and the site served the sign-in page and proxied the API (the smoke test of #10) | Lint, typecheck and the tests on 22.22.2 itself, and Node 24 and 26. |
+| **PostgreSQL** | 17: the Compose file, CI, and Render's managed database (`postgresMajorVersion: "17"`), which the smoke test of #10 ran against | Any other major version. |
+| **Operating system** | Ubuntu (CI: the backend and frontend checks, with PostgreSQL as a service container, not Compose; and Render's Linux) and Windows (the author's machine: everything, including Compose on Docker Desktop) | macOS, and Linux on a desktop. |
+| **Docker Compose file** | Windows with Docker Desktop | Linux, macOS, and a Docker without IPv6 (the file binds `[::1]` as well as `127.0.0.1`; see the note under [Local setup](#local-setup)). |
+| **Browsers** | Some screens, in English only, in a headless Edge against the production build with a mock API and invented data: the landing, sign-in, projects and 404 pages and the workspace as first built (#74, #76, #79) | Everything added after that (the forms in the workspace, members, how long a question has been open, the kept answer), every screen in Azerbaijani, and the real staging site: nobody has clicked through the screens (#10, #32). |
+
+The version numbers below are what the tools and packages declare or what CI uses, not a promise that every version in the range has been tried.
+
 ## Local setup
 
 The backend needs a PostgreSQL. The repo ships a `docker-compose.yml` with one
@@ -85,8 +100,9 @@ Things to know:
 
 ## Run the backend
 
-Needs Python 3.12+ and a PostgreSQL you can create databases on (see
-[Local setup](#local-setup)).
+Written for Python 3.12 or newer (Django 6.1's own minimum) and a PostgreSQL you can
+create databases on (see [Local setup](#local-setup)). **Only Python 3.14 has been run**
+(see [What was tested](#what-was-tested-and-what-was-not)).
 
 ```bash
 cd backend
@@ -128,8 +144,11 @@ and drop the old ones with `DROP DATABASE <name>;`.
 
 ## Run the frontend
 
-Needs Node.js 22.22.2 or newer on the 22 line, or 24.15+ (the minimum jsdom
-declares; it runs the frontend tests).
+jsdom, which runs the frontend tests, declares Node `^22.22.2 || ^24.15.0 || >=26`. CI uses a
+current Node 22 (chosen by the runner) and Render is pinned to 22.22.2; the author's machine has 22.20.0, below that
+declared minimum: npm warns, and lint, typecheck, the tests and the build passed there (PRs #14, #62, #74, #76, #82). So the
+declared minimum is not a hard floor in practice, but only these have been run (see
+[What was tested](#what-was-tested-and-what-was-not)).
 
 ```bash
 cd frontend
@@ -432,7 +451,7 @@ has no backups and is deleted 30 days after it is created.
 - Not known: which Host header Render's health check sends. If the first
   deploy fails its health check with a 400, add that host to
   `DJANGO_ALLOWED_HOSTS`. The health endpoint does not touch the database.
-- Python is Render's default (3.14.x); Node is pinned to 22.22.2, as in CI.
+- Python is Render's default (3.14.x); Node is pinned to 22.22.2 (CI has no exact pin: it asks for Node 22 and takes what the runner provides).
 
 ## Built with claude-harness
 
