@@ -61,7 +61,7 @@ class SmokeScriptTests(LiveServerTestCase):
         _, output = self.run_script()
         self.assertNotIn(PASSWORD, output)
         _, output = self.run_script(password=WRONG_PASSWORD)
-        self.assertNotIn("not-the-demo-password", output)
+        self.assertNotIn(WRONG_PASSWORD, output)
 
     def test_it_asks_for_the_password_and_a_url(self):
         with mock.patch.dict(os.environ, {}, clear=False):

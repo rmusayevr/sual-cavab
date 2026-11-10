@@ -59,7 +59,7 @@ from .views import COULD_NOT_WRITE, NOT_SET_UP
 
 from core.testing import invented_password
 PASSWORD = invented_password()
-FAKE_KEY = "INVENTED-not-a-real-key-0000"
+FAKE_KEY = invented_password()  # an opaque stand-in for the API key
 DRAFT_TEXT = "Salam, bu sualları aydınlaşdıra bilərsinizmi? Q1: provayderlər."
 
 

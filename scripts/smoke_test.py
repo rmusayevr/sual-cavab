@@ -15,6 +15,7 @@ Drafting calls a paid API, so it is checked only with --draft.
 import http.cookiejar
 import json
 import os
+import secrets
 import sys
 import urllib.error
 import urllib.request
@@ -116,7 +117,7 @@ def run(base, password, draft=False, out=print):
         status, _ = outsider.call("GET", f"/api/projects/{ticketing['id']}/")
         check("... and gets a 404 for a project they are not on", status == 404, status)
 
-    status, _ = Session(base).call("POST", "/api/auth/login/", {"email": OWNER, "password": "not-the-password"})
+    status, _ = Session(base).call("POST", "/api/auth/login/", {"email": OWNER, "password": secrets.token_urlsafe(12)})
     check("a wrong password does not sign in", status in (400, 403), status)
 
     if draft and ticketing:

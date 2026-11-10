@@ -140,7 +140,7 @@ class SignInTests(AccountTestCase):
         def attempt(n):
             return self.client.post(
                 reverse("auth-login"),
-                {"email": "ada@example.com", "password": "wrong"},
+                {"email": "ada@example.com", "password": WRONG_PASSWORD},
                 format="json",
                 HTTP_X_FORWARDED_FOR=f"203.0.113.{n}",
             )

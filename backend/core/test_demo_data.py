@@ -223,7 +223,7 @@ class SignInTests(TestCase):
 
         response = Client().post(
             "/api/auth/login/",
-            {"email": f"demo.owner@{DEMO_DOMAIN}", "password": "not-the-demo-password"},
+            {"email": f"demo.owner@{DEMO_DOMAIN}", "password": invented_password()},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 400)
