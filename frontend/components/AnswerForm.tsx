@@ -2,6 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 
+import { useT } from "@/lib/i18n";
 import { CHANNELS, today, type Channel } from "@/lib/questions";
 
 import type { SubmitResult } from "./QuestionForm";
@@ -25,6 +26,7 @@ type Props = {
 
 /** Records who answered a question, when, and where. */
 export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
+  const t = useT();
   const [values, setValues] = useState<AnswerFields>({
     text: "",
     answered_by: "",
@@ -46,7 +48,7 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
       const result = await onSubmit(values);
       if (result) setErrors(result);
     } catch {
-      setErrors({ form: "Could not reach the server." });
+      setErrors({ form: t("error.server") });
     } finally {
       inFlight.current = false;
       setSaving(false);
@@ -74,7 +76,7 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
   return (
     <form onSubmit={submit} className="grid gap-4">
       <div className="grid gap-1">
-        {label("text", "Answer")}
+        {label("text", t("answer.text"))}
         <Textarea
           id={id("text")}
           rows={3}
@@ -85,7 +87,7 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
         {error("text")}
       </div>
       <div className="grid gap-1">
-        {label("by", "Answered by")}
+        {label("by", t("answer.by"))}
         <Input
           id={id("by")}
           value={values.answered_by}
@@ -95,7 +97,7 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
         {error("answered_by")}
       </div>
       <div className="grid gap-1">
-        {label("on", "Date")}
+        {label("on", t("answer.date"))}
         <Input
           id={id("on")}
           type="date"
@@ -106,7 +108,7 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
         {error("answered_on")}
       </div>
       <div className="grid gap-1">
-        {label("channel", "Where")}
+        {label("channel", t("answer.where"))}
         <Select
           id={id("channel")}
           value={values.channel}
@@ -115,14 +117,14 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
         >
           {CHANNELS.map((c) => (
             <option key={c.value} value={c.value}>
-              {c.label}
+              {t(`channel.${c.value}`)}
             </option>
           ))}
         </Select>
         {error("channel")}
       </div>
       <div className="grid gap-1">
-        {label("note", "Note (optional)")}
+        {label("note", t("answer.note"))}
         <Input
           id={id("note")}
           value={values.channel_note}
@@ -134,10 +136,10 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
       {errors.form && <Alert tone="error">{errors.form}</Alert>}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save answer"}
+          {saving ? t("question.saving") : t("answer.save")}
         </Button>
         <Button variant="secondary" onClick={onCancel} disabled={saving}>
-          Cancel
+          {t("question.cancel")}
         </Button>
       </div>
     </form>

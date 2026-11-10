@@ -135,7 +135,7 @@ export default function Workspace() {
       setState((s) => (s.kind === "ready" ? { ...s, questions: [...s.questions, created] } : s));
       return null;
     }
-    return await failure(response, "Could not add the question.", [...QUESTION_FIELDS]);
+    return await failure(response, t("error.addQuestion"), [...QUESTION_FIELDS]);
   }
 
   const toggle = (n: number) => setTicked((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p, n]));
@@ -271,7 +271,7 @@ export default function Workspace() {
 
         <Card className="grid gap-4">
           <h2 className="text-lg font-semibold">{t("workspace.add")}</h2>
-          <QuestionForm idPrefix="add" submitLabel="Add question" busyLabel="Adding…" clearOnSuccess onSubmit={add} />
+          <QuestionForm idPrefix="add" submitLabel={t("form.add")} busyLabel={t("form.adding")} clearOnSuccess onSubmit={add} />
         </Card>
 
         <section aria-labelledby="draft-heading" className="grid gap-3 rounded-md bg-navy p-4 text-navy-foreground">
