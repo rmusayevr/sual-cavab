@@ -1,6 +1,8 @@
 # Runs the same commands as `checks` in .claude/harness-loop.json, so a green
 # local run and a green CI run mean the same thing. Needs no secrets.
-# backend/core/test_ci_drift.py fails when the two lists differ: change both together (#51).
+# backend/core/test_ci_drift.py fails when the two lists differ: change both together (#51). It reads
+# this file as text, so it also fails on a `run:` in any form but a plain one-line `- run: command`, and on
+# keys that change whether a step runs (`if`, `continue-on-error`, a step's `env`, ...): keep steps plain.
 name: CI
 
 on:
