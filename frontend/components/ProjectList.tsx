@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { useT, type Key } from "@/lib/i18n";
 import type { Project } from "@/lib/projects";
 
 import { Alert } from "./ui/Alert";
@@ -45,10 +45,17 @@ export default function ProjectList() {
     return (
       <EmptyState strip={false}>
         <p className="flex flex-wrap items-center gap-2">
-          <Link href="/login" className={buttonClasses("primary")}>
-            {t("session.signIn")}
-          </Link>
-          <span>{t("projects.signInTo")}</span>
+          {/* one sentence per language, so the button can sit where that language wants it */}
+          {t("projects.signInLine")
+            .split("{link}")
+            .flatMap((part, i, parts) => [
+              part.trim() ? <span key={`t${i}`}>{part}</span> : null,
+              i < parts.length - 1 ? (
+                <Link key={`l${i}`} href="/login" className={buttonClasses("primary")}>
+                  {t("session.signIn")}
+                </Link>
+              ) : null,
+            ])}
         </p>
       </EmptyState>
     );
@@ -77,7 +84,7 @@ export default function ProjectList() {
                   </h2>
                   <p className="text-sm text-muted-foreground">
                     {p.client_name}
-                    {p.my_role === "owner" ? t("projects.owner") : ""} · {t("projects.stillOpen", { n: p.open_question_count })}
+                    {p.my_role === "owner" ? ` ${t("projects.owner")}` : ""} · {t("projects.stillOpen", { n: p.open_question_count })}
                   </p>
                 </div>
                 {p.open_question_count > 0 && (
@@ -102,7 +109,7 @@ function NewProjectForm({ onCreated }: { onCreated: (p: Project) => void }) {
   const t = useT();
   const [name, setName] = useState("");
   const [clientName, setClientName] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Key | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -116,10 +123,10 @@ function NewProjectForm({ onCreated }: { onCreated: (p: Project) => void }) {
         setName("");
         setClientName("");
       } else {
-        setError(t("projects.createFailed"));
+        setError("projects.createFailed");
       }
     } catch {
-      setError(t("error.server"));
+      setError("error.server");
     } finally {
       setSaving(false);
     }
@@ -138,7 +145,7 @@ function NewProjectForm({ onCreated }: { onCreated: (p: Project) => void }) {
         <Field label={t("projects.client")}>
           {(props) => <Input required value={clientName} onChange={(e) => setClientName(e.target.value)} {...props} />}
         </Field>
-        {error && <Alert tone="error">{error}</Alert>}
+        {error && <Alert tone="error">{t(error)}</Alert>}
         <Button type="submit" disabled={saving} className="w-full">
           {saving ? t("projects.creating") : t("projects.create")}
         </Button>

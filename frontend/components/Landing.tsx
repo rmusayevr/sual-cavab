@@ -15,12 +15,14 @@ import { Wordmark } from "./ui/Wordmark";
 // already Azerbaijani with English technical terms, as the drafting feature writes it, so it is
 // shown the same in both languages.
 
-const SAMPLE_QUESTIONS: Array<{ id: number; key: Key; status: QuestionStatus }> = [
-  { id: 1, key: "landing.q1", status: "open" },
-  { id: 2, key: "landing.q2", status: "asked" },
-  { id: 3, key: "landing.q3", status: "answered" },
-  { id: 4, key: "landing.q4", status: "open" },
-  { id: 5, key: "landing.q5", status: "open" },
+// Question text is the ledger entry: it is written in English and is not translated (DESIGN.md
+// section 7), like the questions a person types in the app. Only the status words follow the language.
+const SAMPLE_QUESTIONS: Array<{ id: number; text: string; status: QuestionStatus }> = [
+  { id: 1, text: "Who can issue a refund — only admins, or support too?", status: "open" },
+  { id: 2, text: "What happens to sold tickets when an event date moves?", status: "asked" },
+  { id: 3, text: "Which card types are allowed at checkout?", status: "answered" },
+  { id: 4, text: "Is there a max number of tickets per order?", status: "open" },
+  { id: 5, text: "Should guest checkout be supported?", status: "open" },
 ];
 
 const FEATURES: Array<[string, Key, Key]> = [
@@ -69,7 +71,7 @@ export default function Landing() {
               {SAMPLE_QUESTIONS.map((q) => (
                 <li key={q.id} className="flex items-start gap-3 px-4 py-3">
                   <span className="font-mono text-xs text-muted-foreground">Q{q.id}</span>
-                  <span className="min-w-0 flex-1 text-sm">{t(q.key)}</span>
+                  <span className="min-w-0 flex-1 text-sm">{q.text}</span>
                   <StatusChip status={q.status} className="shrink-0 text-muted-foreground" />
                 </li>
               ))}
