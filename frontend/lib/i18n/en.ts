@@ -82,9 +82,6 @@ export const en = {
   "channel.email": "Email",
   "channel.other": "Other",
 
-  "questions.loading": "Loading questions…",
-  "questions.loadError": "Could not load the questions.",
-  "questions.none": "No questions yet. Add the first one below.",
 
   "error.addQuestion": "Could not add the question.",
   "error.changeStatus": "Could not change the status.",

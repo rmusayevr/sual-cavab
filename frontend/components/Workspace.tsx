@@ -13,7 +13,7 @@ import { LanguageSwitch, useT } from "@/lib/i18n";
 import { MAX_QUESTIONS, useDraft } from "@/lib/useDraft";
 
 import QuestionForm, { type QuestionFields, type SubmitResult } from "./QuestionForm";
-import { QUESTION_FIELDS, QuestionItem, failure } from "./QuestionsManager";
+import { QUESTION_FIELDS, QuestionItem, failure } from "./QuestionItem";
 import SessionStatus from "./SessionStatus";
 import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";

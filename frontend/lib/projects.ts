@@ -1,4 +1,4 @@
-import { en, type Key } from "./i18n/en";
+import type { Key } from "./i18n/en";
 
 export type Role = "owner" | "member";
 
@@ -42,12 +42,7 @@ export function daysOpen(createdAt: string, now: Date = new Date()): number {
   return Math.max(0, Math.floor((now.getTime() - new Date(createdAt).getTime()) / DAY_MS));
 }
 
-export function ageText(days: number): string {
-  if (days === 0) return en["age.zero"];
-  return days === 1 ? en["age.one"] : en["age.many"].replace("{n}", String(days));
-}
-
-/** The dictionary key and values for the same words, so a screen can show them in the chosen language. */
+/** The dictionary key and values for how long a question has been open ("open for 3 days"), so a screen can show it in the chosen language. */
 export function ageKey(days: number): { key: Key; values?: { n: number } } {
   if (days === 0) return { key: "age.zero" };
   return days === 1 ? { key: "age.one" } : { key: "age.many", values: { n: days } };

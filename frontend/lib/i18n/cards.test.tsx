@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { QuestionItem } from "@/components/QuestionsManager";
+import { QuestionItem } from "@/components/QuestionItem";
 import type { FullQuestion } from "@/lib/questions";
 import { transitionKey } from "@/lib/questions";
 

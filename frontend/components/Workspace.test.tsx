@@ -330,4 +330,140 @@ describe("Workspace (#70)", () => {
       }
     }
   });
+
+  // #83: what the old questions and draft pages tested, now for the workspace they were folded into.
+  type Sent = { method: string; url: string; body: unknown };
+  /** A backend that also takes POSTs to /questions/ (the add form) and records every request. */
+  function withAdd(onAdd: (body: unknown) => Response | Promise<Response>, list: unknown[] = []) {
+    const sent: Sent[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+        sent.push({ method, url, body });
+        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+        if (method === "POST" && url.endsWith("/questions/")) return onAdd(body);
+        if (url.includes("/questions/")) return json(200, list);
+        if (url.endsWith("/members/")) return json(200, members);
+        return json(200, projects);
+      }),
+    );
+    return sent;
+  }
+  const fill = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  const adds = (sent: Sent[]) => sent.filter((c) => c.method === "POST" && c.url.endsWith("/questions/"));
+
+  it("shows a loading state first, as ledger rows that pulse", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+
+    const { container } = render(<Workspace />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading project…");
+    expect(container.querySelector('[aria-hidden="true"].motion-safe\\:animate-pulse, .motion-safe\\:animate-pulse')).not.toBeNull();
+  });
+
+  it("says so when the project has no questions yet, and offers the add form", async () => {
+    served = [];
+    api();
+    render(<Workspace />);
+
+    expect(await screen.findByText("No questions yet. Add the first one.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add question" })).toBeInTheDocument();
+  });
+
+  it("adds a question: posts the three fields, shows it in the list and empties the form", async () => {
+    const sent = withAdd(() => json(201, { ...q(7, "open", "Which providers?"), blocks: "Checkout" }));
+    render(<Workspace />);
+    await screen.findByText("No questions yet. Add the first one.");
+
+    fill("Question", "Which providers?");
+    fill("Why it matters", "Pricing");
+    fill("What it blocks", "Checkout");
+    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
+
+    expect(await screen.findByText("Which providers?")).toBeInTheDocument();
+    expect(adds(sent)[0].body).toEqual({ text: "Which providers?", why_it_matters: "Pricing", blocks: "Checkout" });
+    expect(screen.getByLabelText("Question")).toHaveValue("");
+  });
+
+  it("shows the API's message next to the field when adding is refused, and keeps what was typed", async () => {
+    withAdd(() => json(400, { text: ["This field may not be blank."] }));
+    render(<Workspace />);
+    await screen.findByText("No questions yet. Add the first one.");
+
+    fill("What it blocks", "Checkout");
+    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
+
+    expect(await screen.findByText("This field may not be blank.")).toBeInTheDocument();
+    expect(screen.getByLabelText("What it blocks")).toHaveValue("Checkout");
+  });
+
+  it("does not add twice while the first request runs, even when the form is submitted again", async () => {
+    let release: (r: Response) => void = () => {};
+    const sent = withAdd(() => new Promise<Response>((resolve) => (release = resolve)));
+    render(<Workspace />);
+    await screen.findByText("No questions yet. Add the first one.");
+
+    fill("Question", "Q?");
+    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
+    const busy = await screen.findByRole("button", { name: /adding/i });
+    expect(busy).toBeDisabled();
+    fireEvent.submit(busy.closest("form")!); // Enter in a field submits the form itself
+
+    await waitFor(() => expect(adds(sent)).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(adds(sent)).toHaveLength(1);
+    release(json(201, q(8, "open", "Q?")));
+    expect(await screen.findByText("Q?")).toBeInTheDocument();
+  });
+
+  it("says so when the server cannot be reached while adding, and keeps what was typed", async () => {
+    withAdd(() => Promise.reject(new Error("offline")));
+    render(<Workspace />);
+    await screen.findByText("No questions yet. Add the first one.");
+
+    fill("Question", "Q?");
+    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
+
+    expect(await screen.findByText(/could not reach the server/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Question")).toHaveValue("Q?");
+  });
+
+  it("allows at most ten questions in one draft, and the other rows then look unavailable", async () => {
+    served = Array.from({ length: 11 }, (_, n) => q(n + 1, "open", `Open question ${n + 1}`));
+    api();
+    render(<Workspace />);
+    await screen.findByText("Open question 1");
+
+    for (let n = 1; n <= 10; n++) fireEvent.click(screen.getByRole("checkbox", { name: `Pick Q${n}` }));
+
+    expect(screen.getByRole("checkbox", { name: "Pick Q11" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Pick Q10" })).toBeEnabled(); // a ticked one can be unticked
+    fireEvent.click(screen.getByRole("checkbox", { name: "Pick Q10" }));
+    expect(screen.getByRole("checkbox", { name: "Pick Q11" })).toBeEnabled();
+  });
+
+  it("says that writing again replaces the draft, and warns when the ticked questions no longer match it", async () => {
+    api();
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Pick Q1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
+    await screen.findByLabelText(/Draft \(edit it/);
+    expect(screen.getByRole("button", { name: "Write a new draft (replaces the one below)" })).toBeInTheDocument();
+    expect(screen.queryByText("The ticked questions have changed since this draft was written.")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Pick Q2" }));
+
+    expect(screen.getByText("The ticked questions have changed since this draft was written.")).toBeInTheDocument();
+  });
+
+  it("lets a long question without spaces shrink inside its row", async () => {
+    served = [q(1, "open", "https://example.invalid/a/very/long/link/that/has/no/spaces/at/all/ever/and/keeps/going")];
+    api();
+    render(<Workspace />);
+
+    const button = (await screen.findByText(/very\/long\/link/)).closest("button")!;
+    expect(button).toHaveClass("min-w-0");
+  });
 });
