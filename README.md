@@ -289,8 +289,9 @@ still decides, and its message is shown if it refuses. Validation errors from
 the API appear next to the field. If the server refuses an answer because the
 question moved while the form was open (a teammate answered or dropped it), the
 form stays open with what was typed, the question behind it is reloaded, and the
-save button is offered again only if the question can still be answered (if not,
-the text stays so it can be copied). Re-opening an answered question keeps the old
+save button is offered again only if the question, as far as the page knows
+(it could not be reloaded, say), can still be answered (if not, the text stays so
+it can be copied; the hint says the answer was not saved). Re-opening an answered question keeps the old
 answer, shown as "Earlier answer".
 
 ## Drafting a message (Claude)

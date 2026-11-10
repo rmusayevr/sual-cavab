@@ -69,6 +69,7 @@ export function QuestionItem({
   const canAnswer = TRANSITIONS[question.status].includes("answered");
 
   async function transition(to: QuestionStatus, answer?: AnswerFields): Promise<SubmitResult> {
+    setMessage(null); // a reason from an earlier refusal is not this attempt's
     const response = await apiFetch(`${url}transition/`, { method: "POST", body: answer ? { to, answer } : { to } });
     if (response.ok) {
       onChanged((await response.json()) as FullQuestion);
@@ -164,7 +165,7 @@ export function QuestionItem({
 
         {mode === "answer" && (
           <>
-            {kept && <p className="text-sm text-muted-foreground">{t(canAnswer ? "answer.keptRetry" : "answer.keptCopy")}</p>}
+            {kept && <Alert tone="info">{t(canAnswer ? "answer.keptRetry" : "answer.keptCopy")}</Alert>}
             <AnswerForm
               idPrefix={`${id}-answer`}
               canSave={canAnswer}

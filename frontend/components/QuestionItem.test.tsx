@@ -349,8 +349,8 @@ describe("QuestionItem: record an answer", () => {
   // #36, the owner's choice B: when the server refuses the answer because the question moved under the
   // person (a teammate answered or dropped it), the form stays open with what they typed, the question
   // behind it is reloaded, and saving is offered again only if the question can still be answered.
-  const KEPT_COPY = "Your answer is kept below so you can copy it. This question can no longer be answered.";
-  const KEPT_RETRY = "Your answer is kept below. Check the question, then save it again.";
+  const KEPT_COPY = "Your answer was not saved, but it is kept below so you can copy it. The question cannot be answered in its present state.";
+  const KEPT_RETRY = "Your answer was not saved, but it is kept below. Check the question, then save it again.";
 
   it("keeps the typed answer when a teammate dropped the question meanwhile: the reason, the reloaded question, no save, a hint to copy", async () => {
     backend({
@@ -370,7 +370,7 @@ describe("QuestionItem: record an answer", () => {
     expect(screen.getByLabelText("Answered by")).toHaveValue("Əli Məmmədov");
     expect(screen.getByLabelText("Note (optional)")).toHaveValue("Weekly sync");
     expect(screen.queryByRole("button", { name: "Save answer" })).not.toBeInTheDocument(); // nothing the status forbids is offered
-    expect(screen.getByText(KEPT_COPY)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(KEPT_COPY); // announced, and it says the answer was NOT saved
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByLabelText("Answer")).not.toBeInTheDocument();
@@ -620,5 +620,30 @@ describe("QuestionItem: answers", () => {
     expect(screen.getByLabelText("Where").tagName).toBe("SELECT");
     for (const label of ["Answer", "Answered by", "Date", "Where", "Note (optional)"]) expect(screen.getByLabelText(label)).toHaveClass("min-h-11");
     expect(screen.getByRole("button", { name: "Save answer" })).toHaveClass("min-h-11");
+  });
+
+  it("drops the old reason when saving is tried again and the server refuses for another reason", async () => {
+    let attempts = 0;
+    backend({
+      [LIST]: () => json(200, [question(1)]),
+      [TRANSITION_1]: () => {
+        attempts += 1;
+        return attempts === 1
+          ? json(400, { to: ["The question was changed. Check it and try again."], allowed: ["answered"] })
+          : json(400, { answer: { answered_on: ["The answer cannot be dated in the future."] } });
+      },
+      [QUESTION_1]: () => json(200, question(1, { status: "asked" })),
+    });
+    render(<Board projectId="5" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+    fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "30 days." } });
+    fireEvent.change(screen.getByLabelText("Answered by"), { target: { value: "Əli Məmmədov" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+    await screen.findByText("The question was changed. Check it and try again.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+
+    expect(await screen.findByText("The answer cannot be dated in the future.")).toBeInTheDocument();
+    expect(screen.queryByText("The question was changed. Check it and try again.")).not.toBeInTheDocument();
   });
 });
