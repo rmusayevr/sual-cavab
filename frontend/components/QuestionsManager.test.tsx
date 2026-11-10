@@ -406,17 +406,26 @@ describe("QuestionsManager: record an answer", () => {
     });
   });
 
-  // The server compares an answer date with today in Asia/Baku, so the default is Baku's date, not the
-  // browser's (#48). 20:30 UTC is already the next day in Baku (UTC+4) and still the day before for a
-  // browser in the Americas or at UTC, so a default taken from the browser's calendar would be refused.
-  it("starts with today's date in Baku, even just after Baku midnight, and the chat channel", async () => {
+  // The server refuses an answer date after today in Asia/Baku (#48), so the default must not be after
+  // Baku's date, and not after the browser's own date either (a browser in the Americas must not be
+  // handed its own future). Which of the two it is depends on the machine's time zone, so this checks
+  // the rule at a moment when the calendars differ (20:30 UTC is already the 6th in Baku); the exact
+  // dates per zone are in lib/questions.test.ts.
+  it("starts with a date that is neither after Baku's today nor after the browser's, and the chat channel", async () => {
     backend({ [LIST]: () => json(200, [question(1)]) });
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-03-05T20:30:00Z"));
+    const now = new Date("2026-03-05T20:30:00Z");
+    vi.setSystemTime(now);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const own = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const baku = "2026-03-06";
     try {
       render(<QuestionsManager projectId="5" />);
       fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
-      expect(screen.getByLabelText("Date")).toHaveValue("2026-03-06");
+      const value = (screen.getByLabelText("Date") as HTMLInputElement).value;
+      expect(value <= baku).toBe(true);
+      expect(value <= own).toBe(true);
+      expect([own, baku]).toContain(value);
       expect(screen.getByLabelText("Where")).toHaveValue("chat");
     } finally {
       vi.useRealTimers();

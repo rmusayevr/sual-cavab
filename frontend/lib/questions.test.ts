@@ -44,25 +44,37 @@ describe("transitions", () => {
   });
 });
 
-// The server refuses an answer date after today in Asia/Baku (UTC+4, settings.TIME_ZONE), so the
-// default must be Baku's today whatever the browser's own time zone is (#48). These instants are
-// in UTC, so the tests give the same answer on any machine.
+// The server refuses an answer date after today in Asia/Baku (UTC+4, settings.TIME_ZONE) (#48). The
+// default is the EARLIER of the browser's date and Baku's: never refused, never in the browser's own
+// future. The instants are in UTC and the browser's date is passed in, so the answer is the same on
+// any machine.
 describe("today", () => {
-  it("is the Baku date, zero-padded", () => {
-    expect(today(new Date("2026-03-05T10:00:00Z"))).toBe("2026-03-05");
+  it("is just today where the browser and Baku agree, zero-padded", () => {
+    expect(today(new Date("2026-03-05T10:00:00Z"), "2026-03-05")).toBe("2026-03-05");
+    expect(today(new Date("2026-03-05T20:30:00Z"), "2026-03-06")).toBe("2026-03-06"); // a browser in Baku
   });
 
-  it("is still the day before up to 23:59 in Baku (19:59 UTC)", () => {
-    expect(today(new Date("2026-03-05T19:59:59Z"))).toBe("2026-03-05");
+  it("is Baku's date for a browser AHEAD of Baku just after its own midnight: the reported bug", () => {
+    // 19:59:59 UTC is 23:59:59 in Baku, but already the next day at UTC+6 or UTC+9
+    expect(today(new Date("2026-03-05T19:59:59Z"), "2026-03-06")).toBe("2026-03-05");
+    expect(today(new Date("2026-03-05T16:00:00Z"), "2026-03-06")).toBe("2026-03-05"); // a Tokyo browser at 01:00
   });
 
-  it("is already the next day at Baku midnight (20:00 UTC), where a browser behind UTC+4 would say yesterday", () => {
-    expect(today(new Date("2026-03-05T20:00:00Z"))).toBe("2026-03-06");
-    expect(today(new Date("2026-03-05T20:30:00Z"))).toBe("2026-03-06");
+  it("is the browser's own date for a browser BEHIND Baku, never a date in its own future", () => {
+    // 20:30 UTC is 00:30 the next day in Baku, but still the 5th at UTC or in the Americas
+    expect(today(new Date("2026-03-05T20:30:00Z"), "2026-03-05")).toBe("2026-03-05");
+    expect(today(new Date("2026-03-05T21:00:00Z"), "2026-03-05")).toBe("2026-03-05"); // Los Angeles at 13:00
   });
 
-  it("crosses a month and a year the way Baku's calendar does", () => {
-    expect(today(new Date("2026-12-31T20:00:00Z"))).toBe("2027-01-01");
-    expect(today(new Date("2026-02-28T20:00:00Z"))).toBe("2026-03-01");
+  it("crosses a month and a year the way each calendar does", () => {
+    expect(today(new Date("2026-12-31T20:00:00Z"), "2027-01-01")).toBe("2027-01-01");
+    expect(today(new Date("2026-12-31T20:00:00Z"), "2026-12-31")).toBe("2026-12-31");
+    expect(today(new Date("2026-02-28T19:00:00Z"), "2026-03-01")).toBe("2026-02-28");
+  });
+
+  it("uses the browser's own calendar by default, when no date is given, and is never later than it", () => {
+    const now = new Date();
+    const own = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    expect(today(now) <= own).toBe(true);
   });
 });
