@@ -199,3 +199,31 @@ for (const lang of ["en", "az"] as Language[]) {
     });
   });
 }
+
+// #36: the hint under the kept answer, in both languages
+const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+for (const lang of ["en", "az"] as Language[]) {
+  const t = (key: Key, values?: Record<string, string | number>) => translate(lang, key, values);
+  describe(`a refused answer in ${lang}`, () => {
+    it("keeps the typed text and says so in the language", async () => {
+      act(() => setLanguage(lang));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init?: RequestInit) => {
+          if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+          if (init?.method === "POST") return json(400, { to: ["Not allowed."], allowed: ["open"] });
+          return json(200, question("open"));
+        }),
+      );
+      show(question("open"));
+      fireEvent.click(screen.getByRole("button", { name: t("transition.recordAnswer") }));
+      fireEvent.change(screen.getByLabelText(t("answer.text")), { target: { value: "Invented answer." } });
+      fireEvent.change(screen.getByLabelText(t("answer.by")), { target: { value: "Invented Person" } });
+
+      fireEvent.click(screen.getByRole("button", { name: t("answer.save") }));
+
+      expect(await screen.findByText(t("answer.keptRetry"))).toBeInTheDocument();
+      expect(screen.getByLabelText(t("answer.text"))).toHaveValue("Invented answer.");
+    });
+  });
+}

@@ -613,4 +613,36 @@ describe("Workspace (#70)", () => {
     expect(screen.getByLabelText("What it blocks")).toHaveAttribute("rows", "1");
     expect(screen.getByLabelText("What it blocks")).not.toHaveClass("min-h-24");
   });
+
+  // #36 (the owner's choice B), through the real workspace: the question is replaced by the reload and
+  // the typed answer must survive that.
+  it("keeps a typed answer in the form when the server refuses it because a teammate dropped the question", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+        if (init?.method === "POST" && url.endsWith("/transition/"))
+          return json(400, { to: ["A dropped question cannot become answered."], allowed: ["open"] });
+        if (url === "/api/projects/5/questions/1/") return json(200, { ...questions[0], status: "dropped" });
+        if (url.includes("/questions/")) return json(200, served);
+        if (url.endsWith("/members/")) return json(200, members);
+        return json(200, projects);
+      }),
+    );
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("button", { name: /Q1.*Which payment providers/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+    fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "Thirty days, in writing." } });
+    fireEvent.change(screen.getByLabelText("Answered by"), { target: { value: "Invented Person" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+
+    expect(await screen.findByText("A dropped question cannot become answered.")).toBeInTheDocument();
+    const detail = screen.getByRole("region", { name: "Selected question" });
+    expect(within(detail).getByLabelText("Answer")).toHaveValue("Thirty days, in writing."); // kept through the reload
+    expect(within(detail).getByLabelText("Answered by")).toHaveValue("Invented Person");
+    expect(within(detail).queryByRole("button", { name: "Save answer" })).not.toBeInTheDocument();
+    expect(within(detail).getByText(/kept below so you can copy it/)).toBeInTheDocument();
+    expect(within(detail).getAllByText("Dropped").length).toBeGreaterThan(0); // the card shows the question as it is now
+  });
 });

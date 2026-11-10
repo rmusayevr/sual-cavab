@@ -346,7 +346,13 @@ describe("QuestionItem: record an answer", () => {
     expect(screen.getByLabelText("Answer")).toHaveValue("30 days.");
   });
 
-  it("shows the refusal when a teammate dropped the question meanwhile, and reloads it", async () => {
+  // #36, the owner's choice B: when the server refuses the answer because the question moved under the
+  // person (a teammate answered or dropped it), the form stays open with what they typed, the question
+  // behind it is reloaded, and saving is offered again only if the question can still be answered.
+  const KEPT_COPY = "Your answer is kept below so you can copy it. This question can no longer be answered.";
+  const KEPT_RETRY = "Your answer is kept below. Check the question, then save it again.";
+
+  it("keeps the typed answer when a teammate dropped the question meanwhile: the reason, the reloaded question, no save, a hint to copy", async () => {
     backend({
       [LIST]: () => json(200, [question(1)]),
       [TRANSITION_1]: () => json(400, { to: ["A dropped question cannot become answered."], allowed: ["open"] }),
@@ -355,9 +361,104 @@ describe("QuestionItem: record an answer", () => {
     render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
+
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+
     expect(await screen.findByRole("alert")).toHaveTextContent("A dropped question cannot become answered.");
+    expect(await screen.findByText("Dropped")).toBeInTheDocument(); // the question behind the form is up to date
+    expect(screen.getByLabelText("Answer")).toHaveValue("30 days."); // nothing typed is lost
+    expect(screen.getByLabelText("Answered by")).toHaveValue("Əli Məmmədov");
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("Weekly sync");
+    expect(screen.queryByRole("button", { name: "Save answer" })).not.toBeInTheDocument(); // nothing the status forbids is offered
+    expect(screen.getByText(KEPT_COPY)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByLabelText("Answer")).not.toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Restore" })).toBeInTheDocument();
+  });
+
+  it("keeps the typed answer, and offers no save, when a teammate answered the question meanwhile", async () => {
+    backend({
+      [LIST]: () => json(200, [question(1)]),
+      [TRANSITION_1]: () => json(400, { to: ["A answered question cannot become answered."], allowed: ["open"] }),
+      [QUESTION_1]: () => json(200, question(1, { status: "answered", current_answer: answerOf({ text: "Their answer." }) })),
+    });
+    render(<Board projectId="5" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+    fill();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+
+    expect(await screen.findByText("Their answer.")).toBeInTheDocument(); // what the teammate recorded
+    expect(screen.getByLabelText("Answer")).toHaveValue("30 days."); // and what this person typed
+    expect(screen.queryByRole("button", { name: "Save answer" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the form when the reloaded question can still be answered, and saving again works", async () => {
+    let attempts = 0;
+    const calls = backend({
+      [LIST]: () => json(200, [question(1)]),
+      [TRANSITION_1]: () => {
+        attempts += 1;
+        return attempts === 1
+          ? json(400, { to: ["The question was changed. Check it and try again."], allowed: ["answered"] })
+          : json(200, question(1, { status: "answered", current_answer: answerOf({ text: "30 days." }) }));
+      },
+      [QUESTION_1]: () => json(200, question(1, { status: "asked" })), // a teammate marked it asked: still answerable
+    });
+    render(<Board projectId="5" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The question was changed. Check it and try again.");
+    expect(screen.getByText(KEPT_RETRY)).toBeInTheDocument();
+    expect(screen.getByLabelText("Answer")).toHaveValue("30 days.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+
+    expect(await screen.findByRole("button", { name: "Re-open" })).toBeInTheDocument(); // saved: the card is back in view mode
+    expect(screen.queryByLabelText("Answer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    const posts = calls.filter((c) => c.method === "POST" && c.url.endsWith("/transition/"));
+    expect(posts).toHaveLength(2);
+    expect(posts[1].body).toEqual(posts[0].body); // the same answer, sent again
+  });
+
+  it("keeps the form and the text when the reload fails too, and still offers saving (the server decides)", async () => {
+    backend({
+      [LIST]: () => json(200, [question(1)]),
+      [TRANSITION_1]: () => json(400, { to: ["A dropped question cannot become answered."], allowed: ["open"] }),
+      [QUESTION_1]: () => Promise.reject(new Error("offline")),
+    });
+    render(<Board projectId="5" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+    fill();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("A dropped question cannot become answered.");
+    expect(screen.getByLabelText("Answer")).toHaveValue("30 days.");
+    expect(screen.getByRole("button", { name: "Save answer" })).toBeInTheDocument();
+  });
+
+  it("forgets the hint when the form is cancelled and opened again", async () => {
+    backend({
+      [LIST]: () => json(200, [question(1)]),
+      [TRANSITION_1]: () => json(400, { to: ["A dropped question cannot become answered."], allowed: ["open"] }),
+      [QUESTION_1]: () => json(200, question(1, { status: "asked" })),
+    });
+    render(<Board projectId="5" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+    await screen.findByText(KEPT_RETRY);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+
+    expect(screen.queryByText(KEPT_RETRY)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Answer")).toHaveValue(""); // a fresh form, not the old text
   });
 
   it("shows a message the form has no input for, instead of failing silently", async () => {

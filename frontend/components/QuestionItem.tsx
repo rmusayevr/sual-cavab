@@ -61,7 +61,12 @@ export function QuestionItem({
   const [mode, setMode] = useState<Mode>("view");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // A refused answer keeps the form open with what was typed (#36): this says so under the reason.
+  const [kept, setKept] = useState(false);
   const url = `${base}${question.number}/`;
+  // Whether the question, as last loaded, can still be answered. The server decides; this only
+  // decides whether the save button is offered again.
+  const canAnswer = TRANSITIONS[question.status].includes("answered");
 
   async function transition(to: QuestionStatus, answer?: AnswerFields): Promise<SubmitResult> {
     const response = await apiFetch(`${url}transition/`, { method: "POST", body: answer ? { to, answer } : { to } });
@@ -69,6 +74,7 @@ export function QuestionItem({
       onChanged((await response.json()) as FullQuestion);
       setMode("view");
       setMessage(null);
+      setKept(false);
       return null;
     }
     const errors = await failure(response, t("error.changeStatus"), answer ? ANSWER_FIELDS : []);
@@ -81,7 +87,11 @@ export function QuestionItem({
       } catch {
         // Could not reload; the reason below is still the useful message.
       }
-      setMode("view");
+      // A typed answer is not thrown away (#36): the form stays open with its text, so it can be saved
+      // again if the question can still be answered, or copied out if it cannot. A move without a form
+      // (a status button) has nothing typed to keep, so the card just goes back to showing the question.
+      if (answer) setKept(true);
+      else setMode("view");
       setMessage(errors.to);
       return null;
     }
@@ -153,11 +163,18 @@ export function QuestionItem({
         )}
 
         {mode === "answer" && (
-          <AnswerForm
-            idPrefix={`${id}-answer`}
-            onSubmit={(answer) => transition("answered", answer)}
-            onCancel={() => setMode("view")}
-          />
+          <>
+            {kept && <p className="text-sm text-muted-foreground">{t(canAnswer ? "answer.keptRetry" : "answer.keptCopy")}</p>}
+            <AnswerForm
+              idPrefix={`${id}-answer`}
+              canSave={canAnswer}
+              onSubmit={(answer) => transition("answered", answer)}
+              onCancel={() => {
+                setMode("view");
+                setKept(false);
+              }}
+            />
+          </>
         )}
 
         {mode === "view" && (
@@ -170,6 +187,7 @@ export function QuestionItem({
                 onClick={() => {
                   if (to !== "answered") return void move(to);
                   setMessage(null);
+                  setKept(false);
                   setMode("answer");
                 }}
               >

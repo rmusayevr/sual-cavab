@@ -286,7 +286,11 @@ change its status and record an answer (text, who answered, date,
 chat/meeting/email/other, optional note).
 Only the status buttons the transition table allows are offered; the server
 still decides, and its message is shown if it refuses. Validation errors from
-the API appear next to the field. Re-opening an answered question keeps the old
+the API appear next to the field. If the server refuses an answer because the
+question moved while the form was open (a teammate answered or dropped it), the
+form stays open with what was typed, the question behind it is reloaded, and the
+save button is offered again only if the question can still be answered (if not,
+the text stays so it can be copied). Re-opening an answered question keeps the old
 answer, shown as "Earlier answer".
 
 ## Drafting a message (Claude)

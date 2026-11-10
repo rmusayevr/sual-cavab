@@ -77,6 +77,8 @@ export const en = {
   "answer.where": "Where",
   "answer.note": "Note (optional)",
   "answer.save": "Save answer",
+  "answer.keptRetry": "Your answer is kept below. Check the question, then save it again.",
+  "answer.keptCopy": "Your answer is kept below so you can copy it. This question can no longer be answered.",
   "channel.chat": "Chat",
   "channel.meeting": "Meeting",
   "channel.email": "Email",
