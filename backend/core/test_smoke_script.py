@@ -11,7 +11,9 @@ from django.core.cache import caches
 from django.core.management import call_command
 from django.test import LiveServerTestCase
 
-PASSWORD = "invented-demo-password-xyz"
+from core.testing import invented_password
+PASSWORD = invented_password()
+WRONG_PASSWORD = invented_password()
 SCRIPT = Path(settings.BASE_DIR).parent / "scripts" / "smoke_test.py"
 
 
@@ -45,7 +47,7 @@ class SmokeScriptTests(LiveServerTestCase):
         self.assertEqual(failures, 1, output)
 
     def test_it_fails_with_the_wrong_password(self):
-        failures, output = self.run_script(password="not-the-demo-password")
+        failures, output = self.run_script(password=WRONG_PASSWORD)
         self.assertGreater(failures, 3, output)
         self.assertIn("FAIL the demo owner can sign in", output)
 
@@ -58,8 +60,8 @@ class SmokeScriptTests(LiveServerTestCase):
     def test_the_password_is_never_printed(self):
         _, output = self.run_script()
         self.assertNotIn(PASSWORD, output)
-        _, output = self.run_script(password="not-the-demo-password")
-        self.assertNotIn("not-the-demo-password", output)
+        _, output = self.run_script(password=WRONG_PASSWORD)
+        self.assertNotIn(WRONG_PASSWORD, output)
 
     def test_it_asks_for_the_password_and_a_url(self):
         with mock.patch.dict(os.environ, {}, clear=False):

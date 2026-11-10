@@ -18,7 +18,8 @@ from projects.models import Membership, Project
 from .models import Answer, Question
 from .services import TRANSITIONS, TransitionNotAllowed, change_status
 
-PASSWORD = "invented-test-password"
+from core.testing import invented_password
+PASSWORD = invented_password()
 
 
 def make_user(email):
