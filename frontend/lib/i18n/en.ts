@@ -82,7 +82,6 @@ export const en = {
   "channel.email": "Email",
   "channel.other": "Other",
 
-
   "error.addQuestion": "Could not add the question.",
   "error.changeStatus": "Could not change the status.",
   "error.saveQuestion": "Could not save the question.",

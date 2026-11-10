@@ -248,17 +248,33 @@ export default function Workspace() {
             {shown.map((q) => {
               const pickable = q.status === "open" || q.status === "asked";
               const isPicked = picked.includes(q.number);
+              // Ten are ticked and this one is not: it cannot be added, and the whole row says so.
+              const limitReached = pickable && !isPicked && picked.length >= MAX_QUESTIONS;
               return (
                 <li key={q.id}>
-                  <Card className={cx("flex items-start gap-3 p-3 sm:p-3", selected === q.number && "border-primary")}>
-                    <input
-                      type="checkbox"
-                      aria-label={t("workspace.pick", { label: q.label })}
-                      className="mt-1 h-5 w-5 shrink-0 accent-primary"
-                      checked={isPicked}
-                      disabled={!pickable || (!isPicked && picked.length >= MAX_QUESTIONS)}
-                      onChange={() => toggle(q.number)}
-                    />
+                  <Card
+                    className={cx(
+                      "flex items-start gap-3 p-3 sm:p-3",
+                      selected === q.number && "border-primary",
+                      limitReached && "opacity-60",
+                    )}
+                  >
+                    {/* the label makes a 44 px tap target around the 20 px box */}
+                    <label
+                      className={cx(
+                        "-m-1 flex min-h-11 min-w-11 shrink-0 items-start justify-center pt-2.5",
+                        limitReached || !pickable ? "cursor-not-allowed" : "cursor-pointer",
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={t("workspace.pick", { label: q.label })}
+                        className="h-5 w-5 shrink-0 accent-primary"
+                        checked={isPicked}
+                        disabled={!pickable || limitReached}
+                        onChange={() => toggle(q.number)}
+                      />
+                    </label>
                     <button
                       type="button"
                       onClick={() => setSelected(q.number)}

@@ -499,4 +499,25 @@ describe("QuestionItem: answers", () => {
     expect(screen.getByText(/14 days\./)).toBeInTheDocument();
     expect(screen.getAllByText(/Əli Məmmədov/).length).toBeGreaterThan(0);
   });
+
+  it("shows no 'Blocks' line for a question that blocks nothing, and one for a question that does", async () => {
+    backend({ [LIST]: () => json(200, [question(1), question(2, { blocks: "Checkout" })]) });
+    render(<Board projectId="5" />);
+    await screen.findByText("Invented question 1");
+
+    expect(screen.getAllByText(/^Blocks: /)).toHaveLength(1);
+    expect(screen.getByText("Blocks: Checkout")).toBeInTheDocument();
+  });
+
+  it("the answer form uses a date input and a select, all easy to tap", async () => {
+    backend({ [LIST]: () => json(200, [question(1)]) });
+    render(<Board projectId="5" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+
+    expect(await screen.findByLabelText("Date")).toHaveAttribute("type", "date");
+    expect(screen.getByLabelText("Where").tagName).toBe("SELECT");
+    for (const label of ["Answer", "Answered by", "Date", "Where", "Note (optional)"]) expect(screen.getByLabelText(label)).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Save answer" })).toHaveClass("min-h-11");
+  });
 });

@@ -23,7 +23,7 @@ export type Member = {
 
 export type QuestionStatus = "open" | "asked" | "answered" | "dropped";
 
-/** The part of a question the Still open view shows. */
+/** A question as the lists show it: its number, text, why it matters, what it blocks, its status and when it was made. */
 export type Question = {
   id: number;
   number: number;

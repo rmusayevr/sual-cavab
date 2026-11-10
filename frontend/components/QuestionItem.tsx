@@ -15,12 +15,6 @@ import { Card } from "./ui/Card";
 import { StatusChip } from "./ui/StatusChip";
 
 /**
- * One question of the workspace: its text, why it matters, what it blocks and its answers, with the
- * buttons that change its status, the edit form and the answer form. (Until #83 this lived in the
- * old questions page, QuestionsManager.)
- */
-
-/**
  * The messages in a refused response, keyed by the fields the form shows. A
  * message about anything else (a gateway body, a field this form has no input
  * for) goes under "form" instead of being dropped; "to" is kept so the caller
@@ -45,6 +39,12 @@ export async function failure(response: Response, fallback: string, shown: strin
 
 export const QUESTION_FIELDS = ["text", "why_it_matters", "blocks"] as const;
 const ANSWER_FIELDS = ["text", "answered_by", "answered_on", "channel", "channel_note"];
+
+/**
+ * One question of the workspace: its text, why it matters, what it blocks and its answers, with the
+ * buttons that change its status, the edit form and the answer form. (Until #83 this lived in the
+ * old questions page, QuestionsManager.)
+ */
 
 type Mode = "view" | "edit" | "answer";
 

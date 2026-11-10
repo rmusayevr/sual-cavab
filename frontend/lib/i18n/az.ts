@@ -84,7 +84,6 @@ export const az: Record<Key, string> = {
   "channel.email": "E-poçt",
   "channel.other": "Digər",
 
-
   "error.addQuestion": "Sualı əlavə etmək alınmadı.",
   "error.changeStatus": "Statusu dəyişmək alınmadı.",
   "error.saveQuestion": "Sualı saxlamaq alınmadı.",
