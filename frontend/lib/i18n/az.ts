@@ -38,6 +38,7 @@ export const az: Record<Key, string> = {
 
   "workspace.projects": "Layihələr",
   "workspace.loading": "Layihə yüklənir…",
+  "workspace.signInLine": "Bu layihəni görmək üçün {link}.",
   "workspace.notFound": "Layihə tapılmadı.",
   "workspace.back": "Layihələrinizə qayıt",
   "workspace.loadError": "Layihəni yükləmək mümkün olmadı.",

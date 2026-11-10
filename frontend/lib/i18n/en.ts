@@ -36,6 +36,7 @@ export const en = {
 
   "workspace.projects": "Projects",
   "workspace.loading": "Loading project…",
+  "workspace.signInLine": "{link} to see this project.",
   "workspace.notFound": "Project not found.",
   "workspace.back": "Back to your projects",
   "workspace.loadError": "Could not load the project.",
