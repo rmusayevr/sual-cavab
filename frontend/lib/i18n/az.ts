@@ -59,12 +59,12 @@ export const az: Record<Key, string> = {
   "question.edit": "Redaktə et",
   "question.save": "Saxla",
   "question.saving": "Saxlanılır…",
-  "question.cancel": "İmtina",
+  "question.cancel": "İmtina et",
 
   "transition.markAsked": "Soruşulub kimi qeyd et",
   "transition.recordAnswer": "Cavabı qeyd et",
   "transition.drop": "Ləğv et",
-  "transition.unask": "Soruşulmamış et",
+  "transition.unask": "Soruşulmayıb kimi qeyd et",
   "transition.reopen": "Yenidən aç",
   "transition.restore": "Bərpa et",
 
@@ -77,13 +77,17 @@ export const az: Record<Key, string> = {
   "answer.text": "Cavab",
   "answer.by": "Cavab verən",
   "answer.date": "Tarix",
-  "answer.where": "Harada",
+  "answer.where": "Kanal",
   "answer.note": "Qeyd (istəyə bağlı)",
   "answer.save": "Cavabı saxla",
   "channel.chat": "Çat",
   "channel.meeting": "Görüş",
   "channel.email": "E-poçt",
   "channel.other": "Digər",
+
+  "questions.loading": "Suallar yüklənir…",
+  "questions.loadError": "Sualları yükləmək mümkün olmadı.",
+  "questions.none": "Hələ sual yoxdur. İlk sualı aşağıda əlavə edin.",
 
   "error.addQuestion": "Sualı əlavə etmək alınmadı.",
   "error.changeStatus": "Statusu dəyişmək alınmadı.",

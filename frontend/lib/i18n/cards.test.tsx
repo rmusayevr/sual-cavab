@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { QuestionItem } from "@/components/QuestionsManager";
@@ -128,3 +128,74 @@ describe("the example's words", () => {
     expect(translate("az", "transition.recordAnswer")).toBe("Cavabı qeyd et");
   });
 });
+
+// Review of #81: the first version of these tests only checked that each label exists, not which
+// field it belongs to, and left the answer's channel word, Cancel, "Saving…" and the failure
+// fallbacks unchecked.
+for (const lang of ["en", "az"] as Language[]) {
+  const t = (key: Key, values?: Record<string, string | number>) => translate(lang, key, values);
+  const refused = () => vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
+
+  describe(`the card's details in ${lang}`, () => {
+    it("puts each label on its own field", () => {
+      act(() => setLanguage(lang));
+      show(question("open"));
+      fireEvent.click(screen.getByRole("button", { name: t("question.edit") }));
+
+      expect(screen.getByLabelText(t("form.why"))).toHaveValue("Invented reason");
+      expect(screen.getByLabelText(t("form.blocks"))).toHaveValue("Invented task");
+    });
+
+    it("shows the channel an answer was given on with the form's own word for it", () => {
+      act(() => setLanguage(lang));
+      show(question("answered", { current_answer: { ...answer, channel: "email" } }));
+
+      expect(screen.getByText(new RegExp(t("channel.email")))).toBeInTheDocument();
+      expect(screen.queryByText(/ email$/)).not.toBeInTheDocument();
+    });
+
+    it("words the answer form's Cancel, and returns to the card", () => {
+      act(() => setLanguage(lang));
+      show(question("open"));
+      fireEvent.click(screen.getByRole("button", { name: t("transition.recordAnswer") }));
+
+      fireEvent.click(screen.getByRole("button", { name: t("question.cancel") }));
+
+      expect(screen.getByRole("button", { name: t("question.edit") })).toBeInTheDocument();
+    });
+
+    it("says in the language that a refused status change failed", async () => {
+      act(() => setLanguage(lang));
+      refused();
+      show(question("open"));
+
+      fireEvent.click(screen.getByRole("button", { name: t("transition.markAsked") }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(t("error.changeStatus"));
+    });
+
+    it("says in the language that a refused save failed", async () => {
+      act(() => setLanguage(lang));
+      refused();
+      show(question("open"));
+      fireEvent.click(screen.getByRole("button", { name: t("question.edit") }));
+      fireEvent.change(screen.getByLabelText(t("form.question")), { target: { value: "Changed invented text?" } });
+
+      fireEvent.click(screen.getByRole("button", { name: t("question.save") }));
+
+      await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(t("error.saveQuestion")));
+    });
+
+    it("shows the busy word on the save button while a save is running", async () => {
+      act(() => setLanguage(lang));
+      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+      show(question("open"));
+      fireEvent.click(screen.getByRole("button", { name: t("question.edit") }));
+      fireEvent.change(screen.getByLabelText(t("form.question")), { target: { value: "Changed invented text?" } });
+
+      fireEvent.click(screen.getByRole("button", { name: t("question.save") }));
+
+      expect(await screen.findByRole("button", { name: t("question.saving") })).toBeDisabled();
+    });
+  });
+}

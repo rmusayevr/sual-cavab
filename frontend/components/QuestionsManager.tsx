@@ -45,19 +45,19 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
     };
   }, [base]);
 
-  if (state.kind === "loading") return <LedgerLoading label="Loading questions…" />;
+  if (state.kind === "loading") return <LedgerLoading label={t("questions.loading")} />;
   if (state.kind === "not-found")
     return (
       <EmptyState>
-        <p>Project not found.</p>
+        <p>{t("workspace.notFound")}</p>
         <div>
           <Link href="/projects" className={buttonClasses("secondary")}>
-            Back to your projects
+            {t("workspace.back")}
           </Link>
         </div>
       </EmptyState>
     );
-  if (state.kind === "error") return <Alert tone="error">Could not load the questions.</Alert>;
+  if (state.kind === "error") return <Alert tone="error">{t("questions.loadError")}</Alert>;
 
   const replace = (updated: FullQuestion) =>
     setState((s) =>
@@ -79,7 +79,7 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
     <div className="grid gap-6">
       {state.questions.length === 0 ? (
         <EmptyState>
-          <p>No questions yet. Add the first one below.</p>
+          <p>{t("questions.none")}</p>
         </EmptyState>
       ) : (
         <ul className="grid list-none gap-4">
@@ -89,7 +89,7 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
         </ul>
       )}
       <Card className="grid gap-4">
-        <h2 className="text-lg font-semibold">Add a question</h2>
+        <h2 className="text-lg font-semibold">{t("workspace.add")}</h2>
         <QuestionForm idPrefix="add" submitLabel={t("form.add")} busyLabel={t("form.adding")} clearOnSuccess onSubmit={add} />
       </Card>
     </div>
@@ -277,7 +277,7 @@ function AnswerView({ answer, heading }: { answer: Answer; heading: string }) {
       <p className="text-sm font-medium text-muted-foreground">{heading}</p>
       <p>{answer.text}</p>
       <p className="text-sm text-muted-foreground">
-        {t("question.by", { who: answer.answered_by })} · {answer.channel}
+        {t("question.by", { who: answer.answered_by })} · {t(`channel.${answer.channel}`)}
         {answer.channel_note ? ` (${answer.channel_note})` : ""} · {answer.answered_on}
       </p>
     </div>
