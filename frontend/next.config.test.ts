@@ -70,7 +70,25 @@ describe("the older project pages", () => {
     for (const rule of await redirects()) expect(rule.permanent).toBe(false);
   });
 
-  it("only touch the project pages, never the /api proxy (which has /projects/<id>/draft/ under /api)", async () => {
-    for (const rule of await redirects()) expect(rule.source.startsWith("/projects/")).toBe(true);
+  it("are exactly these six rules, so an over-broad one (a wildcard that would also catch /projects/5 or /projects/5/questions/3, or loop) cannot slip in", async () => {
+    const sources = (await redirects()).map((r) => r.source).sort();
+    expect(sources).toEqual(
+      ["draft", "overview", "questions"].flatMap((page) => [`/projects/:id/${page}`, `/projects/:id/${page}/`]).sort(),
+    );
+    for (const rule of await redirects()) {
+      expect(Object.keys(rule).sort(), rule.source).toEqual(["destination", "permanent", "source"]); // no statusCode next to permanent
+      expect(rule.source.match(/:\w+/g), rule.source).toEqual([":id"]); // the one parameter, no wildcard
+    }
+  });
+
+  // What the rules match, worked out from their sources (the only parameter is :id, one path segment).
+  // The real behaviour on `next start` is in the PR text: 307 with and without a trailing slash.
+  it("match the old addresses, and not the workspace, a sub-path, a longer word or the /api proxy", async () => {
+    const patterns = (await redirects()).map((r) => new RegExp(`^${r.source.replace(":id", "[^/]+")}$`));
+    const matches = (path: string) => patterns.some((p) => p.test(path));
+    for (const path of ["/projects/5/draft", "/projects/5/draft/", "/projects/5/questions", "/projects/5/overview/"])
+      expect(matches(path), path).toBe(true);
+    for (const path of ["/projects/5", "/projects/5/", "/projects/5/questions/3", "/projects/5/draftXYZ", "/projects/x/y/draft", "/api/projects/5/draft/", "/projects"])
+      expect(matches(path), path).toBe(false);
   });
 });

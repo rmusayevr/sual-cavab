@@ -269,17 +269,21 @@ what is allowed:
 
 ### Still open
 
-The project page lists what the project is waiting on: questions in status
-**open** or **asked**, each with its number, text, what it blocks and how long
-it has been open. The age counts from when the question was created; re-opening
-a question does not reset it. The project list shows the same count
-(`open_question_count`, computed in the database from the same two statuses).
+The workspace (`/projects/<id>`) shows what the project is waiting on: the
+counts of questions in each status, and every question with its number, status
+and text; a question in status **open** or **asked** also says how long it has
+been open (what it blocks is on the selected question). The age counts from when
+the question was created; re-opening a question does not reset it. The project
+list shows the same count of open questions (`open_question_count`, computed in
+the database from the same two statuses).
 
 ### Question screens
 
-`/projects/<id>/questions` lists every question (any status) and is where people
-add a question, edit its three text fields, change its status and record an
-answer (text, who answered, date, chat/meeting/email/other, optional note).
+In the workspace (`/projects/<id>`; the older `/questions` address redirects to
+it) the list shows every question (any status, with a filter by status), and the
+panel on the right is where people add a question, edit its three text fields,
+change its status and record an answer (text, who answered, date,
+chat/meeting/email/other, optional note).
 Only the status buttons the transition table allows are offered; the server
 still decides, and its message is shown if it refuses. Validation errors from
 the API appear next to the field. Re-opening an answered question keeps the old
