@@ -182,7 +182,9 @@ CACHES = {
     # deletes expired rows, and live ones only if still over the limit. Until
     # then expired rows accumulate (follow-up). DRF's update isn't atomic, so
     # simultaneous requests can exceed the rate slightly. Needs
-    # `createcachetable`; without the table, sign-in fails closed with a 500.
+    # `createcachetable`; without the table, sign-in, member-adds and drafting fail closed
+    # with a 500, and `manage.py check --database default` (and `migrate`) warn with the
+    # command (#47).
     "throttle": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "throttle_cache",
