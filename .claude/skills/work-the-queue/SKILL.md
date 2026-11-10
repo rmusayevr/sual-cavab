@@ -107,4 +107,4 @@ question with a recommendation first.
   packages, `review-a-dependency` never did. Each step now names its skill.
 - **A second client project.** A suite was reported green because the shell's
   exit code was the trailing `echo`'s. The runner itself had failed.
-- **sual-cavab (2026-11).** A small infrastructure PR (#59) was merged without step 4 (the independent review): no size exemption. The owner had to ask whether it had run; the review then found a `--keepdb` regression, a long-name truncation and a wrong claim about `-k`, fixed in #60 over two rounds. Review and triage come before the merge, always.
+- **sual-cavab (2026-11).** A small infrastructure PR (#59) was merged without step 4 (the independent review): no size exemption. The owner asked whether it had run; the review then found two regressions (`--keepdb` runs, long database names), fixed in #60 over two rounds. Review and triage come before the merge, always.

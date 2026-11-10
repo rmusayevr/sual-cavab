@@ -10,9 +10,8 @@ status: local
 
 ## Occurrences
 
-### 2026-11-10 — sual-cavab
+### 2026-11-09 — sual-cavab
 
-In PR #59 I wrote from memory that `-k` is `--keepdb`: in a code comment, in the check that decided whether to use a per-process test database name, and in the README. Django's source says `-k` filters tests by name, so runs with `-k` skipped the per-process name. The independent review found it; fixed in PR #60. CLAUDE.md already says 'Do not invent file paths, flags, config keys ... Check, or say it is unchecked': the rule existed and did not fire at the moment of writing, so no new layer is proposed.
+In the first commit of PR #60 (the fix for the regressions found in PR #59) I wrote from memory that `-k` is `--keepdb`: in a code comment, in the check that decided whether to use a per-process test database name, and in the README. Django's source says `-k` filters tests by name. The independent review of #60 caught it in round 1, before #60 merged, and the fix landed in the same PR. CLAUDE.md already says 'Do not invent file paths, flags, config keys ... Check, or say it is unchecked': the rule existed and did not fire at the moment of writing, so no new layer is proposed.
 
-**Cost:** A wrong claim shipped in a merged PR, a regression for `-k` runs, and part of a second PR to fix it.
-
+**Cost:** A wrong claim in a fix PR that had to be reviewed and rewritten (one extra review round). It never reached `staging`: the review caught it first.
