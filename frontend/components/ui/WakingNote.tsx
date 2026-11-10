@@ -1,6 +1,8 @@
 "use client";
 
 import { cx } from "@/lib/cx";
+import { en } from "@/lib/i18n/en";
+import { useT } from "@/lib/i18n";
 import { useAfterDelay } from "@/lib/useAfterDelay";
 
 /**
@@ -8,7 +10,8 @@ import { useAfterDelay } from "@/lib/useAfterDelay";
  * first request then takes about 33 s (web) and 83 to 93 s (API), and a warm one 0.1 s. After five
  * seconds of waiting, say so. The wording is one constant so the language layer (#71) can swap it.
  */
-export const WAKING_TEXT = "The site may be waking up after being idle. This can take up to two minutes.";
+/** The English wording; the note itself shows the chosen language. */
+export const WAKING_TEXT = en["waking"];
 
 export function WakingNote({
   active,
@@ -21,10 +24,11 @@ export function WakingNote({
   className?: string;
 }) {
   const slow = useAfterDelay(active);
+  const t = useT();
   if (!slow) return null;
   return (
     <p role="status" className={cx("text-sm", tone === "navy" ? "opacity-80" : "text-muted-foreground", className)}>
-      {WAKING_TEXT}
+      {t("waking")}
     </p>
   );
 }

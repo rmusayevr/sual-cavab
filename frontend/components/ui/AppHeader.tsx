@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import SessionStatus from "@/components/SessionStatus";
+import { LanguageSwitch } from "@/lib/i18n";
 
 import { CarpetStrip, Eyebrow } from "./Ledger";
 
@@ -25,7 +26,10 @@ export function AppHeader({
         <Link href="/" aria-label="Sual-Cavab, home" className="font-display text-xl font-semibold">
           Sual<span className="text-saffron">·</span>Cavab
         </Link>
-        <SessionStatus layout="nav" wakingNote={false} />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <LanguageSwitch />
+          <SessionStatus layout="nav" wakingNote={false} />
+        </div>
       </nav>
       <div className="mx-auto grid max-w-6xl gap-3 px-6 pb-12 pt-6">
         <Eyebrow tone="navy">{eyebrow}</Eyebrow>

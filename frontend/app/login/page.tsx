@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import LoginForm from "@/components/LoginForm";
+import { LanguageSwitch, T } from "@/lib/i18n";
 import { CarpetStrip, Eyebrow } from "@/components/ui/Ledger";
 
 export const metadata: Metadata = { title: "Sign in · Sual-Cavab" };
@@ -11,16 +12,25 @@ export const metadata: Metadata = { title: "Sign in · Sual-Cavab" };
 export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 bg-navy px-6 py-12 text-navy-foreground pattern-lattice">
-      <Link href="/" aria-label="Sual-Cavab, home" className="font-display text-2xl font-semibold">
-        Sual<span className="text-saffron">·</span>Cavab
-      </Link>
+      <div className="flex w-full max-w-sm items-center justify-between gap-4">
+        <Link href="/" aria-label="Sual-Cavab, home" className="font-display text-2xl font-semibold">
+          Sual<span className="text-saffron">·</span>Cavab
+        </Link>
+        <LanguageSwitch />
+      </div>
       <div className="w-full max-w-sm overflow-hidden rounded-md bg-card text-card-foreground shadow-card">
         <CarpetStrip />
         <div className="grid gap-4 p-6">
           <div className="grid gap-2">
-            <Eyebrow>Access</Eyebrow>
-            <h1 className="text-3xl font-semibold">Sign in</h1>
-            <p className="text-sm text-muted-foreground">Accounts are created by an administrator.</p>
+            <Eyebrow>
+              <T k="login.eyebrow" />
+            </Eyebrow>
+            <h1 className="text-3xl font-semibold">
+              <T k="login.title" />
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              <T k="login.note" />
+            </p>
           </div>
           <LoginForm />
         </div>

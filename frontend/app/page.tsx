@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import SessionStatus from "@/components/SessionStatus";
+import { LanguageSwitch } from "@/lib/i18n";
 import { buttonClasses } from "@/components/ui/Button";
 import { StatusChip } from "@/components/ui/StatusChip";
 import type { QuestionStatus } from "@/lib/status";
@@ -41,7 +42,10 @@ export default function HomePage() {
           <Link href="/" aria-label="Sual-Cavab, home" className="font-display text-xl font-semibold">
             Sual<span className="text-saffron">·</span>Cavab
           </Link>
-          <SessionStatus layout="nav" />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <LanguageSwitch />
+            <SessionStatus layout="nav" />
+          </div>
         </nav>
         <div className="mx-auto grid max-w-6xl gap-12 px-6 pb-24 pt-12 md:grid-cols-[1.1fr_1fr] md:items-center">
           <div>

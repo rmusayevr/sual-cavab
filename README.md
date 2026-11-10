@@ -326,6 +326,17 @@ Set up (see `backend/.env.example`):
 Not checked by any test: a real call to the API (tests use a fake client). The
 first real draft has to be made by hand once the key is set.
 
+## Language (English, Azerbaijani)
+
+The interface is English by default, with Azerbaijani as a second language (#71). An `EN | AZ` switch sits in the header of the pages; the choice is kept in the browser's local storage.
+
+- **Where the words live:** `frontend/lib/i18n/en.ts` (the master list of keys) and `az.ts` (same keys; a missing one is a compile error and a test failure). No library. Use `useT()` in a client component, or `<T k="..." />` in a server page. `{name}` in a text is filled in at run time.
+- **First paint is always English**: the server cannot know the choice, and the markup must match. A person who chose Azerbaijani sees it as soon as the page has loaded, after a brief English flash (accepted for v1).
+- **Never translated:** what a person typed (questions, answers) and the drafted message. The draft prompt already asks for Azerbaijani.
+- **Status words** come from the dictionaries (`status.open` and so on), one set per language, next to the one table of colours (`lib/status.ts`).
+- **The Azerbaijani wording was written by Claude, not by a native speaker; the owner reviews it.** Technical terms stay in English.
+- **Translated so far:** the workspace (`/projects/[id]`), the session status in every header, the sign-in page and form, the status words and the waking-up note. Not yet: the landing page body, the projects list, the question and answer forms, the old `/questions`, `/draft` and `/overview` pages, the 404, and the Still open list. Those stay English until their turn.
+
 ## Staging on Render
 
 A staging site for looking at the app with **invented demo data**. It is

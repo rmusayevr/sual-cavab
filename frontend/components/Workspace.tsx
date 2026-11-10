@@ -8,7 +8,8 @@ import { apiFetch } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import type { Project, QuestionStatus } from "@/lib/projects";
 import type { FullQuestion } from "@/lib/questions";
-import { STATUSES, statusLabel } from "@/lib/status";
+import { STATUSES } from "@/lib/status";
+import { LanguageSwitch, useT } from "@/lib/i18n";
 import { MAX_QUESTIONS, useDraft } from "@/lib/useDraft";
 
 import QuestionForm, { type QuestionFields, type SubmitResult } from "./QuestionForm";
@@ -36,6 +37,7 @@ type Filter = "all" | QuestionStatus;
  */
 export default function Workspace() {
   const { id } = useParams<{ id: string }>();
+  const t = useT();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<number | null>(null);
@@ -75,10 +77,13 @@ export default function Workspace() {
     <div className="min-h-screen bg-background [overflow-wrap:anywhere]">
       <header className="bg-navy pattern-lattice text-navy-foreground">
         <nav className="mx-auto flex max-w-[90rem] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-4 sm:px-6">
-          <Link href="/" aria-label="Sual-Cavab, home" className="font-display text-xl font-semibold">
+          <Link href="/" aria-label={t("nav.home")} className="font-display text-xl font-semibold">
             Sual<span className="text-saffron">·</span>Cavab
           </Link>
-          <SessionStatus layout="nav" wakingNote={false} />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <LanguageSwitch />
+            <SessionStatus layout="nav" wakingNote={false} />
+          </div>
         </nav>
         <CarpetStrip />
       </header>
@@ -89,17 +94,17 @@ export default function Workspace() {
   if (state.kind === "loading")
     return shell(
       <div className="mx-auto max-w-3xl p-4">
-        <LedgerLoading label="Loading project…" />
+        <LedgerLoading label={t("workspace.loading")} />
       </div>,
     );
   if (state.kind === "not-found")
     return shell(
       <div className="mx-auto max-w-3xl p-4">
         <EmptyState strip={false}>
-          <p>Project not found.</p>
+          <p>{t("workspace.notFound")}</p>
           <div>
             <Link href="/projects" className={buttonClasses("secondary")}>
-              Back to your projects
+              {t("workspace.back")}
             </Link>
           </div>
         </EmptyState>
@@ -108,7 +113,7 @@ export default function Workspace() {
   if (state.kind === "error")
     return shell(
       <div className="mx-auto max-w-3xl p-4">
-        <Alert tone="error">Could not load the project.</Alert>
+        <Alert tone="error">{t("workspace.loadError")}</Alert>
       </div>,
     );
 
@@ -138,9 +143,9 @@ export default function Workspace() {
 
   return shell(
     <div className="mx-auto grid max-w-[90rem] grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-[15rem_minmax(0,1fr)_24rem]">
-      <nav aria-label="Your projects" className="min-w-0 rounded-md bg-navy p-3 text-navy-foreground lg:self-start">
+      <nav aria-label={t("session.yourProjects")} className="min-w-0 rounded-md bg-navy p-3 text-navy-foreground lg:self-start">
         <Eyebrow tone="navy" className="px-2 pb-2">
-          Projects
+          {t("workspace.projects")}
         </Eyebrow>
         <ul className="grid list-none gap-1">
           {projects.map((p) => {
@@ -182,7 +187,7 @@ export default function Workspace() {
           <h1 className="text-3xl font-semibold">{project.name}</h1>
           <p>
             <Link href={`/projects/${id}/overview`} className="text-sm text-muted-foreground underline">
-              Members and details
+              {t("workspace.members")}
             </Link>
           </p>
         </div>
@@ -190,13 +195,13 @@ export default function Workspace() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {STATUSES.map((s) => (
             <Card key={s} data-testid={`stat-${s}`} className="grid gap-1 p-3 sm:p-3">
-              <span className="text-xs text-muted-foreground">{statusLabel[s]}</span>
+              <span className="text-xs text-muted-foreground">{t(`status.${s}`)}</span>
               <span className="font-display text-2xl font-semibold">{count(s)}</span>
             </Card>
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter questions">
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t("workspace.filterGroup")}>
           {(["all", ...STATUSES] as Filter[]).map((f) => (
             <Button
               key={f}
@@ -205,14 +210,14 @@ export default function Workspace() {
               onClick={() => setFilter(f)}
               className={filter === f ? "border-primary text-primary" : undefined}
             >
-              {f === "all" ? "All" : statusLabel[f]}
+              {f === "all" ? t("workspace.all") : t(`status.${f}`)}
             </Button>
           ))}
         </div>
 
         {shown.length === 0 ? (
           <EmptyState strip={false}>
-            <p>{questions.length === 0 ? "No questions yet. Add the first one." : "No questions with this status."}</p>
+            <p>{questions.length === 0 ? t("workspace.none") : t("workspace.noneWithStatus")}</p>
           </EmptyState>
         ) : (
           <ul className="grid list-none gap-2">
@@ -224,7 +229,7 @@ export default function Workspace() {
                   <Card className={cx("flex items-start gap-3 p-3 sm:p-3", selected === q.number && "border-primary")}>
                     <input
                       type="checkbox"
-                      aria-label={`Pick ${q.label}`}
+                      aria-label={t("workspace.pick", { label: q.label })}
                       className="mt-1 h-5 w-5 shrink-0 accent-primary"
                       checked={isPicked}
                       disabled={!pickable || (!isPicked && picked.length >= MAX_QUESTIONS)}
@@ -251,7 +256,7 @@ export default function Workspace() {
       </main>
 
       <aside className="grid min-w-0 content-start gap-4">
-        <section aria-label="Selected question" className="grid gap-3">
+        <section aria-label={t("workspace.selected")} className="grid gap-3">
           {current ? (
             <ul className="grid list-none">
               <QuestionItem key={current.id} question={current} base={base} onChanged={replace} />
@@ -259,50 +264,45 @@ export default function Workspace() {
           ) : (
             <Card>
               <p className="text-muted-foreground">
-                Select a question to see why it matters, what it blocks and its answer.
+                {t("workspace.selectPrompt")}
               </p>
             </Card>
           )}
         </section>
 
         <Card className="grid gap-4">
-          <h2 className="text-lg font-semibold">Add a question</h2>
+          <h2 className="text-lg font-semibold">{t("workspace.add")}</h2>
           <QuestionForm idPrefix="add" submitLabel="Add question" busyLabel="Adding…" clearOnSuccess onSubmit={add} />
         </Card>
 
         <section aria-labelledby="draft-heading" className="grid gap-3 rounded-md bg-navy p-4 text-navy-foreground">
           <h2 id="draft-heading" className="text-lg font-semibold">
-            Draft a message
+            {t("draft.heading")}
           </h2>
           <p className="text-sm opacity-80">
             {picked.length === 0
-              ? `Tick up to ${MAX_QUESTIONS} open or asked questions.`
-              : `${picked.length} ${picked.length === 1 ? "question" : "questions"} ticked: ${[...picked]
-                  .sort((x, y) => x - y)
-                  .map((n) => `Q${n}`)
-                  .join(", ")}.`}
+              ? t("draft.tickPrompt", { max: MAX_QUESTIONS })
+              : t(picked.length === 1 ? "draft.tickedOne" : "draft.tickedMany", {
+                  n: picked.length,
+                  list: [...picked]
+                    .sort((x, y) => x - y)
+                    .map((n) => `Q${n}`)
+                    .join(", "),
+                })}
           </p>
-          <p className="text-sm opacity-80">
-            The text of the selected questions (the question, why it matters and what it blocks) is sent to Claude to
-            write the draft. Nothing else about the project or the client is sent. The app never sends the message
-            anywhere: you copy it and send it yourself.
-          </p>
+          <p className="text-sm opacity-80">{t("draft.notice")}</p>
           <div>
             <Button onClick={() => draft.write()} disabled={draft.writing || picked.length === 0}>
-              {draft.writing
-                ? "Writing…"
-                : draft.draft !== null
-                  ? "Write a new draft (replaces the one below)"
-                  : "Write a draft"}
+              {draft.writing ? t("draft.writing") : draft.draft !== null ? t("draft.rewrite") : t("draft.write")}
             </Button>
           </div>
           {draft.error && <Alert tone="error">{draft.error}</Alert>}
           {draft.draft !== null && (
             <div className="grid gap-3">
               <label htmlFor="draft-text" className="text-sm font-medium">
-                Draft (edit it before you send it)
+                {t("draft.label")}
               </label>
-              {draft.draftIsStale && <Alert>The ticked questions have changed since this draft was written.</Alert>}
+              {draft.draftIsStale && <Alert>{t("draft.stale")}</Alert>}
               <Textarea
                 id="draft-text"
                 rows={10}
@@ -314,16 +314,12 @@ export default function Workspace() {
               />
               <div className="flex flex-wrap items-center gap-3">
                 <Button variant="secondary" onClick={draft.copy}>
-                  Copy
+                  {t("draft.copy")}
                 </Button>
-                {draft.copied === "yes" && <span role="status">Copied.</span>}
-                {draft.copied === "failed" && (
-                  <span role="status">Could not copy. Select the text and copy it yourself.</span>
-                )}
+                {draft.copied === "yes" && <span role="status">{t("draft.copied")}</span>}
+                {draft.copied === "failed" && <span role="status">{t("draft.copyFailed")}</span>}
               </div>
-              <p className="text-sm opacity-80">
-                Nothing has been sent. This draft is not saved: copy it before you leave the page.
-              </p>
+              <p className="text-sm opacity-80">{t("draft.notSent")}</p>
             </div>
           )}
         </section>
