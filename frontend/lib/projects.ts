@@ -1,3 +1,5 @@
+import { en, type Key } from "./i18n/en";
+
 export type Role = "owner" | "member";
 
 export type Project = {
@@ -41,6 +43,12 @@ export function daysOpen(createdAt: string, now: Date = new Date()): number {
 }
 
 export function ageText(days: number): string {
-  if (days === 0) return "open for less than a day";
-  return days === 1 ? "open for 1 day" : `open for ${days} days`;
+  if (days === 0) return en["age.zero"];
+  return days === 1 ? en["age.one"] : en["age.many"].replace("{n}", String(days));
+}
+
+/** The dictionary key and values for the same words, so a screen can show them in the chosen language. */
+export function ageKey(days: number): { key: Key; values?: { n: number } } {
+  if (days === 0) return { key: "age.zero" };
+  return days === 1 ? { key: "age.one" } : { key: "age.many", values: { n: days } };
 }

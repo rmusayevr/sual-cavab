@@ -39,6 +39,11 @@ const questions = [
   q(4, "dropped", "Do we need a mobile app?"),
 ];
 
+const members = [
+  { user_id: 1, email: "owner@example.invalid", name: "Olga Owner", role: "owner", added_at: "2026-01-01T00:00:00Z" },
+  { user_id: 2, email: "member@example.invalid", name: "", role: "member", added_at: "2026-01-02T00:00:00Z" },
+];
+
 let draftBody: unknown = null;
 let served: typeof questions = questions;
 function api(overrides: Record<string, () => Response> = {}) {
@@ -51,6 +56,7 @@ function api(overrides: Record<string, () => Response> = {}) {
         return json(200, { draft: "Salam, bir neçə sualımız var." });
       }
       if (url.includes("/questions/")) return json(200, served);
+      if (url.endsWith("/members/")) return json(200, members);
       return json(200, projects);
     }),
   );
@@ -227,5 +233,41 @@ describe("Workspace (#70)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Answered" }));
 
     expect(screen.getByText("2 questions ticked: Q1, Q2.")).toBeInTheDocument();
+  });
+
+  // #83: what the old overview and Still open pages showed, now in the workspace.
+  it("lists the project's members with their roles, falling back to the email for a nameless one", async () => {
+    api();
+    render(<Workspace />);
+
+    const list = await screen.findByRole("list", { name: "Members" });
+    expect(within(list).getByText("Olga Owner · owner")).toBeInTheDocument();
+    expect(within(list).getByText("member@example.invalid · member")).toBeInTheDocument();
+  });
+
+  it("still shows the project when the members cannot be loaded, without a members list", async () => {
+    api({ "/members/": () => json(500, {}) });
+    render(<Workspace />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Ticketing" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Members" })).not.toBeInTheDocument();
+  });
+
+  it("says how long an open or asked question has been open, and nothing for answered or dropped ones", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-01-04T12:00:00Z")); // 3 days after the questions were created
+    try {
+      api();
+      render(<Workspace />);
+      await screen.findByText("Which payment providers are allowed?");
+
+      const row = (text: string) => screen.getByText(text).closest("li")!;
+      expect(within(row("Which payment providers are allowed?")).getByText("open for 3 days")).toBeInTheDocument();
+      expect(within(row("Who approves refunds?")).getByText("open for 3 days")).toBeInTheDocument();
+      expect(within(row("Which currency do we show?")).queryByText(/open for/)).not.toBeInTheDocument();
+      expect(within(row("Do we need a mobile app?")).queryByText(/open for/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
