@@ -60,8 +60,9 @@ export default function Workspace() {
     Promise.all([apiFetch("/api/projects/"), apiFetch(base)])
       .then(async ([projectsRes, questionsRes]) => {
         if (cancelled) return;
-        // A 401 or 403 is a session that ended (or a failed CSRF check): the backend answers 404 for a
-        // project the person is not on, so only a 404 means "not found" (#91).
+        // The backend's SessionAuthentication answers 403 (never 401) when nobody is signed in, and 404 for a
+        // project the person is not on, so only a 404 means "not found" (#91). 401 is kept for a proxy or a
+        // future authentication class.
         const signedOut = (r: Response) => r.status === 401 || r.status === 403;
         if (signedOut(questionsRes) || signedOut(projectsRes)) return setState({ kind: "signed-out" });
         if (questionsRes.status === 404) return setState({ kind: "not-found" });

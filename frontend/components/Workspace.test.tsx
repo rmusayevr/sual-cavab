@@ -693,4 +693,34 @@ describe("Workspace (#70)", () => {
     expect(await screen.findByText(/to see this project\./)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it("tells a signed-out person to sign in when ONLY the questions request is refused (403): the case #91 describes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/questions/")) return json(403, { detail: "Authentication credentials were not provided." });
+        if (url.endsWith("/members/")) return json(200, members);
+        return json(200, projects);
+      }),
+    );
+    render(<Workspace />);
+
+    expect(await screen.findByText(/to see this project\./)).toBeInTheDocument();
+    expect(screen.queryByText("Project not found.")).not.toBeInTheDocument();
+  });
+
+  it("puts 'sign in' before 'not found' when both could apply (the session ended between the two requests)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/questions/")) return json(404, {});
+        if (url.endsWith("/members/")) return json(403, {});
+        return json(403, {});
+      }),
+    );
+    render(<Workspace />);
+
+    expect(await screen.findByText(/to see this project\./)).toBeInTheDocument();
+    expect(screen.queryByText("Project not found.")).not.toBeInTheDocument();
+  });
 });
