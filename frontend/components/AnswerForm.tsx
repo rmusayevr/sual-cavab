@@ -22,10 +22,12 @@ type Props = {
   idPrefix: string;
   onSubmit: (answer: AnswerFields) => Promise<SubmitResult>;
   onCancel: () => void;
+  /** False when the question can no longer be answered: the text stays, the save button goes. */
+  canSave?: boolean;
 };
 
 /** Records who answered a question, when, and where. */
-export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
+export default function AnswerForm({ idPrefix, onSubmit, onCancel, canSave = true }: Props) {
   const t = useT();
   const [values, setValues] = useState<AnswerFields>({
     text: "",
@@ -135,9 +137,11 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel }: Props) {
       </div>
       {errors.form && <Alert tone="error">{errors.form}</Alert>}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={saving}>
-          {saving ? t("question.saving") : t("answer.save")}
-        </Button>
+        {canSave && (
+          <Button type="submit" disabled={saving}>
+            {saving ? t("question.saving") : t("answer.save")}
+          </Button>
+        )}
         <Button variant="secondary" onClick={onCancel} disabled={saving}>
           {t("question.cancel")}
         </Button>

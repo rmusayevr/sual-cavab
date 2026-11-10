@@ -79,6 +79,8 @@ export const az: Record<Key, string> = {
   "answer.where": "Kanal",
   "answer.note": "Qeyd (istəyə bağlı)",
   "answer.save": "Cavabı saxla",
+  "answer.keptRetry": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda qalır. Suala baxın, sonra yenidən saxlayın.",
+  "answer.keptCopy": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda qalır və onu kopyalaya bilərsiniz. Bu suala indiki vəziyyətində cavab yazmaq mümkün deyil.",
   "channel.chat": "Çat",
   "channel.meeting": "Görüş",
   "channel.email": "E-poçt",
