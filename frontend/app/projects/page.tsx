@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import ProjectList from "@/components/ProjectList";
 import { AppHeader } from "@/components/ui/AppHeader";
+import { T } from "@/lib/i18n";
 
 export const metadata: Metadata = { title: "Projects · Sual-Cavab" };
 
@@ -10,8 +11,10 @@ export const metadata: Metadata = { title: "Projects · Sual-Cavab" };
 export default function ProjectsPage() {
   return (
     <div className="min-h-screen">
-      <AppHeader eyebrow="Ledger" title="Your projects">
-        <p>Every client project you are on, with what it is still waiting for.</p>
+      <AppHeader eyebrow={<T k="projects.eyebrow" />} title={<T k="projects.title" />}>
+        <p>
+          <T k="projects.lead" />
+        </p>
       </AppHeader>
       <main className="mx-auto w-full max-w-6xl px-6 py-10">
         <ProjectList />

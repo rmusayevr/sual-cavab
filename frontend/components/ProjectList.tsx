@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import type { Project } from "@/lib/projects";
 
 import { Alert } from "./ui/Alert";
@@ -19,6 +20,7 @@ type State =
   | { kind: "error" };
 
 export default function ProjectList() {
+  const t = useT();
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
@@ -38,19 +40,19 @@ export default function ProjectList() {
     };
   }, []);
 
-  if (state.kind === "loading") return <LedgerLoading label="Loading projects…" />;
+  if (state.kind === "loading") return <LedgerLoading label={t("projects.loading")} />;
   if (state.kind === "signed-out")
     return (
       <EmptyState strip={false}>
         <p className="flex flex-wrap items-center gap-2">
           <Link href="/login" className={buttonClasses("primary")}>
-            Sign in
+            {t("session.signIn")}
           </Link>
-          <span>to see your projects.</span>
+          <span>{t("projects.signInTo")}</span>
         </p>
       </EmptyState>
     );
-  if (state.kind === "error") return <Alert tone="error">Could not load projects.</Alert>;
+  if (state.kind === "error") return <Alert tone="error">{t("projects.loadError")}</Alert>;
 
   const added = (project: Project) =>
     setState((s) => (s.kind === "ready" ? { kind: "ready", projects: [...s.projects, project] } : s));
@@ -59,7 +61,7 @@ export default function ProjectList() {
     <div className="grid gap-10 lg:grid-cols-[1fr_22rem] lg:items-start">
       {state.projects.length === 0 ? (
         <EmptyState strip={false}>
-          <p>You are not on any project yet. Create one with the form, or ask an owner to add you.</p>
+          <p>{t("projects.empty")}</p>
         </EmptyState>
       ) : (
         <ul className="grid list-none gap-3">
@@ -75,7 +77,7 @@ export default function ProjectList() {
                   </h2>
                   <p className="text-sm text-muted-foreground">
                     {p.client_name}
-                    {p.my_role === "owner" ? " (owner)" : ""} · {p.open_question_count} still open
+                    {p.my_role === "owner" ? t("projects.owner") : ""} · {t("projects.stillOpen", { n: p.open_question_count })}
                   </p>
                 </div>
                 {p.open_question_count > 0 && (
@@ -97,6 +99,7 @@ export default function ProjectList() {
 }
 
 function NewProjectForm({ onCreated }: { onCreated: (p: Project) => void }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [clientName, setClientName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -113,10 +116,10 @@ function NewProjectForm({ onCreated }: { onCreated: (p: Project) => void }) {
         setName("");
         setClientName("");
       } else {
-        setError("Could not create the project. Check the fields and try again.");
+        setError(t("projects.createFailed"));
       }
     } catch {
-      setError("Could not reach the server.");
+      setError(t("error.server"));
     } finally {
       setSaving(false);
     }
@@ -126,18 +129,18 @@ function NewProjectForm({ onCreated }: { onCreated: (p: Project) => void }) {
     <section className="min-w-0 overflow-hidden rounded-md border border-t-4 border-t-saffron bg-card text-card-foreground shadow-card">
       <form onSubmit={onSubmit} className="grid gap-4 p-5">
         <div className="grid gap-1">
-          <Eyebrow>New line</Eyebrow>
-          <h2 className="text-xl font-semibold">New project</h2>
+          <Eyebrow>{t("projects.newEyebrow")}</Eyebrow>
+          <h2 className="text-xl font-semibold">{t("projects.newTitle")}</h2>
         </div>
-        <Field label="Project name">
+        <Field label={t("projects.name")}>
           {(props) => <Input required value={name} onChange={(e) => setName(e.target.value)} {...props} />}
         </Field>
-        <Field label="Client">
+        <Field label={t("projects.client")}>
           {(props) => <Input required value={clientName} onChange={(e) => setClientName(e.target.value)} {...props} />}
         </Field>
         {error && <Alert tone="error">{error}</Alert>}
         <Button type="submit" disabled={saving} className="w-full">
-          {saving ? "Creating…" : "Create project"}
+          {saving ? t("projects.creating") : t("projects.create")}
         </Button>
       </form>
     </section>
