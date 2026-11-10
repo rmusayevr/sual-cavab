@@ -16,8 +16,8 @@ export function AppHeader({
   title,
   children,
 }: {
-  eyebrow: string;
-  title: string;
+  eyebrow: ReactNode;
+  title: ReactNode;
   children?: ReactNode;
 }) {
   return (
