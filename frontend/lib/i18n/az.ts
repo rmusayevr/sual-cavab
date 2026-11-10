@@ -84,10 +84,6 @@ export const az: Record<Key, string> = {
   "channel.email": "E-poçt",
   "channel.other": "Digər",
 
-  "questions.loading": "Suallar yüklənir…",
-  "questions.loadError": "Sualları yükləmək mümkün olmadı.",
-  "questions.none": "Hələ sual yoxdur. İlk sualı aşağıda əlavə edin.",
-
   "error.addQuestion": "Sualı əlavə etmək alınmadı.",
   "error.changeStatus": "Statusu dəyişmək alınmadı.",
   "error.saveQuestion": "Sualı saxlamaq alınmadı.",

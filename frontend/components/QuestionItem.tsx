@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
@@ -11,90 +10,9 @@ import { TRANSITIONS, fieldErrors, transitionKey, type Answer, type FullQuestion
 import AnswerForm, { type AnswerFields } from "./AnswerForm";
 import QuestionForm, { type QuestionFields, type SubmitResult } from "./QuestionForm";
 import { Alert } from "./ui/Alert";
-import { Button, buttonClasses } from "./ui/Button";
+import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
-import { EmptyState, LedgerLoading } from "./ui/Ledger";
 import { StatusChip } from "./ui/StatusChip";
-
-type State =
-  | { kind: "loading" }
-  | { kind: "ready"; questions: FullQuestion[] }
-  | { kind: "not-found" }
-  | { kind: "error" };
-
-/** Every question of a project: add, edit, change status, record an answer. */
-export default function QuestionsManager({ projectId }: { projectId: string }) {
-  const t = useT();
-  const [state, setState] = useState<State>({ kind: "loading" });
-  const base = `/api/projects/${projectId}/questions/`;
-
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch(base)
-      .then(async (response) => {
-        if (cancelled) return;
-        if (response.ok) setState({ kind: "ready", questions: (await response.json()) as FullQuestion[] });
-        else if (response.status === 404 || response.status === 403) setState({ kind: "not-found" });
-        else setState({ kind: "error" });
-      })
-      .catch(() => {
-        if (!cancelled) setState({ kind: "error" });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [base]);
-
-  if (state.kind === "loading") return <LedgerLoading label={t("questions.loading")} />;
-  if (state.kind === "not-found")
-    return (
-      <EmptyState>
-        <p>{t("workspace.notFound")}</p>
-        <div>
-          <Link href="/projects" className={buttonClasses("secondary")}>
-            {t("workspace.back")}
-          </Link>
-        </div>
-      </EmptyState>
-    );
-  if (state.kind === "error") return <Alert tone="error">{t("questions.loadError")}</Alert>;
-
-  const replace = (updated: FullQuestion) =>
-    setState((s) =>
-      s.kind === "ready" ? { kind: "ready", questions: s.questions.map((q) => (q.id === updated.id ? updated : q)) } : s,
-    );
-  const append = (created: FullQuestion) =>
-    setState((s) => (s.kind === "ready" ? { kind: "ready", questions: [...s.questions, created] } : s));
-
-  async function add(values: QuestionFields): Promise<SubmitResult> {
-    const response = await apiFetch(base, { method: "POST", body: values });
-    if (response.status === 201) {
-      append((await response.json()) as FullQuestion);
-      return null;
-    }
-    return await failure(response, t("error.addQuestion"), [...QUESTION_FIELDS]);
-  }
-
-  return (
-    <div className="grid gap-6">
-      {state.questions.length === 0 ? (
-        <EmptyState>
-          <p>{t("questions.none")}</p>
-        </EmptyState>
-      ) : (
-        <ul className="grid list-none gap-4">
-          {state.questions.map((q) => (
-            <QuestionItem key={q.id} question={q} base={base} onChanged={replace} />
-          ))}
-        </ul>
-      )}
-      <Card className="grid gap-4">
-        <h2 className="text-lg font-semibold">{t("workspace.add")}</h2>
-        <QuestionForm idPrefix="add" submitLabel={t("form.add")} busyLabel={t("form.adding")} clearOnSuccess onSubmit={add} />
-      </Card>
-    </div>
-  );
-}
 
 /**
  * The messages in a refused response, keyed by the fields the form shows. A
@@ -121,6 +39,12 @@ export async function failure(response: Response, fallback: string, shown: strin
 
 export const QUESTION_FIELDS = ["text", "why_it_matters", "blocks"] as const;
 const ANSWER_FIELDS = ["text", "answered_by", "answered_on", "channel", "channel_note"];
+
+/**
+ * One question of the workspace: its text, why it matters, what it blocks and its answers, with the
+ * buttons that change its status, the edit form and the answer form. (Until #83 this lived in the
+ * old questions page, QuestionsManager.)
+ */
 
 type Mode = "view" | "edit" | "answer";
 

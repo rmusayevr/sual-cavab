@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import QuestionsManager from "./QuestionsManager";
+import { apiFetch } from "@/lib/api";
+import type { FullQuestion } from "@/lib/questions";
+
+import { QuestionItem } from "./QuestionItem";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -51,7 +55,6 @@ function backend(routes: Record<string, (body: unknown) => Response | Promise<Re
 }
 
 const LIST = "GET /api/projects/5/questions/";
-const ADD = "POST /api/projects/5/questions/";
 const TRANSITION_1 = "POST /api/projects/5/questions/1/transition/";
 const EDIT_1 = "PATCH /api/projects/5/questions/1/";
 const QUESTION_1 = "GET /api/projects/5/questions/1/";
@@ -60,72 +63,46 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("QuestionsManager: the list", () => {
-  it("shows a loading state first", () => {
-    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
-    render(<QuestionsManager projectId="5" />);
-    expect(screen.getByText(/loading questions/i)).toBeInTheDocument();
-  });
+/**
+ * A test-only stand-in for the list around the questions: it loads them and keeps what a changed
+ * question sends back, the way the workspace does. The behaviour under test is QuestionItem's.
+ * (These tests came from the old questions page, QuestionsManager, removed in #83.)
+ */
+function Board({ projectId }: { projectId: string }) {
+  const base = `/api/projects/${projectId}/questions/`;
+  const [questions, setQuestions] = useState<FullQuestion[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch(base)
+      .then((response) => response.json())
+      .then((list) => {
+        if (!cancelled) setQuestions(list as FullQuestion[]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [base]);
+  if (questions === null) return null;
+  return (
+    <ul>
+      {questions.map((q) => (
+        <QuestionItem
+          key={q.id}
+          question={q}
+          base={base}
+          onChanged={(updated) => setQuestions((list) => (list ?? []).map((x) => (x.id === updated.id ? updated : x)))}
+        />
+      ))}
+    </ul>
+  );
+}
 
-  it("says so when the project has no questions yet", async () => {
-    backend({ [LIST]: () => json(200, []) });
-    render(<QuestionsManager projectId="5" />);
-    expect(await screen.findByText(/no questions yet/i)).toBeInTheDocument();
-  });
-
-  it("shows an error, not an empty list, when loading fails", async () => {
-    backend({ [LIST]: () => json(500, {}) });
-    render(<QuestionsManager projectId="5" />);
-    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load the questions/i);
-    expect(screen.queryByText(/no questions yet/i)).not.toBeInTheDocument();
-  });
-
-  it("shows not found for a project the backend hides", async () => {
-    backend({ [LIST]: () => json(404, { detail: "No Project matches the given query." }) });
-    render(<QuestionsManager projectId="5" />);
-    expect(await screen.findByText(/project not found/i)).toBeInTheDocument();
-  });
-
-  it("lists every question with its status, including answered and dropped ones", async () => {
-    backend({
-      [LIST]: () =>
-        json(200, [
-          question(1),
-          question(2, { status: "answered", current_answer: answerOf() }),
-          question(3, { status: "dropped" }),
-        ]),
-    });
-    render(<QuestionsManager projectId="5" />);
-    const items = await screen.findAllByTestId("question");
-    expect(items).toHaveLength(3);
-    expect(within(items[1]).getByText("Answered")).toBeInTheDocument();
-    expect(within(items[2]).getByText("Dropped")).toBeInTheDocument();
-  });
-
-  it("shows the current answer and the history of older ones", async () => {
-    backend({
-      [LIST]: () =>
-        json(200, [
-          question(1, {
-            status: "answered",
-            current_answer: answerOf({ id: 2, text: "Corrected: 30 days." }),
-            previous_answers: [answerOf({ id: 1, text: "14 days.", superseded_at: "2026-03-02T00:00:00Z" })],
-          }),
-        ]),
-    });
-    render(<QuestionsManager projectId="5" />);
-    expect(await screen.findByText(/Corrected: 30 days\./)).toBeInTheDocument();
-    expect(screen.getByText(/14 days\./)).toBeInTheDocument();
-    expect(screen.getAllByText(/Əli Məmmədov/).length).toBeGreaterThan(0);
-  });
-});
-
-describe("QuestionsManager: status buttons", () => {
+describe("QuestionItem: status buttons", () => {
   const MOVES = ["Mark asked", "Record answer", "Drop", "Un-ask", "Re-open", "Restore"];
 
   const buttonsFor = async (status: string) => {
     backend({ [LIST]: () => json(200, [question(1, { status })]) });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     await screen.findByText("Invented question 1");
     return screen
       .getAllByRole("button")
@@ -154,7 +131,7 @@ describe("QuestionsManager: status buttons", () => {
       [LIST]: () => json(200, [question(1)]),
       [TRANSITION_1]: () => json(200, question(1, { status: "asked" })),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Mark asked" }));
     expect(await screen.findByRole("button", { name: "Un-ask" })).toBeInTheDocument();
     expect(calls.find((c) => c.method === "POST" && c.url.endsWith("/transition/"))?.body).toEqual({ to: "asked" });
@@ -167,7 +144,7 @@ describe("QuestionsManager: status buttons", () => {
         json(400, { to: ["A answered question cannot become asked."], allowed: ["open"] }),
       [QUESTION_1]: () => json(200, question(1, { status: "answered", current_answer: answerOf() })),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Mark asked" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("A answered question cannot become asked.");
     expect(await screen.findByRole("button", { name: "Re-open" })).toBeInTheDocument();
@@ -180,7 +157,7 @@ describe("QuestionsManager: status buttons", () => {
       [TRANSITION_1]: () => json(400, { to: ["A answered question cannot become asked."], allowed: ["open"] }),
       [QUESTION_1]: () => json(500, {}),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Mark asked" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("A answered question cannot become asked.");
     expect(screen.getByRole("button", { name: "Mark asked" })).toBeInTheDocument();
@@ -198,7 +175,7 @@ describe("QuestionsManager: status buttons", () => {
         return json(200, question(1, { status: "asked" }));
       },
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Mark asked" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not reach the server/i);
     fireEvent.click(screen.getByRole("button", { name: "Mark asked" }));
@@ -207,90 +184,14 @@ describe("QuestionsManager: status buttons", () => {
   });
 });
 
-describe("QuestionsManager: add", () => {
-  it("posts the three fields and shows the new question", async () => {
-    const calls = backend({
-      [LIST]: () => json(200, []),
-      [ADD]: () => json(201, question(1, { text: "Which providers?", blocks: "Checkout" })),
-    });
-    render(<QuestionsManager projectId="5" />);
-    await screen.findByText(/no questions yet/i);
 
-    fireEvent.change(screen.getByLabelText("Question"), { target: { value: "Which providers?" } });
-    fireEvent.change(screen.getByLabelText("Why it matters"), { target: { value: "Pricing" } });
-    fireEvent.change(screen.getByLabelText("What it blocks"), { target: { value: "Checkout" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
-
-    const added = await screen.findByTestId("question");
-    expect(within(added).getByText("Which providers?")).toBeInTheDocument();
-    expect(calls.find((c) => c.method === "POST")?.body).toEqual({
-      text: "Which providers?",
-      why_it_matters: "Pricing",
-      blocks: "Checkout",
-    });
-    expect(screen.getByLabelText("Question")).toHaveValue("");
-  });
-
-  it("shows the API's message next to the field and keeps what was typed", async () => {
-    backend({
-      [LIST]: () => json(200, []),
-      [ADD]: () => json(400, { text: ["This field may not be blank."] }),
-    });
-    render(<QuestionsManager projectId="5" />);
-    await screen.findByText(/no questions yet/i);
-
-    fireEvent.change(screen.getByLabelText("What it blocks"), { target: { value: "Checkout" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
-
-    expect(await screen.findByText("This field may not be blank.")).toBeInTheDocument();
-    expect(screen.getByLabelText("What it blocks")).toHaveValue("Checkout");
-  });
-
-  it("does not send twice while the first request is running", async () => {
-    let release: (r: Response) => void = () => {};
-    const calls = backend({
-      [LIST]: () => json(200, []),
-      [ADD]: () => new Promise<Response>((resolve) => (release = resolve)),
-    });
-    render(<QuestionsManager projectId="5" />);
-    await screen.findByText(/no questions yet/i);
-
-    fireEvent.change(screen.getByLabelText("Question"), { target: { value: "Q?" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
-    const busy = await screen.findByRole("button", { name: /adding/i });
-    expect(busy).toBeDisabled();
-    // A disabled button cannot be clicked, but Enter in a field submits the form itself.
-    fireEvent.submit(busy.closest("form")!);
-
-    // Each send first fetches the CSRF cookie, so a second POST would show up a moment later.
-    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url.endsWith("/questions/"))).toBe(true));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(calls.filter((c) => c.method === "POST" && c.url.endsWith("/questions/"))).toHaveLength(1);
-    release(json(201, question(1, { text: "Q?" })));
-    await waitFor(() => expect(screen.getByTestId("question")).toBeInTheDocument());
-  });
-
-  it("says so when the server cannot be reached and keeps what was typed", async () => {
-    backend({
-      [LIST]: () => json(200, []),
-      [ADD]: () => Promise.reject(new Error("offline")),
-    });
-    render(<QuestionsManager projectId="5" />);
-    await screen.findByText(/no questions yet/i);
-    fireEvent.change(screen.getByLabelText("Question"), { target: { value: "Q?" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
-    expect(await screen.findByText(/could not reach the server/i)).toBeInTheDocument();
-    expect(screen.getByLabelText("Question")).toHaveValue("Q?");
-  });
-});
-
-describe("QuestionsManager: edit", () => {
+describe("QuestionItem: edit", () => {
   it("sends only the field that was changed and shows the saved text", async () => {
     const calls = backend({
       [LIST]: () => json(200, [question(1, { text: "Old text", status: "asked" })]),
       [EDIT_1]: () => json(200, question(1, { text: "New text", status: "asked" })),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     const box = screen.getByLabelText("Question", { selector: "#edit-1-text" });
     expect(box).toHaveValue("Old text");
@@ -314,7 +215,7 @@ describe("QuestionsManager: edit", () => {
       },
       [EDIT_1]: () => json(200, question(1, { text: "Changed" })),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Drop" }));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(first).toBe(false);
@@ -329,7 +230,7 @@ describe("QuestionsManager: edit", () => {
 
   it("sends nothing when nothing was changed", async () => {
     const calls = backend({ [LIST]: () => json(200, [question(1)]) });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument());
@@ -341,7 +242,7 @@ describe("QuestionsManager: edit", () => {
       [LIST]: () => json(200, [question(1, { blocks: "Checkout" })]),
       [EDIT_1]: () => json(200, question(1)),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText("What it blocks", { selector: "#edit-1-blocks" }), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -354,7 +255,7 @@ describe("QuestionsManager: edit", () => {
       [LIST]: () => json(200, [question(1)]),
       [EDIT_1]: () => json(400, { text: ["This field may not be blank."] }),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText("Question", { selector: "#edit-1-text" }), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -364,7 +265,7 @@ describe("QuestionsManager: edit", () => {
 
   it("cancel leaves the question unchanged and sends nothing", async () => {
     const calls = backend({ [LIST]: () => json(200, [question(1)]) });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByLabelText("Question", { selector: "#edit-1-text" }), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -373,7 +274,7 @@ describe("QuestionsManager: edit", () => {
   });
 });
 
-describe("QuestionsManager: record an answer", () => {
+describe("QuestionItem: record an answer", () => {
   const fill = () => {
     fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "30 days." } });
     fireEvent.change(screen.getByLabelText("Answered by"), { target: { value: "Əli Məmmədov" } });
@@ -388,7 +289,7 @@ describe("QuestionsManager: record an answer", () => {
       [TRANSITION_1]: () =>
         json(200, question(1, { status: "answered", current_answer: answerOf({ channel: "meeting" }) })),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
@@ -420,7 +321,7 @@ describe("QuestionsManager: record an answer", () => {
     const own = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     const baku = "2026-03-06";
     try {
-      render(<QuestionsManager projectId="5" />);
+      render(<Board projectId="5" />);
       fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
       const value = (screen.getByLabelText("Date") as HTMLInputElement).value;
       expect(value <= baku).toBe(true);
@@ -437,7 +338,7 @@ describe("QuestionsManager: record an answer", () => {
       [LIST]: () => json(200, [question(1)]),
       [TRANSITION_1]: () => json(400, { answer: { answered_on: ["The answer cannot be dated in the future."] } }),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
@@ -451,7 +352,7 @@ describe("QuestionsManager: record an answer", () => {
       [TRANSITION_1]: () => json(400, { to: ["A dropped question cannot become answered."], allowed: ["open"] }),
       [QUESTION_1]: () => json(200, question(1, { status: "dropped" })),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
@@ -464,7 +365,7 @@ describe("QuestionsManager: record an answer", () => {
       [LIST]: () => json(200, [question(1)]),
       [TRANSITION_1]: () => json(502, { error: "Bad gateway" }),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
@@ -477,7 +378,7 @@ describe("QuestionsManager: record an answer", () => {
       [LIST]: () => json(200, [question(1)]),
       [TRANSITION_1]: () => new Response("<html>502</html>", { status: 502 }),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
@@ -489,7 +390,7 @@ describe("QuestionsManager: record an answer", () => {
       [LIST]: () => json(200, [question(1)]),
       [TRANSITION_1]: () => json(400, { answer: { answered_on: ["The answer cannot be dated in the future."] } }),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
@@ -511,7 +412,7 @@ describe("QuestionsManager: record an answer", () => {
         return json(200, question(1, { status: (body as { to: string }).to, current_answer: answerOf() }));
       },
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Drop" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not reach the server/i);
 
@@ -529,14 +430,14 @@ describe("QuestionsManager: record an answer", () => {
       [TRANSITION_1]: () => json(400, { to: ["A answered question cannot become asked."], allowed: ["open"] }),
       [QUESTION_1]: () => Promise.reject(new Error("offline")),
     });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Mark asked" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("A answered question cannot become asked.");
   });
 
   it("cancel closes the form without sending", async () => {
     const calls = backend({ [LIST]: () => json(200, [question(1)]) });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByLabelText("Answer")).not.toBeInTheDocument();
@@ -544,10 +445,11 @@ describe("QuestionsManager: record an answer", () => {
   });
 });
 
-describe("QuestionsManager look (#56)", () => {
+
+describe("QuestionItem look (#56)", () => {
   it("shows a question's status as a chip with the word in it, and its text on its own line", async () => {
     backend({ [LIST]: () => json(200, [question(1, { status: "asked" })]) });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
 
     const item = await screen.findByTestId("question");
     expect(within(item).getByText("Asked").firstElementChild).toHaveClass("bg-status-asked");
@@ -556,7 +458,7 @@ describe("QuestionsManager look (#56)", () => {
 
   it("every action on a question is easy to tap, and dropping looks different from the rest", async () => {
     backend({ [LIST]: () => json(200, [question(1)]) });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
 
     const item = await screen.findByTestId("question");
     const buttons = within(item).getAllByRole("button");
@@ -569,73 +471,53 @@ describe("QuestionsManager look (#56)", () => {
 
   it("shows a question's number in monospace and red, and its answer as the example's green-ruled block", async () => {
     backend({ [LIST]: () => json(200, [question(1, { status: "answered", current_answer: answerOf() })]) });
-    render(<QuestionsManager projectId="5" />);
+    render(<Board projectId="5" />);
 
     const item = await screen.findByTestId("question");
     expect(within(item).getByText("Q1")).toHaveClass("font-mono", "text-xs", "text-primary");
     const block = within(item).getByText("30 days.").parentElement!;
     expect(block).toHaveClass("border-l-4", "border-status-answered", "bg-muted");
   });
-
-  it("the add form uses the shared fields and keeps its labels tied to them", async () => {
-    backend({ [LIST]: () => json(200, []) });
-    render(<QuestionsManager projectId="5" />);
-
-    await screen.findByText(/no questions yet/i);
-    for (const label of ["Question", "Why it matters", "What it blocks"]) {
-      expect(screen.getByLabelText(label)).toHaveClass("min-h-11");
-    }
-    expect(screen.getByLabelText("Question")).toHaveAttribute("id", "add-text");
-  });
-
-  it("the one-line field stays one line: the shared text area has no four-line minimum", async () => {
-    backend({ [LIST]: () => json(200, []) });
-    render(<QuestionsManager projectId="5" />);
-
-    await screen.findByText(/no questions yet/i);
-    expect(screen.getByLabelText("What it blocks")).toHaveAttribute("rows", "1");
-    expect(screen.getByLabelText("What it blocks")).not.toHaveClass("min-h-24");
-  });
-
-  it("the answer form uses the shared fields, a date input and a select, all easy to tap", async () => {
-    backend({ [LIST]: () => json(200, [question(1)]) });
-    render(<QuestionsManager projectId="5" />);
-
-    fireEvent.click(await screen.findByRole("button", { name: /mark answered|answer/i }));
-
-    expect(await screen.findByLabelText("Date")).toHaveAttribute("type", "date");
-    for (const label of ["Answer", "Answered by", "Date", "Where", "Note (optional)"]) {
-      expect(screen.getByLabelText(label)).toHaveClass("min-h-11");
-    }
-    expect(screen.getByRole("button", { name: "Save answer" })).toHaveClass("min-h-11");
-  });
 });
 
-describe("QuestionsManager: the states (#72)", () => {
-  it("loading says what is loading and shows ledger rows that fill in", () => {
-    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+describe("QuestionItem: answers", () => {
+  // from the old questions page's list tests: the current answer and the history of older ones
+  it("shows the current answer and the history of older ones", async () => {
+    backend({
+      [LIST]: () =>
+        json(200, [
+          question(1, {
+            status: "answered",
+            current_answer: answerOf({ id: 2, text: "Corrected: 30 days." }),
+            previous_answers: [answerOf({ id: 1, text: "14 days.", superseded_at: "2026-03-02T00:00:00Z" })],
+          }),
+        ]),
+    });
+    render(<Board projectId="5" />);
 
-    const { container } = render(<QuestionsManager projectId="5" />);
-
-    expect(screen.getByRole("status")).toHaveTextContent("Loading questions…");
-    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass("motion-safe:animate-pulse");
+    expect(await screen.findByText(/Corrected: 30 days\./)).toBeInTheDocument();
+    expect(screen.getByText(/14 days\./)).toBeInTheDocument();
+    expect(screen.getAllByText(/Əli Məmmədov/).length).toBeGreaterThan(0);
   });
 
-  it("a missing project is a card under a carpet strip, with the way back", async () => {
-    backend({ [LIST]: () => json(404, {}) });
+  it("shows no 'Blocks' line for a question that blocks nothing, and one for a question that does", async () => {
+    backend({ [LIST]: () => json(200, [question(1), question(2, { blocks: "Checkout" })]) });
+    render(<Board projectId="5" />);
+    await screen.findByText("Invented question 1");
 
-    render(<QuestionsManager projectId="5" />);
-
-    const message = await screen.findByText(/Project not found/);
-    expect(message.closest(".bg-card")!.firstElementChild).toHaveClass("pattern-carpet");
+    expect(screen.getAllByText(/^Blocks: /)).toHaveLength(1);
+    expect(screen.getByText("Blocks: Checkout")).toBeInTheDocument();
   });
 
-  it("no questions yet is a card under a carpet strip that says what to do", async () => {
-    backend({ [LIST]: () => json(200, []) });
+  it("the answer form uses a date input and a select, all easy to tap", async () => {
+    backend({ [LIST]: () => json(200, [question(1)]) });
+    render(<Board projectId="5" />);
 
-    render(<QuestionsManager projectId="5" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
 
-    const message = await screen.findByText(/no questions yet/i);
-    expect(message.closest(".bg-card")!.firstElementChild).toHaveClass("pattern-carpet");
+    expect(await screen.findByLabelText("Date")).toHaveAttribute("type", "date");
+    expect(screen.getByLabelText("Where").tagName).toBe("SELECT");
+    for (const label of ["Answer", "Answered by", "Date", "Where", "Note (optional)"]) expect(screen.getByLabelText(label)).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Save answer" })).toHaveClass("min-h-11");
   });
 });

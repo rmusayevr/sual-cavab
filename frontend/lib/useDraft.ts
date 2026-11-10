@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState } from "react";
 
 import { apiFetch } from "./api";
 import { useT, type Key } from "./i18n";
@@ -31,7 +31,7 @@ export async function explain(response: Response): Promise<DraftError> {
 
 /**
  * Writing a DRAFT message for the picked questions, editing it, copying it. The app never sends the
- * message: there is no send button and no integration. Shared by the draft page and the workspace.
+ * message: there is no send button and no integration. Used by the workspace.
  */
 export function useDraft(projectId: string, picked: number[]) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -42,8 +42,7 @@ export function useDraft(projectId: string, picked: number[]) {
   const [copied, setCopied] = useState<"yes" | "failed" | null>(null);
   const inFlight = useRef(false);
 
-  async function write(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
+  async function write() {
     if (inFlight.current || picked.length === 0) return;
     inFlight.current = true;
     setWriting(true);

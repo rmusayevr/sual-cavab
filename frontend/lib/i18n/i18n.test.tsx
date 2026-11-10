@@ -44,6 +44,19 @@ describe("the dictionaries", () => {
   });
 });
 
+describe("the notice about what is sent", () => {
+  // checked as written in each language, so rewording that drops the guarantee fails here
+  it("says in English that the app never sends the message", () => {
+    expect(en["draft.notice"]).toMatch(/never sends the message anywhere/);
+    expect(en["draft.notice"]).toMatch(/Nothing else about the project or the client is sent/);
+  });
+
+  it("says in Azerbaijani that the app does not send the message anywhere", () => {
+    expect(az["draft.notice"]).toMatch(/heç yerə göndərmir/);
+    expect(az["draft.notice"]).toMatch(/başqa heç nə göndərilmir/);
+  });
+});
+
 describe("translate", () => {
   it("fills named values", () => {
     expect(translate("en", "session.signedInAs", { who: "Ada" })).toBe("Signed in as Ada.");
