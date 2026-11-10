@@ -406,14 +406,30 @@ describe("QuestionsManager: record an answer", () => {
     });
   });
 
-  it("starts with today's date and the chat channel", async () => {
+  // The server refuses an answer date after today in Asia/Baku (#48), so the default must not be after
+  // Baku's date, and not after the browser's own date either (a browser in the Americas must not be
+  // handed its own future). Which of the two it is depends on the machine's time zone, so this checks
+  // the rule at a moment when the calendars differ (20:30 UTC is already the 6th in Baku); the exact
+  // dates per zone are in lib/questions.test.ts.
+  it("starts with a date that is neither after Baku's today nor after the browser's, and the chat channel", async () => {
     backend({ [LIST]: () => json(200, [question(1)]) });
-    render(<QuestionsManager projectId="5" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
-    const d = new Date();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const now = new Date("2026-03-05T20:30:00Z");
+    vi.setSystemTime(now);
     const pad = (n: number) => String(n).padStart(2, "0");
-    expect(screen.getByLabelText("Date")).toHaveValue(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-    expect(screen.getByLabelText("Where")).toHaveValue("chat");
+    const own = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const baku = "2026-03-06";
+    try {
+      render(<QuestionsManager projectId="5" />);
+      fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+      const value = (screen.getByLabelText("Date") as HTMLInputElement).value;
+      expect(value <= baku).toBe(true);
+      expect(value <= own).toBe(true);
+      expect([own, baku]).toContain(value);
+      expect(screen.getByLabelText("Where")).toHaveValue("chat");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows the API's message next to the date and keeps what was typed", async () => {

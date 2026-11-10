@@ -55,10 +55,36 @@ export function transitionLabel(from: QuestionStatus, to: QuestionStatus): strin
   return en[transitionKey(from, to)];
 }
 
-/** Today's date as the user's calendar shows it, YYYY-MM-DD. */
-export function today(now: Date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
+const pad = (n: number | string) => String(n).padStart(2, "0");
+
+/** The date on the browser's own calendar, YYYY-MM-DD. */
+function browserDate(now: Date): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
+ * The date in Asia/Baku, YYYY-MM-DD, built from the parts so it does not depend on how a locale
+ * writes a date. Keep the zone equal to settings.TIME_ZONE in backend/config/settings.py: the server
+ * refuses an answer date after its today.
+ */
+function bakuDate(now: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Baku", year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${pad(get("month"))}-${pad(get("day"))}`;
+}
+
+/**
+ * The default date of an answer (#48): the EARLIER of the browser's date and Baku's, YYYY-MM-DD.
+ * The server refuses a date after today in Baku, so a browser ahead of Baku just after its own
+ * midnight must not offer its own date; a browser behind Baku (the Americas) must not be handed a
+ * date in its own future. Where the two calendars agree, as in Baku, it is just today. Dates of the
+ * form YYYY-MM-DD compare correctly as text. `local` is a parameter so tests do not depend on the
+ * machine's time zone.
+ */
+export function today(now: Date = new Date(), local: string = browserDate(now)): string {
+  const baku = bakuDate(now);
+  return local < baku ? local : baku;
 }
 
 /**
