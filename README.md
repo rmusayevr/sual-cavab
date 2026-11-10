@@ -269,17 +269,21 @@ what is allowed:
 
 ### Still open
 
-The project page lists what the project is waiting on: questions in status
-**open** or **asked**, each with its number, text, what it blocks and how long
-it has been open. The age counts from when the question was created; re-opening
-a question does not reset it. The project list shows the same count
-(`open_question_count`, computed in the database from the same two statuses).
+The workspace (`/projects/<id>`) shows what the project is waiting on: the
+counts of questions in each status, and every question with its number, status
+and text; a question in status **open** or **asked** also says how long it has
+been open (what it blocks is on the selected question). The age counts from when
+the question was created; re-opening a question does not reset it. The project
+list shows the same count of open questions (`open_question_count`, computed in
+the database from the same two statuses).
 
 ### Question screens
 
-`/projects/<id>/questions` lists every question (any status) and is where people
-add a question, edit its three text fields, change its status and record an
-answer (text, who answered, date, chat/meeting/email/other, optional note).
+In the workspace (`/projects/<id>`; the older `/questions` address redirects to
+it) the list shows every question (any status, with a filter by status), and the
+panel on the right is where people add a question, edit its three text fields,
+change its status and record an answer (text, who answered, date,
+chat/meeting/email/other, optional note).
 Only the status buttons the transition table allows are offered; the server
 still decides, and its message is shown if it refuses. Validation errors from
 the API appear next to the field. Re-opening an answered question keeps the old
@@ -287,7 +291,7 @@ answer, shown as "Earlier answer".
 
 ## Drafting a message (Claude)
 
-`/projects/<id>/draft`: pick open or asked questions (up to 10) and get a
+In the workspace (`/projects/<id>`; the older `/draft`, `/questions` and `/overview` addresses redirect to it): pick open or asked questions (up to 10) and get a
 **draft** message, in Azerbaijani with technical terms kept in English, as text
 in a box you can edit and copy. **The app never sends anything**: there is no
 email or chat integration, and a test fails if a module of the drafting package
@@ -334,7 +338,7 @@ The interface is English by default, with Azerbaijani as a second language (#71)
 - **Never translated:** what a person typed (questions, answers) and the drafted message. The draft prompt already asks for Azerbaijani.
 - **Status words** come from the dictionaries (`status.open` and so on), one set per language, next to the one table of colours (`lib/status.ts`). They follow the language on every page, including pages whose other words are still English.
 - **The Azerbaijani wording was written by Claude, not by a native speaker; the owner reviews it.** Technical terms stay in English.
-- **Translated:** the landing page, the sign-in page and form, the projects page and its list and new-project form, the workspace (`/projects/[id]`: shell, members, how long a question has been open, question card, add and edit forms, answer form, draft panel and its error messages), the 404, the session status in every header, the home link's name, the status words and the waking-up note. The landing page's sample questions stay in English (a question is the ledger entry and is never translated, as in the design example) and its sample message is already Azerbaijani (as the drafting feature writes it); both are shown the same in both languages. **Still English** (older pages that the workspace is meant to replace, and things that cannot follow a browser choice): `/draft` (apart from its drafting error messages, which follow the language because the page shares the workspace's drafting code), `/projects/[id]/overview` and the Still open list, the headings and buttons around the list on the old `/questions` page (its cards and forms are translated, being the same components as the workspace's), the page titles and social-card text (they are fixed when the page is built), and any message the server itself sends back (a refused status change, a validation error: shown as the server wrote it).
+- **Translated:** the landing page, the sign-in page and form, the projects page and its list and new-project form, the workspace (`/projects/[id]`: shell, members, how long a question has been open, question card, add and edit forms, answer form, draft panel and its error messages), the 404, the session status in every header, the home link's name, the status words and the waking-up note. The landing page's sample questions stay in English (a question is the ledger entry and is never translated, as in the design example) and its sample message is already Azerbaijani (as the drafting feature writes it); both are shown the same in both languages. **Still English** (things that cannot follow a browser choice): the page titles and social-card text (they are fixed when the page is built) and any message the server itself sends back (a refused status change, a validation error: shown as the server wrote it). The components of the older pages (draft, questions list, overview, Still open) are no longer reachable and are removed in the next change.
 
 ## Staging on Render
 

@@ -39,7 +39,6 @@ export const en = {
   "workspace.notFound": "Project not found.",
   "workspace.back": "Back to your projects",
   "workspace.loadError": "Could not load the project.",
-  "workspace.members": "Members and details",
   "workspace.filterGroup": "Filter questions",
   "workspace.all": "All",
   "workspace.pick": "Pick {label}",
