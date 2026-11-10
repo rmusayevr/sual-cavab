@@ -55,10 +55,22 @@ export function transitionLabel(from: QuestionStatus, to: QuestionStatus): strin
   return en[transitionKey(from, to)];
 }
 
-/** Today's date as the user's calendar shows it, YYYY-MM-DD. */
+/**
+ * Today's date in Asia/Baku, YYYY-MM-DD: the calendar the server checks an answer date against
+ * (it refuses a date after settings.TIME_ZONE's today). The browser's own calendar can be a day
+ * ahead of it, which made the default date a "future date" just after midnight (#48). The en-CA
+ * locale writes the date as year-month-day.
+ */
+export const SERVER_TIME_ZONE = "Asia/Baku";
+const SERVER_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: SERVER_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 export function today(now: Date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return SERVER_DATE.format(now);
 }
 
 /**

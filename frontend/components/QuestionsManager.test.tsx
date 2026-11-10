@@ -406,14 +406,21 @@ describe("QuestionsManager: record an answer", () => {
     });
   });
 
-  it("starts with today's date and the chat channel", async () => {
+  // The server compares an answer date with today in Asia/Baku, so the default is Baku's date, not the
+  // browser's (#48). 20:30 UTC is already the next day in Baku (UTC+4) and still the day before for a
+  // browser in the Americas or at UTC, so a default taken from the browser's calendar would be refused.
+  it("starts with today's date in Baku, even just after Baku midnight, and the chat channel", async () => {
     backend({ [LIST]: () => json(200, [question(1)]) });
-    render(<QuestionsManager projectId="5" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
-    const d = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    expect(screen.getByLabelText("Date")).toHaveValue(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-    expect(screen.getByLabelText("Where")).toHaveValue("chat");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-03-05T20:30:00Z"));
+    try {
+      render(<QuestionsManager projectId="5" />);
+      fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+      expect(screen.getByLabelText("Date")).toHaveValue("2026-03-06");
+      expect(screen.getByLabelText("Where")).toHaveValue("chat");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows the API's message next to the date and keeps what was typed", async () => {

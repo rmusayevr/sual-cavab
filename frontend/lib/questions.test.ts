@@ -44,8 +44,25 @@ describe("transitions", () => {
   });
 });
 
+// The server refuses an answer date after today in Asia/Baku (UTC+4, settings.TIME_ZONE), so the
+// default must be Baku's today whatever the browser's own time zone is (#48). These instants are
+// in UTC, so the tests give the same answer on any machine.
 describe("today", () => {
-  it("uses the local calendar date, zero-padded", () => {
-    expect(today(new Date(2026, 2, 5, 23, 30))).toBe("2026-03-05");
+  it("is the Baku date, zero-padded", () => {
+    expect(today(new Date("2026-03-05T10:00:00Z"))).toBe("2026-03-05");
+  });
+
+  it("is still the day before up to 23:59 in Baku (19:59 UTC)", () => {
+    expect(today(new Date("2026-03-05T19:59:59Z"))).toBe("2026-03-05");
+  });
+
+  it("is already the next day at Baku midnight (20:00 UTC), where a browser behind UTC+4 would say yesterday", () => {
+    expect(today(new Date("2026-03-05T20:00:00Z"))).toBe("2026-03-06");
+    expect(today(new Date("2026-03-05T20:30:00Z"))).toBe("2026-03-06");
+  });
+
+  it("crosses a month and a year the way Baku's calendar does", () => {
+    expect(today(new Date("2026-12-31T20:00:00Z"))).toBe("2027-01-01");
+    expect(today(new Date("2026-02-28T20:00:00Z"))).toBe("2026-03-01");
   });
 });
