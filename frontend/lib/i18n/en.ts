@@ -110,6 +110,7 @@ export const en = {
   "projects.lead": "Every client project you are on, with what it is still waiting for.",
   "projects.loading": "Loading projects…",
   "projects.signInLine": "{link} to see your projects.",
+  "workspace.signInLine": "{link} to see this project.",
   "projects.loadError": "Could not load projects.",
   "projects.empty": "You are not on any project yet. Create one with the form, or ask an owner to add you.",
   "projects.owner": "(owner)",

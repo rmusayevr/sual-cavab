@@ -20,12 +20,14 @@ import { Button, buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
 import { Textarea } from "./ui/Field";
 import { CarpetStrip, EmptyState, Eyebrow, LedgerLoading } from "./ui/Ledger";
+import { SignInPrompt } from "./ui/SignInPrompt";
 import { StatusChip } from "./ui/StatusChip";
 import { Wordmark } from "./ui/Wordmark";
 
 type State =
   | { kind: "loading" }
   | { kind: "ready"; projects: Project[]; questions: FullQuestion[] }
+  | { kind: "signed-out" }
   | { kind: "not-found" }
   | { kind: "error" };
 
@@ -58,7 +60,11 @@ export default function Workspace() {
     Promise.all([apiFetch("/api/projects/"), apiFetch(base)])
       .then(async ([projectsRes, questionsRes]) => {
         if (cancelled) return;
-        if (questionsRes.status === 404 || questionsRes.status === 403) return setState({ kind: "not-found" });
+        // A 401 or 403 is a session that ended (or a failed CSRF check): the backend answers 404 for a
+        // project the person is not on, so only a 404 means "not found" (#91).
+        const signedOut = (r: Response) => r.status === 401 || r.status === 403;
+        if (signedOut(questionsRes) || signedOut(projectsRes)) return setState({ kind: "signed-out" });
+        if (questionsRes.status === 404) return setState({ kind: "not-found" });
         if (!projectsRes.ok || !questionsRes.ok) return setState({ kind: "error" });
         const projects = (await projectsRes.json()) as Project[];
         const questions = (await questionsRes.json()) as FullQuestion[];
@@ -117,6 +123,14 @@ export default function Workspace() {
     return shell(
       <div className="mx-auto max-w-3xl p-4">
         <LedgerLoading label={t("workspace.loading")} />
+      </div>,
+    );
+  if (state.kind === "signed-out")
+    return shell(
+      <div className="mx-auto max-w-3xl p-4">
+        <EmptyState strip={false}>
+          <SignInPrompt line="workspace.signInLine" />
+        </EmptyState>
       </div>,
     );
   if (state.kind === "not-found")

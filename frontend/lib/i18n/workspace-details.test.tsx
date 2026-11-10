@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Workspace from "@/components/Workspace";
@@ -88,6 +88,21 @@ for (const lang of ["en", "az"] as Language[]) {
         unmount();
         vi.useRealTimers();
       }
+    });
+
+    it("tells a signed-out person to sign in, in the language, with the button where the sentence puts it (#91)", async () => {
+      act(() => setLanguage(lang));
+      vi.stubGlobal("fetch", vi.fn(async () => json(403, {})));
+      render(<Workspace />);
+
+      const expected = t("workspace.signInLine").replace("{link}", t("session.signIn"));
+      // the header offers a Sign in link too; the one in the page body is inside the sentence
+      const sentence = await waitFor(() => {
+        const found = screen.getAllByRole("link", { name: t("session.signIn") }).map((l) => l.parentElement!).find((p) => p.tagName === "P");
+        expect(found).toBeDefined();
+        return found!;
+      });
+      expect(sentence.textContent).toBe(expected);
     });
 
     it("words a refused draft in the language: the server says drafting is not set up", async () => {

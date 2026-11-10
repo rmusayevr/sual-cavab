@@ -8,9 +8,10 @@ import { useT, type Key } from "@/lib/i18n";
 import type { Project } from "@/lib/projects";
 
 import { Alert } from "./ui/Alert";
-import { Button, buttonClasses } from "./ui/Button";
+import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
 import { Field, Input } from "./ui/Field";
+import { SignInPrompt } from "./ui/SignInPrompt";
 import { EmptyState, Eyebrow, LedgerLoading } from "./ui/Ledger";
 
 type State =
@@ -44,19 +45,7 @@ export default function ProjectList() {
   if (state.kind === "signed-out")
     return (
       <EmptyState strip={false}>
-        <p className="flex flex-wrap items-center gap-2">
-          {/* one sentence per language, so the button can sit where that language wants it */}
-          {t("projects.signInLine")
-            .split("{link}")
-            .flatMap((part, i, parts) => [
-              part.trim() ? <span key={`t${i}`}>{part}</span> : null,
-              i < parts.length - 1 ? (
-                <Link key={`l${i}`} href="/login" className={buttonClasses("primary")}>
-                  {t("session.signIn")}
-                </Link>
-              ) : null,
-            ])}
-        </p>
+        <SignInPrompt line="projects.signInLine" />
       </EmptyState>
     );
   if (state.kind === "error") return <Alert tone="error">{t("projects.loadError")}</Alert>;

@@ -112,6 +112,7 @@ export const az: Record<Key, string> = {
   "projects.lead": "Üzvü olduğunuz bütün müştəri layihələri və hələ nəyi gözlədikləri.",
   "projects.loading": "Layihələr yüklənir…",
   "projects.signInLine": "Layihələrinizi görmək üçün {link}.",
+  "workspace.signInLine": "Bu layihəni görmək üçün {link}.",
   "projects.loadError": "Layihələri yükləmək mümkün olmadı.",
   "projects.empty": "Hələ heç bir layihənin üzvü deyilsiniz. Formadan layihə yaradın və ya owner-dən sizi əlavə etməsini xahiş edin.",
   "projects.owner": "(owner)",
