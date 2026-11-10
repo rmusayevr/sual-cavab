@@ -270,4 +270,64 @@ describe("Workspace (#70)", () => {
       vi.useRealTimers();
     }
   });
+
+  // Review of #88: the members are loaded on their own; however that call fails, the project is shown.
+  it("shows the project when the members call fails on the network", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.endsWith("/members/")) throw new Error("offline");
+        if (url.includes("/questions/")) return json(200, served);
+        return json(200, projects);
+      }),
+    );
+    render(<Workspace />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Ticketing" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Members" })).not.toBeInTheDocument();
+  });
+
+  it("shows the project when the members reply is not JSON", async () => {
+    api({ "/members/": () => new Response("<html>bad gateway</html>", { status: 200 }) });
+    render(<Workspace />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Ticketing" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("does not wait for a members call that never answers", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.endsWith("/members/")) return new Promise<Response>(() => {});
+        if (url.includes("/questions/")) return Promise.resolve(json(200, served));
+        return Promise.resolve(json(200, projects));
+      }),
+    );
+    render(<Workspace />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Ticketing" })).toBeInTheDocument();
+    expect(screen.getByText("Which payment providers are allowed?")).toBeInTheDocument();
+  });
+
+  it("words the age for under a day, exactly one day and many days (never '0 days' or '1 days')", async () => {
+    for (const [now, expected] of [
+      ["2026-01-01T10:00:00Z", "open for less than a day"],
+      ["2026-01-02T00:00:00Z", "open for 1 day"],
+      ["2026-01-03T00:00:00Z", "open for 2 days"],
+    ] as const) {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(now));
+      try {
+        api();
+        const { unmount } = render(<Workspace />);
+        const row = (await screen.findByText("Which payment providers are allowed?")).closest("li")!;
+        expect(within(row).getByText(expected)).toBeInTheDocument();
+        unmount();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  });
 });

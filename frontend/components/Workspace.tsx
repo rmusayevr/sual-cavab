@@ -25,7 +25,7 @@ import { Wordmark } from "./ui/Wordmark";
 
 type State =
   | { kind: "loading" }
-  | { kind: "ready"; projects: Project[]; questions: FullQuestion[]; members: Member[] }
+  | { kind: "ready"; projects: Project[]; questions: FullQuestion[] }
   | { kind: "not-found" }
   | { kind: "error" };
 
@@ -55,18 +55,16 @@ export default function Workspace() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([apiFetch("/api/projects/"), apiFetch(base), apiFetch(`/api/projects/${id}/members/`)])
-      .then(async ([projectsRes, questionsRes, membersRes]) => {
+    Promise.all([apiFetch("/api/projects/"), apiFetch(base)])
+      .then(async ([projectsRes, questionsRes]) => {
         if (cancelled) return;
         if (questionsRes.status === 404 || questionsRes.status === 403) return setState({ kind: "not-found" });
         if (!projectsRes.ok || !questionsRes.ok) return setState({ kind: "error" });
         const projects = (await projectsRes.json()) as Project[];
         const questions = (await questionsRes.json()) as FullQuestion[];
-        // The members are a nicety: the project is still shown, without the list, if they cannot be read.
-        const members = membersRes.ok ? ((await membersRes.json()) as Member[]) : [];
         // A project you are not on is the same as one that does not exist.
         if (!projects.some((p) => String(p.id) === id)) return setState({ kind: "not-found" });
-        setState({ kind: "ready", projects, questions, members });
+        setState({ kind: "ready", projects, questions });
       })
       .catch(() => {
         if (!cancelled) setState({ kind: "error" });
@@ -75,6 +73,29 @@ export default function Workspace() {
       cancelled = true;
     };
   }, [id, base]);
+
+  // The members are a nicety, loaded on their own: a slow or failed call (a refused status, a dropped
+  // connection, a reply that is not JSON) never delays or breaks the project, it only leaves out the
+  // list (review of #88).
+  const [members, setMembers] = useState<Member[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch(`/api/projects/${id}/members/`)
+      .then(async (response) => (response.ok ? ((await response.json()) as Member[]) : []))
+      .catch(() => [] as Member[])
+      .then((list) => {
+        if (!cancelled) setMembers(Array.isArray(list) ? list : []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  /** How long a question has been open, in the chosen language ("open for 3 days"). */
+  const age = (createdAt: string) => {
+    const { key, values } = ageKey(daysOpen(createdAt));
+    return t(key, values);
+  };
 
   const shell = (body: ReactNode) => (
     <div className="min-h-screen bg-background [overflow-wrap:anywhere]">
@@ -186,9 +207,9 @@ export default function Workspace() {
         <div className="grid gap-1">
           <Eyebrow>{project.client_name}</Eyebrow>
           <h1 className="text-3xl font-semibold">{project.name}</h1>
-          {state.members.length > 0 && (
+          {members.length > 0 && (
             <ul aria-label={t("members.label")} className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-sm text-muted-foreground">
-              {state.members.map((m) => (
+              {members.map((m) => (
                 <li key={m.user_id}>{`${m.name || m.email} · ${t(`role.${m.role}`)}`}</li>
               ))}
             </ul>
@@ -256,7 +277,7 @@ export default function Workspace() {
                       <span>{q.text}</span>
                       {pickable && (
                         <span className="text-xs text-muted-foreground">
-                          {t(ageKey(daysOpen(q.created_at)).key, ageKey(daysOpen(q.created_at)).values)}
+                          {age(q.created_at)}
                         </span>
                       )}
                     </button>

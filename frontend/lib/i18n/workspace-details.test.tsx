@@ -72,6 +72,24 @@ for (const lang of ["en", "az"] as Language[]) {
       expect(within(row).getByText(t("age.many", { n: 3 }))).toBeInTheDocument();
     });
 
+    it("words the age for under a day, exactly one day and many days", async () => {
+      act(() => setLanguage(lang));
+      for (const [now, expected] of [
+        ["2026-01-01T10:00:00Z", t("age.zero")],
+        ["2026-01-02T00:00:00Z", t("age.one")],
+        ["2026-01-05T00:00:00Z", t("age.many", { n: 4 })],
+      ] as const) {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date(now));
+        api();
+        const { unmount } = render(<Workspace />);
+        const row = (await screen.findByText("Invented question 1")).closest("li")!;
+        expect(within(row).getByText(expected)).toBeInTheDocument();
+        unmount();
+        vi.useRealTimers();
+      }
+    });
+
     it("words a refused draft in the language: the server says drafting is not set up", async () => {
       act(() => setLanguage(lang));
       api(503, {});
