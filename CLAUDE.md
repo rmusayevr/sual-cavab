@@ -17,6 +17,10 @@ asking them. Backend: Django + DRF in `backend/`. Frontend: Next.js in
 - Drafting never sends anything. It returns text for a person to review.
 - Who can see or change a project is a business rule: ask before changing it.
 
+## Design
+
+UI follows DESIGN.md. Changing the direction takes an issue.
+
 <!-- BEGIN harness v0.3.0 -->
 <!-- Managed by the harness plugin. Edits inside this block are overwritten on
      update unless `install.mjs` detects them, in which case it refuses without

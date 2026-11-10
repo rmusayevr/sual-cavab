@@ -147,8 +147,7 @@ stays on one origin. Checks: `npm run lint`, `npm run typecheck`,
 
 The look is the owner's design example (an Azerbaijani ledger: deep navy,
 pomegranate red as the one action colour, saffron as the accent, carpet-diamond
-strips as seams; the folder `sual-cavab-design/` has the full spec in
-`DESIGN.md`). Styling is Tailwind CSS 4 (build-time CSS, no runtime code). The
+strips as seams; the repo's `DESIGN.md` has the full spec). Styling is Tailwind CSS 4 (build-time CSS, no runtime code). The
 colours are tokens in `frontend/app/globals.css`, in oklch and with the
 example's names (`bg-card`, `text-muted-foreground`, `bg-navy`, `text-saffron`,
 `bg-status-open`, ...); a component never writes a colour. The three fonts are
