@@ -95,7 +95,7 @@ source .venv/bin/activate     # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 cp .env.example .env          # then set the POSTGRES_* values for your database
 python manage.py migrate
-python manage.py createcachetable  # sign-in attempt counters live in PostgreSQL
+python manage.py createcachetable  # sign-in attempt counters live in PostgreSQL (`python manage.py check --database default` warns if the table is missing)
 python manage.py createsuperuser   # accounts are created by an admin; there is no sign-up
 python manage.py runserver
 ```
