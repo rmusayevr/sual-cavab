@@ -34,12 +34,14 @@ describe("the dictionaries", () => {
     for (const dictionary of [en, az]) for (const [key, text] of Object.entries(dictionary)) expect(text.trim(), key).not.toBe("");
   });
 
-  it("use the example's words for the four statuses", () => {
+  // The example has Ləğv for the fourth; the owner reviewed the wording on 2026-11-10 and chose
+  // "Ləğv olunub", which reads as the other three do (a state, not a verb).
+  it("use the owner's words for the four statuses (the example's, with the fourth reworded)", () => {
     expect([az["status.open"], az["status.asked"], az["status.answered"], az["status.dropped"]]).toEqual([
       "Açıq",
       "Soruşulub",
       "Cavablanıb",
-      "Ləğv",
+      "Ləğv olunub",
     ]);
   });
 });

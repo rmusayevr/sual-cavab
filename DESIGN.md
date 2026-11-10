@@ -43,7 +43,7 @@ All colours are defined once in `frontend/app/globals.css` and reach components 
   --status-open: oklch(0.5 0.19 27);         /* Open     / Açıq */
   --status-asked: oklch(0.7 0.15 75);        /* Asked    / Soruşulub */
   --status-answered: oklch(0.55 0.1 160);    /* Answered / Cavablanıb */
-  --status-dropped: oklch(0.6 0.02 255);     /* Dropped  / Ləğv */
+  --status-dropped: oklch(0.6 0.02 255);     /* Dropped  / Ləğv olunub (the owner's wording, 2026-11-10) */
   --shadow-card: 0 1px 0 oklch(0.86 0.025 75), 0 12px 30px -18px oklch(0.2 0.045 255 / 35%);
 }
 /* No dark theme: the example has none. */

@@ -13,7 +13,7 @@ export const az: Record<Key, string> = {
   "status.open": "Açıq",
   "status.asked": "Soruşulub",
   "status.answered": "Cavablanıb",
-  "status.dropped": "Ləğv",
+  "status.dropped": "Ləğv olunub",
 
   "waking": "Sayt uzun müddət istifadə olunmadıqdan sonra yenidən işə düşə bilər. Bu iki dəqiqəyə qədər çəkə bilər.",
 
@@ -80,8 +80,8 @@ export const az: Record<Key, string> = {
   "answer.where": "Kanal",
   "answer.note": "Qeyd (istəyə bağlı)",
   "answer.save": "Cavabı saxla",
-  "answer.keptRetry": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda qalır. Suala baxın, sonra yenidən saxlayın.",
-  "answer.keptCopy": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda qalır və onu kopyalaya bilərsiniz. Bu suala indiki vəziyyətində cavab yazmaq mümkün deyil.",
+  "answer.keptRetry": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda saxlanır. Suala baxın, sonra yenidən saxlayın.",
+  "answer.keptCopy": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda saxlanır və onu kopyalaya bilərsiniz. Bu suala indiki vəziyyətində cavab yazmaq mümkün deyil.",
   "channel.chat": "Çat",
   "channel.meeting": "Görüş",
   "channel.email": "E-poçt",
@@ -100,7 +100,7 @@ export const az: Record<Key, string> = {
   "landing.f1.title": "Layihə üzrə suallar",
   "landing.f1.text": "Q1, Q2… hər biri niyə vacib olduğu və hansı tapşırığı blokladığı ilə.",
   "landing.f2.title": "Aydın status",
-  "landing.f2.text": "Açıq, soruşulub, cavablanıb və ya ləğv — kim, nə vaxt və harada cavab verib.",
+  "landing.f2.text": "Açıq, soruşulub, cavablanıb və ya ləğv olunub — kim, nə vaxt və harada cavab verib.",
   "landing.f3.title": "Bir baxışda açıq suallar",
   "landing.f3.text": "Hər layihə üçün bir rəqəm. Çatlarda axtarışa ehtiyac qalmır.",
   "landing.f4.title": "Mesaj qaralamaları",
@@ -114,8 +114,8 @@ export const az: Record<Key, string> = {
   "projects.loading": "Layihələr yüklənir…",
   "projects.signInLine": "Layihələrinizi görmək üçün {link}.",
   "projects.loadError": "Layihələri yükləmək mümkün olmadı.",
-  "projects.empty": "Hələ heç bir layihənin üzvü deyilsiniz. Formadan layihə yaradın və ya owner-dən sizi əlavə etməsini xahiş edin.",
-  "projects.owner": "(owner)",
+  "projects.empty": "Hələ heç bir layihənin üzvü deyilsiniz. Formadan layihə yaradın və ya sahibdən sizi əlavə etməsini xahiş edin.",
+  "projects.owner": "(sahib)",
   "projects.stillOpen": "{n} sual hələ açıqdır",
   "projects.newEyebrow": "Yeni sətir",
   "projects.newTitle": "Yeni layihə",
@@ -129,10 +129,10 @@ export const az: Record<Key, string> = {
   "notfound.text": "Ünvanı yoxlayın və ya layihələrinizə qayıdın.",
 
   "members.label": "Üzvlər",
-  "role.owner": "owner",
+  "role.owner": "sahib",
   "role.member": "üzv",
 
-  "age.zero": "bir gündən az açıqdır",
+  "age.zero": "bir gündən azdır açıqdır",
   "age.one": "1 gündür açıqdır",
   "age.many": "{n} gündür açıqdır",
 
