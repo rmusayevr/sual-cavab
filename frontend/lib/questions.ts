@@ -1,12 +1,13 @@
+import { en, type Key } from "./i18n/en";
 import type { Question, QuestionStatus } from "./projects";
 
 export type Channel = "chat" | "meeting" | "email" | "other";
 
 export const CHANNELS: { value: Channel; label: string }[] = [
-  { value: "chat", label: "Chat" },
-  { value: "meeting", label: "Meeting" },
-  { value: "email", label: "Email" },
-  { value: "other", label: "Other" },
+  { value: "chat", label: en["channel.chat"] },
+  { value: "meeting", label: en["channel.meeting"] },
+  { value: "email", label: en["channel.email"] },
+  { value: "other", label: en["channel.other"] },
 ];
 
 export type Answer = {
@@ -40,13 +41,18 @@ export const TRANSITIONS: Record<QuestionStatus, QuestionStatus[]> = {
 };
 
 /** The words on the button for moving `from` -> `to`. */
+export function transitionKey(from: QuestionStatus, to: QuestionStatus): Key {
+  if (to === "asked") return "transition.markAsked";
+  if (to === "answered") return "transition.recordAnswer";
+  if (to === "dropped") return "transition.drop";
+  if (from === "asked") return "transition.unask";
+  if (from === "answered") return "transition.reopen";
+  return "transition.restore";
+}
+
+/** The same words in English (the screens use `t(transitionKey(...))` for the chosen language). */
 export function transitionLabel(from: QuestionStatus, to: QuestionStatus): string {
-  if (to === "asked") return "Mark asked";
-  if (to === "answered") return "Record answer";
-  if (to === "dropped") return "Drop";
-  if (from === "asked") return "Un-ask";
-  if (from === "answered") return "Re-open";
-  return "Restore";
+  return en[transitionKey(from, to)];
 }
 
 /** Today's date as the user's calendar shows it, YYYY-MM-DD. */

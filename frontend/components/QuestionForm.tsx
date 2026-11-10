@@ -2,6 +2,8 @@
 
 import { useRef, useState, type FormEvent } from "react";
 
+import { useT } from "@/lib/i18n";
+
 import { Alert } from "./ui/Alert";
 import { Button } from "./ui/Button";
 import { Textarea } from "./ui/Field";
@@ -35,6 +37,7 @@ export default function QuestionForm({
   onSubmit,
   onCancel,
 }: Props) {
+  const t = useT();
   const [values, setValues] = useState<QuestionFields>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -53,7 +56,7 @@ export default function QuestionForm({
       if (result) setErrors(result);
       else if (clearOnSuccess) setValues(EMPTY);
     } catch {
-      setErrors({ form: "Could not reach the server." });
+      setErrors({ form: t("error.server") });
     } finally {
       inFlight.current = false;
       setSaving(false);
@@ -85,9 +88,9 @@ export default function QuestionForm({
 
   return (
     <form onSubmit={submit} className="grid gap-4">
-      {field("text", "Question", 3)}
-      {field("why_it_matters", "Why it matters", 2)}
-      {field("blocks", "What it blocks", 1)}
+      {field("text", t("form.question"), 3)}
+      {field("why_it_matters", t("form.why"), 2)}
+      {field("blocks", t("form.blocks"), 1)}
       {errors.form && <Alert tone="error">{errors.form}</Alert>}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={saving}>
@@ -95,7 +98,7 @@ export default function QuestionForm({
         </Button>
         {onCancel && (
           <Button variant="secondary" onClick={onCancel} disabled={saving}>
-            Cancel
+            {t("question.cancel")}
           </Button>
         )}
       </div>

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import type { QuestionStatus } from "@/lib/projects";
-import { TRANSITIONS, fieldErrors, transitionLabel, type Answer, type FullQuestion } from "@/lib/questions";
+import { TRANSITIONS, fieldErrors, transitionKey, type Answer, type FullQuestion } from "@/lib/questions";
 
 import AnswerForm, { type AnswerFields } from "./AnswerForm";
 import QuestionForm, { type QuestionFields, type SubmitResult } from "./QuestionForm";
@@ -23,6 +24,7 @@ type State =
 
 /** Every question of a project: add, edit, change status, record an answer. */
 export default function QuestionsManager({ projectId }: { projectId: string }) {
+  const t = useT();
   const [state, setState] = useState<State>({ kind: "loading" });
   const base = `/api/projects/${projectId}/questions/`;
 
@@ -43,19 +45,19 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
     };
   }, [base]);
 
-  if (state.kind === "loading") return <LedgerLoading label="Loading questions…" />;
+  if (state.kind === "loading") return <LedgerLoading label={t("questions.loading")} />;
   if (state.kind === "not-found")
     return (
       <EmptyState>
-        <p>Project not found.</p>
+        <p>{t("workspace.notFound")}</p>
         <div>
           <Link href="/projects" className={buttonClasses("secondary")}>
-            Back to your projects
+            {t("workspace.back")}
           </Link>
         </div>
       </EmptyState>
     );
-  if (state.kind === "error") return <Alert tone="error">Could not load the questions.</Alert>;
+  if (state.kind === "error") return <Alert tone="error">{t("questions.loadError")}</Alert>;
 
   const replace = (updated: FullQuestion) =>
     setState((s) =>
@@ -70,14 +72,14 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
       append((await response.json()) as FullQuestion);
       return null;
     }
-    return await failure(response, "Could not add the question.", [...QUESTION_FIELDS]);
+    return await failure(response, t("error.addQuestion"), [...QUESTION_FIELDS]);
   }
 
   return (
     <div className="grid gap-6">
       {state.questions.length === 0 ? (
         <EmptyState>
-          <p>No questions yet. Add the first one below.</p>
+          <p>{t("questions.none")}</p>
         </EmptyState>
       ) : (
         <ul className="grid list-none gap-4">
@@ -87,8 +89,8 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
         </ul>
       )}
       <Card className="grid gap-4">
-        <h2 className="text-lg font-semibold">Add a question</h2>
-        <QuestionForm idPrefix="add" submitLabel="Add question" busyLabel="Adding…" clearOnSuccess onSubmit={add} />
+        <h2 className="text-lg font-semibold">{t("workspace.add")}</h2>
+        <QuestionForm idPrefix="add" submitLabel={t("form.add")} busyLabel={t("form.adding")} clearOnSuccess onSubmit={add} />
       </Card>
     </div>
   );
@@ -131,6 +133,7 @@ export function QuestionItem({
   base: string;
   onChanged: (q: FullQuestion) => void;
 }) {
+  const t = useT();
   const [mode, setMode] = useState<Mode>("view");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -144,7 +147,7 @@ export function QuestionItem({
       setMessage(null);
       return null;
     }
-    const errors = await failure(response, "Could not change the status.", answer ? ANSWER_FIELDS : []);
+    const errors = await failure(response, t("error.changeStatus"), answer ? ANSWER_FIELDS : []);
     if (errors.to) {
       // The server says this move is not allowed, so what is on screen is out
       // of date. Show the question as it is now, with the reason.
@@ -168,7 +171,7 @@ export function QuestionItem({
       const errors = await transition(to);
       if (errors) setMessage(Object.values(errors).join(" "));
     } catch {
-      setMessage("Could not reach the server.");
+      setMessage(t("error.server"));
     } finally {
       setBusy(false);
     }
@@ -193,7 +196,7 @@ export function QuestionItem({
       setMessage(null);
       return null;
     }
-    return await failure(response, "Could not save the question.", [...QUESTION_FIELDS]);
+    return await failure(response, t("error.saveQuestion"), [...QUESTION_FIELDS]);
   }
 
   const id = `q${question.id}`;
@@ -204,8 +207,8 @@ export function QuestionItem({
           <QuestionForm
             idPrefix={`edit-${question.id}`}
             initial={{ text: question.text, why_it_matters: question.why_it_matters, blocks: question.blocks }}
-            submitLabel="Save"
-            busyLabel="Saving…"
+            submitLabel={t("question.save")}
+            busyLabel={t("question.saving")}
             onSubmit={save}
             onCancel={() => setMode("view")}
           />
@@ -216,11 +219,11 @@ export function QuestionItem({
               <StatusChip status={question.status} />
             </div>
             <p>{question.text}</p>
-            {question.why_it_matters && <p className="text-sm text-muted-foreground">Why it matters: {question.why_it_matters}</p>}
-            {question.blocks && <p className="text-sm text-muted-foreground">Blocks: {question.blocks}</p>}
-            {question.current_answer && <AnswerView answer={question.current_answer} heading="Answer" />}
+            {question.why_it_matters && <p className="text-sm text-muted-foreground">{t("question.why", { text: question.why_it_matters })}</p>}
+            {question.blocks && <p className="text-sm text-muted-foreground">{t("question.blocks", { text: question.blocks })}</p>}
+            {question.current_answer && <AnswerView answer={question.current_answer} heading={t("question.answer")} />}
             {question.previous_answers.map((a) => (
-              <AnswerView key={a.id} answer={a} heading="Earlier answer" />
+              <AnswerView key={a.id} answer={a} heading={t("question.earlier")} />
             ))}
           </>
         )}
@@ -246,7 +249,7 @@ export function QuestionItem({
                   setMode("answer");
                 }}
               >
-                {transitionLabel(question.status, to)}
+                {t(transitionKey(question.status, to))}
               </Button>
             ))}
             <Button
@@ -257,7 +260,7 @@ export function QuestionItem({
                 setMode("edit");
               }}
             >
-              Edit
+              {t("question.edit")}
             </Button>
           </div>
         )}
@@ -268,12 +271,13 @@ export function QuestionItem({
 }
 
 function AnswerView({ answer, heading }: { answer: Answer; heading: string }) {
+  const t = useT();
   return (
     <div className="grid gap-1 border-l-4 border-status-answered bg-muted p-3">
       <p className="text-sm font-medium text-muted-foreground">{heading}</p>
       <p>{answer.text}</p>
       <p className="text-sm text-muted-foreground">
-        by {answer.answered_by} · {answer.channel}
+        {t("question.by", { who: answer.answered_by })} · {t(`channel.${answer.channel}`)}
         {answer.channel_note ? ` (${answer.channel_note})` : ""} · {answer.answered_on}
       </p>
     </div>
