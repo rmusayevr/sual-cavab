@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 /**
- * PreToolUse guard (this project's own, not the harness's): ask before `gh pr merge <n>` when the
- * PR has no review triage comment.
+ * PreToolUse guard (this project's own, not the harness's): ask before `gh pr merge` when the PR
+ * has no review triage comment, or when its latest triage says "not ready".
  *
- * Bought by sual-cavab PR #59 (2026-11), merged without step 4 of work-the-queue (review fresh,
- * triage). The owner had to ask whether the review had run; it then found three defects, fixed in
- * #60. Lesson: merged-without-review (.claude/lessons/).
+ * Bought by sual-cavab PR #59 (2026-11-09), merged without step 4 of work-the-queue (review fresh,
+ * triage). The review run afterwards found two regressions, fixed in #60. Lesson:
+ * merged-without-review (.claude/lessons/).
  *
  * `ask`, not `deny`: the owner may tell the agent to merge a docs-only PR without a review, and a
- * guard that over-blocks gets switched off. The reason says so. In a mode where nobody can answer,
- * an ask is a block, which is the point.
+ * guard that over-blocks gets switched off. UNKNOWN: what an `ask` does when nobody can answer
+ * (an unattended loop). The harness's guard-merge.mjs says it is "a hard block or a silent allow
+ * depending on the permission mode" and uses `deny` in loop mode for that reason. Until it is seen
+ * in the loop's real permission mode, treat this hook as a guard for attended sessions.
  *
  * Decidable from GitHub, not from the command, so it asks `gh` (a network call, made only for a
- * `gh pr merge` segment, with a timeout under the hook's own). FAIL OPEN, like every hook here:
- * `gh` missing, unauthenticated, slow, no PR number in the command (a merge of the current branch
- * is not checked) or an unexpected answer means no decision.
+ * command whose first word is `gh pr merge`, with a timeout under the hook's own). FAIL OPEN, like
+ * every hook here: `gh` missing, unauthenticated, slow or an unexpected answer means no decision.
  *
  * A separate file on purpose: guard-merge.mjs is installed by the harness and a local patch to it
  * would be overwritten by the next update.
@@ -24,52 +25,127 @@ import { appendFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
-const MERGE = /\bgh\s+pr\s+merge\b([^;&|\n]*)/;
+/** Flags of `gh pr merge` that take a value: the value is not the PR. */
+const VALUE_FLAGS = new Set(['-t', '--subject', '-b', '--body', '-F', '--body-file', '-A', '--author-email', '--match-head-commit', '-R', '--repo']);
 
-/** The PR number in `gh pr merge ...` (a bare number or a .../pull/<n> URL), or null. */
-export function prNumber(command) {
-  const m = MERGE.exec(String(command ?? ''));
-  if (!m) return null;
-  for (const raw of m[1].trim().split(/\s+/)) {
-    const token = raw.replace(/^['"]|['"]$/g, '');
-    if (/^\d+$/.test(token)) return Number(token);
-    const url = /\/pull\/(\d+)/.exec(token);
-    if (url) return Number(url[1]);
+/**
+ * Split a command into segments on `;`, `&`, `|` and newlines OUTSIDE quotes, and each segment into
+ * words (quotes removed). Text inside quotes is data, so `echo "gh pr merge 59"` is not a merge and
+ * a `;` inside a subject line does not cut the command.
+ */
+export function segments(command) {
+  const out = [];
+  let words = [];
+  let word = '';
+  let has = false;
+  let q = null;
+  const endWord = () => {
+    if (has) words.push(word);
+    word = '';
+    has = false;
+  };
+  const endSeg = () => {
+    endWord();
+    if (words.length) out.push(words);
+    words = [];
+  };
+  const s = String(command ?? '');
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) {
+      if (c === q) q = null;
+      else if (c === '\\' && q === '"' && i + 1 < s.length && '"\\$`'.includes(s[i + 1])) word += s[++i]; // a shell keeps the backslash before any other character
+      else word += c;
+    } else if (c === '"' || c === "'") {
+      q = c;
+      has = true;
+    } else if (c === ';' || c === '&' || c === '|' || c === '\n') {
+      endSeg();
+    } else if (/\s/.test(c)) {
+      endWord();
+    } else {
+      word += c;
+      has = true;
+    }
   }
-  return null;
+  endSeg();
+  return out;
 }
 
-/** Comment and review bodies of a PR, or null if they cannot be read. */
-function fetchBodies(number) {
+/**
+ * The `gh pr merge` calls in a command: {selector, repo, number}. `selector` is what `gh pr view`
+ * takes (a number, a URL or a branch; null for the current branch); `number` is for the message.
+ */
+export function merges(command) {
+  const found = [];
+  for (const words of segments(command)) {
+    let i = 0;
+    while (i < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i])) i++; // VAR=x gh ...
+    const w = words.slice(i);
+    if (!/^gh(\.exe)?$/i.test((w[0] ?? '').replace(/^.*[\\/]/, '')) || w[1] !== 'pr' || w[2] !== 'merge') continue;
+    let selector = null;
+    let repo = null;
+    let disable = false;
+    for (let j = 3; j < w.length; j++) {
+      const t = w[j];
+      if (t === '--disable-auto') disable = true;
+      else if (t.startsWith('--repo=')) repo = t.slice(7);
+      else if (VALUE_FLAGS.has(t)) {
+        if (t === '-R' || t === '--repo') repo = w[j + 1] ?? null;
+        j++;
+      } else if (t.startsWith('-')) continue;
+      else if (selector === null) selector = t.replace(/^#/, '');
+    }
+    if (disable) continue; // cancels an auto-merge, merges nothing
+    if (repo === null && process.env.GH_REPO) repo = process.env.GH_REPO;
+    const url = selector ? /\/pull\/(\d+)/.exec(selector) : null;
+    found.push({ selector, repo, number: url ? Number(url[1]) : /^\d+$/.test(selector ?? '') ? Number(selector) : null });
+  }
+  return found;
+}
+
+/** Comment and review bodies of a PR, oldest first, or null if they cannot be read. */
+function fetchBodies({ selector, repo }) {
   try {
-    const out = execFileSync('gh', ['pr', 'view', String(number), '--json', 'comments,reviews'], {
-      encoding: 'utf8',
-      timeout: 8000,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
+    const args = ['pr', 'view'];
+    if (selector) args.push(selector);
+    if (repo) args.push('-R', repo);
+    args.push('--json', 'comments,reviews');
+    const out = execFileSync('gh', args, { encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
     const data = JSON.parse(out);
-    return [...(data.comments ?? []), ...(data.reviews ?? [])].map((c) => String(c.body ?? ''));
+    return [...(data.comments ?? []), ...(data.reviews ?? [])]
+      .sort((a, b) => String(a.createdAt ?? a.submittedAt ?? '').localeCompare(String(b.createdAt ?? b.submittedAt ?? '')))
+      .map((c) => String(c.body ?? ''));
   } catch {
     return null; // fail open
   }
 }
 
+const label = (m) => (m.number !== null ? `PR #${m.number}` : m.selector ? `PR "${m.selector}"` : 'this PR');
+
 export function decide(payload, deps = {}) {
   if (payload?.tool_name !== 'Bash') return null;
-  const number = prNumber(payload?.tool_input?.command);
-  if (number === null) return null;
-  const bodies = (deps.fetchBodies ?? fetchBodies)(number);
-  if (!Array.isArray(bodies)) return null;
-  if (bodies.some((b) => /review triage/i.test(b))) return null;
-  return {
-    decision: 'ask',
-    rule: 'review-before-merge',
-    reason:
-      `PR #${number} has no "Review triage" comment. work-the-queue step 4: the fresh-eyes review ` +
-      `runs and its triage is posted before the merge (PR #59 was merged without it and the review ` +
-      `then found three defects). Merge only if the owner told you to merge this PR without a review ` +
-      `(for example a docs-only PR); otherwise run the review first.`,
-  };
+  for (const m of merges(payload?.tool_input?.command)) {
+    const bodies = (deps.fetchBodies ?? fetchBodies)(m);
+    if (!Array.isArray(bodies)) continue; // fail open for this one
+    const triages = bodies.filter((b) => /review triage/i.test(b));
+    const exception =
+      'Merge only if the owner told you to merge this PR without a review (for example a docs-only PR); otherwise run the review first.';
+    if (triages.length === 0)
+      return {
+        decision: 'ask',
+        rule: 'review-before-merge',
+        reason: `${label(m)} has no "Review triage" comment. work-the-queue step 4: the fresh-eyes review runs and its triage is posted before the merge (PR #59 was merged without it; the review then found two regressions). ${exception}`,
+      };
+    const latest = triages[triages.length - 1];
+    if (/(?:→|->)\s*not ready/i.test(latest))
+      return {
+        decision: 'ask',
+        rule: 'review-before-merge',
+        reason: `${label(m)}: its latest review triage says "not ready". Fix the blockers and post the next triage round first. ${exception}`,
+      };
+  }
+  return null;
 }
 
 function record(decision, payload) {
