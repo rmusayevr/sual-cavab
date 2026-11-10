@@ -100,7 +100,7 @@ export default function QuestionsManager({ projectId }: { projectId: string }) {
  * for) goes under "form" instead of being dropped; "to" is kept so the caller
  * can spot a refused move. A fallback if there is nothing readable.
  */
-async function failure(response: Response, fallback: string, shown: string[]): Promise<Record<string, string>> {
+export async function failure(response: Response, fallback: string, shown: string[]): Promise<Record<string, string>> {
   let body: unknown = null;
   try {
     body = await response.json();
@@ -117,12 +117,12 @@ async function failure(response: Response, fallback: string, shown: string[]): P
   return Object.keys(errors).length > 0 ? errors : { form: fallback };
 }
 
-const QUESTION_FIELDS = ["text", "why_it_matters", "blocks"] as const;
+export const QUESTION_FIELDS = ["text", "why_it_matters", "blocks"] as const;
 const ANSWER_FIELDS = ["text", "answered_by", "answered_on", "channel", "channel_note"];
 
 type Mode = "view" | "edit" | "answer";
 
-function QuestionItem({
+export function QuestionItem({
   question,
   base,
   onChanged,
