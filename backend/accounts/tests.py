@@ -6,7 +6,9 @@ from rest_framework.response import Response
 from rest_framework.test import APIClient, APIRequestFactory
 from rest_framework.views import APIView
 
-PASSWORD = "correct-horse-battery-staple"  # invented test value
+from core.testing import invented_password
+PASSWORD = invented_password()
+WRONG_PASSWORD = invented_password()
 
 
 def make_user(email="ada@example.com", **extra):
@@ -84,12 +86,12 @@ class SignInTests(AccountTestCase):
     def test_wrong_password_is_refused(self):
         make_user()
 
-        self.assertEqual(self.sign_in(password="wrong").status_code, 400)
+        self.assertEqual(self.sign_in(password=WRONG_PASSWORD).status_code, 400)
 
     def test_unknown_email_gets_the_same_response_as_a_wrong_password(self):
         make_user()
 
-        wrong_password = self.sign_in(password="wrong")
+        wrong_password = self.sign_in(password=WRONG_PASSWORD)
         unknown_email = self.sign_in(email="nobody@example.com")
 
         self.assertEqual(unknown_email.status_code, wrong_password.status_code)
@@ -130,9 +132,9 @@ class SignInTests(AccountTestCase):
 
     def test_sign_in_is_throttled_after_ten_attempts(self):
         for _ in range(10):
-            self.sign_in(password="wrong")
+            self.sign_in(password=WRONG_PASSWORD)
 
-        self.assertEqual(self.sign_in(password="wrong").status_code, 429)
+        self.assertEqual(self.sign_in(password=WRONG_PASSWORD).status_code, 429)
 
     def test_forged_forwarded_for_header_does_not_reset_the_throttle(self):
         def attempt(n):
@@ -153,7 +155,7 @@ class SignInTests(AccountTestCase):
         # sign-ins do behind the Next.js proxy: the limit must be per account.
         make_user(email="grace@example.com")
         for _ in range(10):
-            self.sign_in(email="ada@example.com", password="wrong")
+            self.sign_in(email="ada@example.com", password=WRONG_PASSWORD)
 
         self.assertEqual(self.sign_in(email="grace@example.com").status_code, 200)
 

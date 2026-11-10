@@ -16,7 +16,10 @@ function stubLogin(status: number) {
   return fetchMock;
 }
 
-function submit(email = "ada@example.com", password = "secret-for-tests") {
+// made per run: a literal here looks like a leaked secret to a scanner (#44)
+const TYPED = crypto.randomUUID();
+
+function submit(email = "ada@example.com", password = TYPED) {
   fireEvent.change(screen.getByLabelText("Email"), { target: { value: email } });
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: password } });
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
@@ -43,12 +46,12 @@ describe("LoginForm", () => {
     const fetchMock = stubLogin(200);
     render(<LoginForm />);
 
-    submit("ada@example.com", "secret-for-tests");
+    submit("ada@example.com", TYPED);
 
     await vi.waitFor(() => expect(replace).toHaveBeenCalled());
     const [url, init] = fetchMock.mock.calls.find(([u]) => u === "/api/auth/login/")!;
     expect(url).toBe("/api/auth/login/");
-    expect(JSON.parse(String(init?.body))).toEqual({ email: "ada@example.com", password: "secret-for-tests" });
+    expect(JSON.parse(String(init?.body))).toEqual({ email: "ada@example.com", password: TYPED });
   });
 
   it("shows one message for a wrong email or password", async () => {

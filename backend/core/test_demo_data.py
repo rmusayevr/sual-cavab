@@ -14,7 +14,8 @@ from questions.models import Answer, Question
 
 from .management.commands.load_demo_data import DEMO_DOMAIN, DEMO_PREFIX
 
-PASSWORD = "invented-demo-password-xyz"
+from core.testing import invented_password
+PASSWORD = invented_password()
 ENV = {"DJANGO_DEMO_DATA": "1", "DEMO_PASSWORD": PASSWORD}
 User = get_user_model()
 
@@ -172,9 +173,10 @@ class IdempotenceTests(TestCase):
         self.assertEqual(question.text, "Edited by a person on staging")
 
     def test_an_existing_demo_account_keeps_its_password(self):
-        User.objects.create_user(email="demo.owner@" + DEMO_DOMAIN, password="the-password-someone-chose")
+        chosen = invented_password()
+        User.objects.create_user(email="demo.owner@" + DEMO_DOMAIN, password=chosen)
         load()
-        self.assertTrue(User.objects.get(email="demo.owner@" + DEMO_DOMAIN).check_password("the-password-someone-chose"))
+        self.assertTrue(User.objects.get(email="demo.owner@" + DEMO_DOMAIN).check_password(chosen))
 
     def test_nothing_is_ever_deleted(self):
         load()

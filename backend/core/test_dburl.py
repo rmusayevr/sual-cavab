@@ -5,23 +5,28 @@ import subprocess
 import sys
 from pathlib import Path
 
+from urllib.parse import quote
+
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase
 
 from config.dburl import database_from_url
+from core.testing import invented_password
+
+PW = invented_password()
 
 
 class ParseTests(SimpleTestCase):
     def test_a_full_url_becomes_a_databases_entry(self):
-        entry = database_from_url("postgresql://sual_user:s3cret@dpg-abc123-a:5433/sual_db")
+        entry = database_from_url(f"postgresql://sual_user:{PW}@dpg-abc123-a:5433/sual_db")
         self.assertEqual(
             entry,
             {
                 "ENGINE": "django.db.backends.postgresql",
                 "NAME": "sual_db",
                 "USER": "sual_user",
-                "PASSWORD": "s3cret",
+                "PASSWORD": PW,
                 "HOST": "dpg-abc123-a",
                 "PORT": "5433",
             },
@@ -32,8 +37,9 @@ class ParseTests(SimpleTestCase):
         self.assertEqual((entry["HOST"], entry["PORT"], entry["NAME"]), ("db.example.invalid", "5432", "name"))
 
     def test_special_characters_in_the_password_are_decoded(self):
-        entry = database_from_url("postgresql://u:pa%24%40%3A%2Fss@host/name")
-        self.assertEqual(entry["PASSWORD"], "pa$@:/ss")  # a "$" or "@" in a password survives
+        awkward = "pa$@:/ss" + PW  # a "$", "@", ":" or "/" in a password must survive
+        entry = database_from_url(f"postgresql://u:{quote(awkward, safe='')}@host/name")
+        self.assertEqual(entry["PASSWORD"], awkward)
 
     def test_sslmode_is_passed_on(self):
         entry = database_from_url("postgresql://u:p@host/name?sslmode=require")
@@ -49,27 +55,27 @@ class RefusalTests(SimpleTestCase):
             database_from_url(url)
         message = str(caught.exception)
         self.assertIn("DJANGO_DATABASE_URL", message)
-        self.assertNotIn("hunter2", message)  # never echoes the password back
+        self.assertNotIn(PW, message)  # never echoes the password back
         return message
 
     def test_another_scheme_is_refused(self):
-        self.refused("mysql://u:hunter2@host/name")
-        self.refused("http://u:hunter2@host/name")
+        self.refused(f"mysql://u:{PW}@host/name")
+        self.refused(f"http://u:{PW}@host/name")
 
     def test_a_missing_host_or_database_name_is_refused(self):
-        self.refused("postgresql://u:hunter2@/name")
-        self.refused("postgresql://u:hunter2@host")
-        self.refused("postgresql://u:hunter2@host/")
+        self.refused(f"postgresql://u:{PW}@/name")
+        self.refused(f"postgresql://u:{PW}@host")
+        self.refused(f"postgresql://u:{PW}@host/")
 
     def test_a_bad_port_is_refused(self):
-        self.refused("postgresql://u:hunter2@host:notaport/name")
+        self.refused(f"postgresql://u:{PW}@host:notaport/name")
 
     def test_an_unsupported_option_is_refused_not_ignored(self):
-        self.assertIn("'options'", self.refused("postgresql://u:hunter2@host/name?options=-c%20x"))
+        self.assertIn("'options'", self.refused(f"postgresql://u:{PW}@host/name?options=-c%20x"))
 
     def test_an_option_without_a_value_is_refused_not_dropped(self):
-        self.assertIn("'sslmode'", self.refused("postgresql://u:hunter2@host/name?sslmode="))
-        self.assertIn("'foo'", self.refused("postgresql://u:hunter2@host/name?foo"))
+        self.assertIn("'sslmode'", self.refused(f"postgresql://u:{PW}@host/name?sslmode="))
+        self.assertIn("'foo'", self.refused(f"postgresql://u:{PW}@host/name?foo"))
 
     def test_nonsense_is_refused(self):
         self.refused("not a url")

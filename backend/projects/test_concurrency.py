@@ -26,7 +26,8 @@ from questions.services import change_status as real_change_status
 
 from .models import Membership, Project
 
-PASSWORD = "invented-test-password"
+from core.testing import invented_password
+PASSWORD = invented_password()
 BLOCK_TIMEOUT = 10  # a correct lock blocks the other request at once; this only ends a wait that never comes
 JOIN_TIMEOUT = 60
 

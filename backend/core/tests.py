@@ -9,6 +9,8 @@ from django.db import connection
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
+from core.testing import invented_password
+
 
 class DatabaseTests(TestCase):
     """Fails loudly when the suite is not really talking to PostgreSQL."""
@@ -62,10 +64,11 @@ class PasswordHasherTests(SimpleTestCase):
         self.assertEqual(settings.PASSWORD_HASHERS, ["django.contrib.auth.hashers.MD5PasswordHasher"])
 
     def test_a_password_made_in_a_test_still_checks(self):
-        encoded = make_password("invented-test-password")
+        password = invented_password()
+        encoded = make_password(password)
         self.assertTrue(encoded.startswith("md5$"))
-        self.assertTrue(check_password("invented-test-password", encoded))
-        self.assertFalse(check_password("another-password", encoded))
+        self.assertTrue(check_password(password, encoded))
+        self.assertFalse(check_password(invented_password(), encoded))
 
     def test_a_server_loading_these_settings_keeps_the_default_hasher(self):
         # What a wsgi/asgi server does: import the settings with no `test` on the command line.

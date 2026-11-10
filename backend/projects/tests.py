@@ -14,7 +14,8 @@ from rest_framework.test import APIClient
 
 from .models import Membership, Project
 
-PASSWORD = "invented-test-password"
+from core.testing import invented_password
+PASSWORD = invented_password()
 
 
 def make_user(email):
