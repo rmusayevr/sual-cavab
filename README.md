@@ -208,6 +208,31 @@ same language, inside its rules; each item is a choice the owner can reject:
 - **404**: "This page is not in the ledger." and the missing page as question
   `Q404`.
 
+### A known `npm audit` finding (accepted, 2026-11-10: #50)
+
+`npm audit` in `frontend/` reports **7 moderate** findings. They are one advisory,
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) (a denial of service in
+`minimatch` 7.0.0 to 11.0.0, from a glob pattern an attacker controls), reported once for every package
+on the chain `eslint-config-next` 16.4.3 -> `typescript-eslint` 8.72.1 -> `@typescript-eslint/typescript-estree`
+-> `minimatch` 10.2.6. **It is accepted, not fixed**, for these reasons (each was checked on 2026-11-10):
+
+- **It is development tooling only.** `npm audit --omit=dev` reports 0 vulnerabilities and `minimatch` is not
+  in the production dependency tree: it is not in the built app.
+- **The vulnerable call is not reached.** `typescript-estree` calls `minimatch` in one place, to match
+  `allowDefaultProject` patterns (`useProgramFromProjectService.js`), and neither `frontend/eslint.config.mjs`
+  nor the `eslint-config-next` presets set `allowDefaultProject` or `projectService`. The advisory needs
+  patterns an attacker controls; the only patterns that could reach it would come from our own config.
+- **Updating the tooling cannot clear it today.** Every `typescript-estree` release up to the newest (8.72.2,
+  published 2026-11-09) depends on `minimatch ^10.2.2`; the first patched `minimatch` is 11.0.1. The only way to
+  clear the finding now is an npm `overrides` entry forcing a major version (11) into a package built for 10:
+  an untested combination, and a hidden coupling to remove later, to silence a finding that cannot be
+  triggered here. Not done on purpose.
+
+**Revisit when** `npm view @typescript-eslint/typescript-estree dependencies.minimatch` shows `11.0.1` or newer:
+update `eslint-config-next` (or `typescript-eslint`) to a release at least two weeks old that carries it (check
+it with the `review-a-dependency` skill first), and delete this section. If `npm audit --omit=dev` ever reports
+anything, that is a different matter: it would be in the built app.
+
 ## Who can see or change a project
 
 Decided by the owner (#5). Access is checked in the query itself, so a project
