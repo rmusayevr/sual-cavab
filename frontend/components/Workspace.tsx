@@ -36,16 +36,17 @@ type Filter = "all" | QuestionStatus;
  */
 export default function Workspace() {
   const { id } = useParams<{ id: string }>();
-  // Opening another project in the rail keeps this component mounted; the key starts the next
-  // project with no ticks, filter, selection or draft left over from the last one.
-  return <ProjectWorkspace key={id} id={id} />;
-}
-
-function ProjectWorkspace({ id }: { id: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<number | null>(null);
-  const [picked, setPicked] = useState<number[]>([]);
+  const [ticked, setTicked] = useState<number[]>([]);
+  // What counts as picked is worked out from the questions as last loaded, not remembered: a
+  // question that was answered, dropped or removed since it was ticked (here, on another page, by a
+  // teammate, or while this page was kept in the background) drops out by itself instead of staying
+  // ticked and disabled, and in the request (review of #79).
+  const picked = state.kind === "ready"
+    ? ticked.filter((n) => state.questions.some((q) => q.number === n && (q.status === "open" || q.status === "asked")))
+    : [];
   const draft = useDraft(id, picked);
   const base = `/api/projects/${id}/questions/`;
 
@@ -121,9 +122,6 @@ function ProjectWorkspace({ id }: { id: string }) {
     setState((s) =>
       s.kind === "ready" ? { ...s, questions: s.questions.map((q) => (q.id === updated.id ? updated : q)) } : s,
     );
-    // A question that was answered or dropped can no longer be asked about.
-    if (updated.status === "answered" || updated.status === "dropped")
-      setPicked((p) => p.filter((n) => n !== updated.number));
   };
 
   async function add(values: QuestionFields): Promise<SubmitResult> {
@@ -136,7 +134,7 @@ function ProjectWorkspace({ id }: { id: string }) {
     return await failure(response, "Could not add the question.", [...QUESTION_FIELDS]);
   }
 
-  const toggle = (n: number) => setPicked((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p, n]));
+  const toggle = (n: number) => setTicked((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p, n]));
 
   return shell(
     <div className="mx-auto grid max-w-[90rem] grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-[15rem_minmax(0,1fr)_24rem]">
@@ -279,7 +277,10 @@ function ProjectWorkspace({ id }: { id: string }) {
           <p className="text-sm opacity-80">
             {picked.length === 0
               ? `Tick up to ${MAX_QUESTIONS} open or asked questions.`
-              : `${picked.length} ${picked.length === 1 ? "question" : "questions"} ticked.`}
+              : `${picked.length} ${picked.length === 1 ? "question" : "questions"} ticked: ${[...picked]
+                  .sort((x, y) => x - y)
+                  .map((n) => `Q${n}`)
+                  .join(", ")}.`}
           </p>
           <p className="text-sm opacity-80">
             The text of the selected questions (the question, why it matters and what it blocks) is sent to Claude to

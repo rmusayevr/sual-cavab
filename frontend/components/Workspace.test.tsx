@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Activity } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Workspace from "./Workspace";
 
-let currentId = "5";
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: currentId }) }));
+vi.mock("next/navigation", () => ({ useParams: () => ({ id: "5" }) }));
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -40,6 +40,7 @@ const questions = [
 ];
 
 let draftBody: unknown = null;
+let served: typeof questions = questions;
 function api(overrides: Record<string, () => Response> = {}) {
   vi.stubGlobal(
     "fetch",
@@ -49,7 +50,7 @@ function api(overrides: Record<string, () => Response> = {}) {
         draftBody = JSON.parse(String(init?.body));
         return json(200, { draft: "Salam, bir neçə sualımız var." });
       }
-      if (url.includes("/questions/")) return json(200, questions);
+      if (url.includes("/questions/")) return json(200, served);
       return json(200, projects);
     }),
   );
@@ -59,7 +60,7 @@ describe("Workspace (#70)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     draftBody = null;
-    currentId = "5";
+    served = questions;
   });
 
   it("lists the person's projects in a rail, the open one marked, with the open counts", async () => {
@@ -177,22 +178,54 @@ describe("Workspace (#70)", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Could not load the project."));
   });
 
-  // The page keeps the same component when the person picks another project in the rail, so what
-  // was ticked, filtered and drafted for one project must not follow them to the next.
-  it("starts clean when another project is opened: no ticks, no filter, no draft", async () => {
+  // Review of #79: Next keeps a page it was left in the background, with its state, and loads the
+  // questions again when it comes back. A question answered meanwhile must not stay ticked.
+  it("drops a ticked question that was answered while the page was in the background", async () => {
     api();
-    const { rerender } = render(<Workspace />);
+    const view = (mode: "visible" | "hidden") => (
+      <Activity mode={mode}>
+        <Workspace />
+      </Activity>
+    );
+    const { rerender } = render(view("visible"));
     fireEvent.click(await screen.findByRole("checkbox", { name: /Q1/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Answered" }));
-    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
-    await screen.findByLabelText(/Draft \(edit it/);
+    expect(screen.getByRole("button", { name: "Write a draft" })).toBeEnabled();
 
-    currentId = "6";
-    rerender(<Workspace />);
+    rerender(view("hidden"));
+    served = questions.map((x) => (x.number === 1 ? { ...x, status: "answered" } : x));
+    rerender(view("visible"));
 
-    await screen.findByRole("heading", { level: 1, name: "Portal" });
-    expect(screen.queryByLabelText(/Draft \(edit it/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Q1/ })).toBeDisabled());
+    expect(screen.getByRole("checkbox", { name: /Q1/ })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Write a draft" })).toBeDisabled();
+  });
+
+  it("unticks a question once it is answered in the detail pane", async () => {
+    api();
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Q1/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Q1.*Which payment providers/ }));
+    // the status change answers with the question as the server now has it
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => json(200, { ...questions[0], status: "dropped" })),
+    );
+
+    const detail = screen.getByRole("region", { name: "Selected question" });
+    fireEvent.click(await within(detail).findByRole("button", { name: /drop/i }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Write a draft" })).toBeDisabled());
+    expect(screen.getByText(/Tick up to 10/)).toBeInTheDocument();
+  });
+
+  it("names the ticked questions, also the ones a filter hides", async () => {
+    api();
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Q2/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Q1/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Answered" }));
+
+    expect(screen.getByText("2 questions ticked: Q1, Q2.")).toBeInTheDocument();
   });
 });
