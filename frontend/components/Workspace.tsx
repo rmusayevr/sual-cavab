@@ -214,11 +214,6 @@ export default function Workspace() {
               ))}
             </ul>
           )}
-          <p>
-            <Link href={`/projects/${id}/overview`} className="text-sm text-muted-foreground underline">
-              {t("workspace.members")}
-            </Link>
-          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

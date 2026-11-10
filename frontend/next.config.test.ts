@@ -49,3 +49,28 @@ describe("where /api is forwarded", () => {
   });
 
 });
+
+// #83: the project page is the workspace. The three older pages (the draft, the questions and the
+// overview) are gone, and anyone with a bookmark or an old link lands on the workspace instead of a 404.
+describe("the older project pages", () => {
+  const redirects = async () => nextConfig.redirects!();
+
+  it("send /projects/<id>/draft, /questions and /overview to the workspace, with or without a trailing slash", async () => {
+    const list = await redirects();
+    for (const page of ["draft", "questions", "overview"]) {
+      for (const slash of ["", "/"]) {
+        const rule = list.find((r) => r.source === `/projects/:id/${page}${slash}`);
+        expect(rule, `${page}${slash}`).toBeDefined();
+        expect(rule?.destination).toBe("/projects/:id");
+      }
+    }
+  });
+
+  it("are a temporary redirect (307), not a permanent one a browser would remember", async () => {
+    for (const rule of await redirects()) expect(rule.permanent).toBe(false);
+  });
+
+  it("only touch the project pages, never the /api proxy (which has /projects/<id>/draft/ under /api)", async () => {
+    for (const rule of await redirects()) expect(rule.source.startsWith("/projects/")).toBe(true);
+  });
+});

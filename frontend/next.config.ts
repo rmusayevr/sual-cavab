@@ -18,6 +18,15 @@ const nextConfig: NextConfig = {
   // this above it, or the browser sees a 500 while Django finishes a paid call
   // nobody reads.
   experimental: { proxyTimeout: 150_000 },
+  // The project page is the workspace (#70, #83). The older pages (draft, questions, overview) are
+  // gone: an old link or bookmark lands there. Temporary, not permanent: a browser keeps a permanent
+  // redirect for good, and the workspace may still change. Both spellings are listed because
+  // skipTrailingSlashRedirect (above) stops Next.js from treating them as one.
+  async redirects() {
+    return ["draft", "questions", "overview"].flatMap((page) =>
+      ["", "/"].map((slash) => ({ source: `/projects/:id/${page}${slash}`, destination: "/projects/:id", permanent: false })),
+    );
+  },
   async rewrites() {
     // Same origin for the browser: session and CSRF cookies stay first-party
     // and no CORS setup is needed (#4). `:path*` drops the trailing slash, and

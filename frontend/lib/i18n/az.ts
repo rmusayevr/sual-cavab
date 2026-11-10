@@ -41,7 +41,6 @@ export const az: Record<Key, string> = {
   "workspace.notFound": "Layihə tapılmadı.",
   "workspace.back": "Layihələrinizə qayıt",
   "workspace.loadError": "Layihəni yükləmək mümkün olmadı.",
-  "workspace.members": "Üzvlər və təfərrüatlar",
   "workspace.filterGroup": "Sualları filtrlə",
   "workspace.all": "Hamısı",
   "workspace.pick": "{label} seç",
