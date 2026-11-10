@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Workspace from "./Workspace";
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: "5" }) }));
+let currentId = "5";
+vi.mock("next/navigation", () => ({ useParams: () => ({ id: currentId }) }));
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -58,6 +59,7 @@ describe("Workspace (#70)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     draftBody = null;
+    currentId = "5";
   });
 
   it("lists the person's projects in a rail, the open one marked, with the open counts", async () => {
@@ -173,5 +175,24 @@ describe("Workspace (#70)", () => {
     render(<Workspace />);
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Could not load the project."));
+  });
+
+  // The page keeps the same component when the person picks another project in the rail, so what
+  // was ticked, filtered and drafted for one project must not follow them to the next.
+  it("starts clean when another project is opened: no ticks, no filter, no draft", async () => {
+    api();
+    const { rerender } = render(<Workspace />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Q1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Answered" }));
+    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
+    await screen.findByLabelText(/Draft \(edit it/);
+
+    currentId = "6";
+    rerender(<Workspace />);
+
+    await screen.findByRole("heading", { level: 1, name: "Portal" });
+    expect(screen.queryByLabelText(/Draft \(edit it/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Write a draft" })).toBeDisabled();
   });
 });

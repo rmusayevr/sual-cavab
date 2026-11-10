@@ -36,6 +36,12 @@ type Filter = "all" | QuestionStatus;
  */
 export default function Workspace() {
   const { id } = useParams<{ id: string }>();
+  // Opening another project in the rail keeps this component mounted; the key starts the next
+  // project with no ticks, filter, selection or draft left over from the last one.
+  return <ProjectWorkspace key={id} id={id} />;
+}
+
+function ProjectWorkspace({ id }: { id: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<number | null>(null);
