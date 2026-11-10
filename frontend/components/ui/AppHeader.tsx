@@ -1,10 +1,10 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import SessionStatus from "@/components/SessionStatus";
 import { LanguageSwitch } from "@/lib/i18n";
 
 import { CarpetStrip, Eyebrow } from "./Ledger";
+import { Wordmark } from "./Wordmark";
 
 /**
  * The navy band at the top of a page: the wordmark (a link home), the session actions, then an
@@ -23,9 +23,7 @@ export function AppHeader({
   return (
     <header className="bg-navy pattern-lattice text-navy-foreground">
       <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-5">
-        <Link href="/" aria-label="Sual-Cavab, home" className="font-display text-xl font-semibold">
-          Sual<span className="text-saffron">·</span>Cavab
-        </Link>
+        <Wordmark className="font-display text-xl font-semibold" />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <LanguageSwitch />
           <SessionStatus layout="nav" wakingNote={false} />

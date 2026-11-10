@@ -15,7 +15,7 @@ export const az: Record<Key, string> = {
   "status.answered": "Cavablanıb",
   "status.dropped": "Ləğv",
 
-  "waking": "Sayt boş qaldıqdan sonra yenidən oyanır. Bu iki dəqiqəyə qədər çəkə bilər.",
+  "waking": "Sayt uzun müddət istifadə olunmadıqdan sonra yenidən işə düşə bilər. Bu iki dəqiqəyə qədər çəkə bilər.",
 
   "session.checking": "Sessiya yoxlanılır…",
   "session.signedInAs": "{who} kimi daxil olmusunuz.",
@@ -27,7 +27,7 @@ export const az: Record<Key, string> = {
 
   "login.eyebrow": "Giriş",
   "login.title": "Daxil ol",
-  "login.note": "Hesabları administrator yaradır.",
+  "login.note": "Hesabları admin yaradır.",
   "login.email": "E-poçt",
   "login.password": "Parol",
   "login.submit": "Daxil ol",
@@ -42,7 +42,7 @@ export const az: Record<Key, string> = {
   "workspace.back": "Layihələrinizə qayıt",
   "workspace.loadError": "Layihəni yükləmək mümkün olmadı.",
   "workspace.members": "Üzvlər və təfərrüatlar",
-  "workspace.filterGroup": "Sualları süz",
+  "workspace.filterGroup": "Sualları filtrlə",
   "workspace.all": "Hamısı",
   "workspace.pick": "{label} seç",
   "workspace.none": "Hələ sual yoxdur. İlk sualı əlavə edin.",
@@ -64,6 +64,6 @@ export const az: Record<Key, string> = {
   "draft.stale": "Qaralama yazıldıqdan sonra seçilmiş suallar dəyişib.",
   "draft.copy": "Kopyala",
   "draft.copied": "Kopyalandı.",
-  "draft.copyFailed": "Kopyalamaq olmadı. Mətni seçib özünüz kopyalayın.",
+  "draft.copyFailed": "Kopyalamaq alınmadı. Mətni seçib özünüz kopyalayın.",
   "draft.notSent": "Heç nə göndərilməyib. Bu qaralama saxlanmır: səhifədən çıxmazdan əvvəl kopyalayın.",
 };

@@ -69,13 +69,22 @@ export function T({ k, values }: { k: Key; values?: Record<string, string | numb
   return useT()(k, values);
 }
 
-/** The `EN | AZ` switch. Marks the page's language for browsers and screen readers. */
-export function LanguageSwitch({ className }: { className?: string }) {
+/**
+ * Keeps `<html lang>` equal to the chosen language, on every page (it is in the root layout, so it
+ * does not depend on a switch being on screen). Renders nothing.
+ */
+export function LanguageSync() {
   const language = useLanguage();
-  const t = useT();
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
+  return null;
+}
+
+/** The `EN | AZ` switch. */
+export function LanguageSwitch({ className }: { className?: string }) {
+  const language = useLanguage();
+  const t = useT();
   return (
     <div role="group" aria-label={t("lang.label")} className={className}>
       {(["en", "az"] as const).map((l) => (

@@ -3,7 +3,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { az } from "./az";
 import { en } from "./en";
-import { LanguageSwitch, T, setLanguage, translate, useT } from "./index";
+import { renderToString } from "react-dom/server";
+import { hydrateRoot } from "react-dom/client";
+
+import { PageShell } from "@/components/ui/PageShell";
+import { Wordmark } from "@/components/ui/Wordmark";
+
+import { LanguageSwitch, LanguageSync, T, setLanguage, translate, useT } from "./index";
 
 afterEach(() => {
   act(() => setLanguage("en"));
@@ -79,7 +85,35 @@ describe("the language in use", () => {
     expect(screen.getByText("Çıxış / Kopyala")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AZ" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("group", { name: "Dil" })).toBeInTheDocument();
+  });
+
+  it("marks the page's language on <html>, wherever the switch is (or is not) on screen", () => {
+    render(
+      <>
+        <LanguageSync />
+        <LanguageSwitch />
+      </>,
+    );
+    expect(document.documentElement.lang).toBe("en");
+
+    fireEvent.click(screen.getByRole("button", { name: "AZ" }));
+
     expect(document.documentElement.lang).toBe("az");
+  });
+
+  it("names the home link in the chosen language, the same on every page", () => {
+    render(<Wordmark />);
+    expect(screen.getByRole("link", { name: en["nav.home"] })).toHaveAttribute("href", "/");
+
+    act(() => setLanguage("az"));
+
+    expect(screen.getByRole("link", { name: az["nav.home"] })).toBeInTheDocument();
+  });
+
+  it("puts the switch on pages that have no header of their own", () => {
+    render(<PageShell>text</PageShell>);
+
+    expect(screen.getByRole("group", { name: en["lang.label"] })).toBeInTheDocument();
   });
 
   it("remembers the choice in local storage, and a page that loads later reads it", () => {
@@ -111,5 +145,28 @@ describe("the language in use", () => {
     fireEvent.click(screen.getByRole("button", { name: "AZ" }));
 
     expect(screen.getAllByText("Çıxış / Kopyala")).toHaveLength(2);
+  });
+
+  // The first paint must be English even for a person who chose Azerbaijani: the server cannot know
+  // the choice, and a different first render would be a hydration mismatch (review of #80).
+  it("renders English on the server and hydrates an Azerbaijani choice without a mismatch", async () => {
+    setLanguage("az");
+    const html = renderToString(<Probe />);
+    expect(html).toContain("Sign out");
+    expect(html).not.toContain("Çıxış");
+
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    const problems: unknown[] = [];
+    let root!: ReturnType<typeof hydrateRoot>;
+    await act(async () => {
+      root = hydrateRoot(container, <Probe />, { onRecoverableError: (e) => problems.push(e) });
+    });
+
+    expect(problems).toEqual([]);
+    expect(container.textContent).toContain("Çıxış");
+    act(() => root.unmount());
+    container.remove();
   });
 });

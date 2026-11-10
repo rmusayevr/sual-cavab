@@ -21,6 +21,7 @@ import { Card } from "./ui/Card";
 import { Textarea } from "./ui/Field";
 import { CarpetStrip, EmptyState, Eyebrow, LedgerLoading } from "./ui/Ledger";
 import { StatusChip } from "./ui/StatusChip";
+import { Wordmark } from "./ui/Wordmark";
 
 type State =
   | { kind: "loading" }
@@ -77,9 +78,7 @@ export default function Workspace() {
     <div className="min-h-screen bg-background [overflow-wrap:anywhere]">
       <header className="bg-navy pattern-lattice text-navy-foreground">
         <nav className="mx-auto flex max-w-[90rem] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-4 sm:px-6">
-          <Link href="/" aria-label={t("nav.home")} className="font-display text-xl font-semibold">
-            Sual<span className="text-saffron">·</span>Cavab
-          </Link>
+          <Wordmark className="font-display text-xl font-semibold" />
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <LanguageSwitch />
             <SessionStatus layout="nav" wakingNote={false} />
