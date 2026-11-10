@@ -130,6 +130,21 @@ export const az: Record<Key, string> = {
   "notfound.title": "Bu səhifə dəftərdə yoxdur.",
   "notfound.text": "Ünvanı yoxlayın və ya layihələrinizə qayıdın.",
 
+  "members.label": "Üzvlər",
+  "role.owner": "owner",
+  "role.member": "üzv",
+
+  "age.zero": "bir gündən az açıqdır",
+  "age.one": "1 gündür açıqdır",
+  "age.many": "{n} gündür açıqdır",
+
+  "draft.err.noSetup": "Bu serverdə qaralama yazmaq qurulmayıb.",
+  "draft.err.rateLimited": "Çox sayda qaralama istədiniz. Bir az sonra yenidən cəhd edin.",
+  "draft.err.badGateway": "Qaralamanı yazmaq alınmadı. Bir dəqiqədən sonra yenidən cəhd edin.",
+  "draft.err.notAvailable": "Bu layihə əlçatan deyil.",
+  "draft.err.signedOut": "Bu layihə əlçatan deyil və ya sessiyanız bitib. Yenidən daxil olun.",
+  "draft.err.failed": "Qaralamanı yazmaq alınmadı.",
+
   "draft.heading": "Mesaj qaralaması",
   "draft.tickPrompt": "Açıq və ya soruşulmuş ən çox {max} sual seçin.",
   "draft.tickedOne": "1 sual seçilib: {list}.",

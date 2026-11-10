@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { cx } from "@/lib/cx";
-import type { Project, QuestionStatus } from "@/lib/projects";
+import { ageKey, daysOpen, type Member, type Project, type QuestionStatus } from "@/lib/projects";
 import type { FullQuestion } from "@/lib/questions";
 import { STATUSES } from "@/lib/status";
 import { LanguageSwitch, useT } from "@/lib/i18n";
@@ -73,6 +73,29 @@ export default function Workspace() {
       cancelled = true;
     };
   }, [id, base]);
+
+  // The members are a nicety, loaded on their own: a slow or failed call (a refused status, a dropped
+  // connection, a reply that is not JSON) never delays or breaks the project, it only leaves out the
+  // list (review of #88).
+  const [members, setMembers] = useState<Member[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch(`/api/projects/${id}/members/`)
+      .then(async (response) => (response.ok ? ((await response.json()) as Member[]) : []))
+      .catch(() => [] as Member[])
+      .then((list) => {
+        if (!cancelled) setMembers(Array.isArray(list) ? list : []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  /** How long a question has been open, in the chosen language ("open for 3 days"). */
+  const age = (createdAt: string) => {
+    const { key, values } = ageKey(daysOpen(createdAt));
+    return t(key, values);
+  };
 
   const shell = (body: ReactNode) => (
     <div className="min-h-screen bg-background [overflow-wrap:anywhere]">
@@ -184,6 +207,13 @@ export default function Workspace() {
         <div className="grid gap-1">
           <Eyebrow>{project.client_name}</Eyebrow>
           <h1 className="text-3xl font-semibold">{project.name}</h1>
+          {members.length > 0 && (
+            <ul aria-label={t("members.label")} className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-sm text-muted-foreground">
+              {members.map((m) => (
+                <li key={m.user_id}>{`${m.name || m.email} · ${t(`role.${m.role}`)}`}</li>
+              ))}
+            </ul>
+          )}
           <p>
             <Link href={`/projects/${id}/overview`} className="text-sm text-muted-foreground underline">
               {t("workspace.members")}
@@ -245,6 +275,11 @@ export default function Workspace() {
                         <StatusChip status={q.status} />
                       </span>
                       <span>{q.text}</span>
+                      {pickable && (
+                        <span className="text-xs text-muted-foreground">
+                          {age(q.created_at)}
+                        </span>
+                      )}
                     </button>
                   </Card>
                 </li>

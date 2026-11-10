@@ -128,6 +128,21 @@ export const en = {
   "notfound.title": "This page is not in the ledger.",
   "notfound.text": "Check the address, or go back to your projects.",
 
+  "members.label": "Members",
+  "role.owner": "owner",
+  "role.member": "member",
+
+  "age.zero": "open for less than a day",
+  "age.one": "open for 1 day",
+  "age.many": "open for {n} days",
+
+  "draft.err.noSetup": "Drafting is not set up on this server.",
+  "draft.err.rateLimited": "You have asked for a lot of drafts. Try again later.",
+  "draft.err.badGateway": "The draft could not be written. Try again in a minute.",
+  "draft.err.notAvailable": "This project is not available.",
+  "draft.err.signedOut": "This project is not available, or you have been signed out. Sign in again.",
+  "draft.err.failed": "Could not write the draft.",
+
   "draft.heading": "Draft a message",
   "draft.tickPrompt": "Tick up to {max} open or asked questions.",
   "draft.tickedOne": "1 question ticked: {list}.",
