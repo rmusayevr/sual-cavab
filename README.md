@@ -477,8 +477,9 @@ has no backups and is deleted 30 days after it is created.
   untested.
 - The API's own address is public (free services cannot receive private
   traffic); it answers only what the app's rules allow. Django's admin is
-  **switched off** on it (`DJANGO_ADMIN_ENABLED=0`), because the admin's
-  sign-in page has no rate limit; the app's own sign-in is limited per account.
+  **switched off** on it (`DJANGO_ADMIN_ENABLED=0`): a public host has no need of it. Its sign-in page is
+  limited all the same (#45): it shares the app's attempt counter, ten a minute per account, so guessing at
+  `/admin/` is not a second budget; a sixth guess there after five at the app's sign-in counts as the sixth.
   The demo account names are public, so anyone can keep one of them locked out
   by failing to sign in to it about ten times a minute (the limit counts every
   attempt); that is the accepted per-account design from #4, and it would make
