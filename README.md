@@ -227,6 +227,31 @@ same language, inside its rules; each item is a choice the owner can reject:
 - **404**: "This page is not in the ledger." and the missing page as question
   `Q404`.
 
+### Cleaning the sign-in counters (`purge_expired_cache`)
+
+The sign-in, member-add and drafting counters live in a database table (`throttle_cache`). Django only
+removes expired rows once that table passes a million, so until then they pile up and every write counts
+the table (#40). `python manage.py purge_expired_cache` removes the expired ones:
+
+```bash
+python manage.py purge_expired_cache --dry-run   # count them; delete nothing
+python manage.py purge_expired_cache             # delete them, in batches of 1000, at most 100 batches
+```
+
+It prints, for each database cache, how many rows it removed, in how many batches and how long it took (a
+run that removed 0 is normal), and says when it stopped at `--max-batches` with rows left: run it again.
+
+**How it runs (the owner's choice on #40):** Render's free tier has no cron, so the start command in
+`render.yaml` runs it at every start, after `createcachetable` and before the server: a free service
+restarts when it wakes, so that is each deploy and each wake-up. It is wrapped in `( ... || echo ...)`, like
+the demo loader: a failed purge never keeps the site down.
+- **Overlap:** two starts at once are harmless: it deletes only rows that are already expired, picked by key.
+- **Missed runs:** nothing is lost; it looks for what is expired now, so any gap is caught up on the next run.
+- **Not running at all:** nothing alerts on that (no scheduler or monitor on the free tier). The consequence
+  is the table growing slowly, as it did before this command; `--dry-run` shows how many rows are waiting.
+- A service that never sleeps (a paid plan) restarts rarely, so it would need a real schedule: a Render cron
+  job running this command daily.
+
 ## Who can see or change a project
 
 Decided by the owner (#5). Access is checked in the query itself, so a project

@@ -42,6 +42,7 @@ services:
     startCommand: >-
       python manage.py migrate --noinput
       && python manage.py createcachetable
+      && (python manage.py purge_expired_cache || echo "purge_expired_cache did not run (see above); starting without it")
       && (python manage.py load_demo_data || echo "load_demo_data did not run (see above); starting without it")
       && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
       --worker-class gthread --workers 1 --threads 4 --timeout 180
