@@ -69,7 +69,29 @@ class AdminLoginThrottleTests(TestCase):
 
         self.assertEqual(response.status_code, 302)  # signed in: redirected to the admin
 
+    def test_a_spelling_the_admin_form_folds_to_the_same_account_shares_the_budget(self):
+        # The admin form folds the username with Unicode NFKC before it signs in, so a fullwidth "a" is the
+        # same account as "a": it must not be a fresh bucket of attempts each time (review of #102).
+        fullwidth = chr(0xFF41) + EMAIL[1:]
+        self.assertNotEqual(fullwidth, EMAIL)
+        for _ in range(10):
+            self.admin_attempt()
+
+        self.assertEqual(self.admin_attempt(email=fullwidth, password=PASSWORD).status_code, 429)
+        self.assertEqual(self.admin_attempt(email=fullwidth.upper()).status_code, 429)
+
+    def test_a_blocked_answer_is_never_cached(self):
+        for _ in range(10):
+            self.admin_attempt()
+
+        response = self.admin_attempt()
+
+        self.assertEqual(response.status_code, 429)
+        self.assertIn("no-cache", response["Cache-Control"])
+
     def test_looking_at_the_sign_in_page_is_not_counted_or_blocked(self):
+        # What this shows: viewing the page is never blocked or counted. It cannot tell the `method == POST` check
+        # from the empty POST body of a GET (the key is None either way): that check is belt and braces (review of #102).
         for _ in range(15):
             self.assertEqual(self.client.get(self.admin_login_url).status_code, 200)
 

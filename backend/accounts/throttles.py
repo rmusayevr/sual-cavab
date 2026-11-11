@@ -1,9 +1,11 @@
 import functools
 import hashlib
 import math
+import unicodedata
 
 from django.core.cache import caches
 from django.http import HttpResponse
+from django.utils.cache import add_never_cache_headers
 from rest_framework.throttling import SimpleRateThrottle
 
 from .models import normalize_email
@@ -49,7 +51,13 @@ class AdminLoginThrottle(LoginPerAccountThrottle):
     not a second ten attempts a minute."""
 
     def get_cache_key(self, request, view):
-        return self.key_for(request.POST.get("username"))
+        username = request.POST.get("username")
+        if isinstance(username, str):
+            # The admin form folds the username with NFKC before it signs in (UsernameField.to_python), so a
+            # fullwidth "a" signs in as "a". Count what the form will authenticate, or every spelling is a
+            # fresh budget (review of #102).
+            username = unicodedata.normalize("NFKC", username)
+        return self.key_for(username)
 
 
 def protect_admin_login(site):
@@ -69,6 +77,7 @@ def protect_admin_login(site):
                     status=429,
                     content_type="text/plain; charset=utf-8",
                 )
+                add_never_cache_headers(response)  # the admin's own login view is never cached either
                 wait = throttle.wait()
                 if wait:
                     response["Retry-After"] = str(math.ceil(wait))
