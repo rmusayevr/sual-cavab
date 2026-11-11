@@ -1,8 +1,10 @@
 from django.core.cache import caches
 from rest_framework.throttling import SimpleRateThrottle
 
+from core.throttles import ExactCountMixin
 
-class DraftThrottle(SimpleRateThrottle):
+
+class DraftThrottle(ExactCountMixin, SimpleRateThrottle):
     """Limits drafts per signed-in user: each one is a paid API call.
 
     Every attempt counts, including ones refused with a 400 or a 404, so the

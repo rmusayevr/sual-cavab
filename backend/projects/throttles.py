@@ -1,8 +1,10 @@
 from django.core.cache import caches
 from rest_framework.throttling import SimpleRateThrottle
 
+from core.throttles import ExactCountMixin
 
-class MemberAddThrottle(SimpleRateThrottle):
+
+class MemberAddThrottle(ExactCountMixin, SimpleRateThrottle):
     """Limits 'add member' attempts per signed-in user.
 
     A 201 versus a 400 on POST .../members/ tells the caller whether an email

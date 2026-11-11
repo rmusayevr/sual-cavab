@@ -313,8 +313,10 @@ you are not on is a 404, the same as one that does not exist.
   accounts). Because anyone can create a project and so become an owner, a
   signed-in user can tell whether an email has an account by trying to add it.
   Accepted for v1 (small, admin-created user base); attempts are limited to
-  about 30 an hour per user, failures included (a burst of parallel requests
-  can slightly exceed it).
+  30 an hour per user, failures included. The count is exact even when requests
+  arrive at the same moment (#41: each account's or user's check takes a PostgreSQL
+  advisory lock for a few milliseconds, so parallel requests take turns; tested with
+  real threads, and the same for sign-in and drafting).
 
 ### When someone leaves: deactivate, do not delete (#39)
 
