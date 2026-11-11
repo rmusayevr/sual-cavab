@@ -223,8 +223,9 @@ if DEBUG and not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 # Drafting (#9). A Fable or Mythos model makes the server refuse to start.
-# Django's admin (on by default). Its sign-in page has no rate limit; a public
-# staging host turns it off (DJANGO_ADMIN_ENABLED=0, #10).
+# Django's admin (on by default). Its sign-in shares the app's attempt limit
+# (accounts.throttles.protect_admin_login, #45); a public staging host turns the
+# admin off anyway (DJANGO_ADMIN_ENABLED=0, #10).
 ADMIN_ENABLED = _env_bool("DJANGO_ADMIN_ENABLED", default=True)
 
 DRAFTING_MODEL = validate_drafting_model(os.environ.get("DRAFTING_MODEL") or DEFAULT_MODEL)

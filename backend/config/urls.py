@@ -10,7 +10,7 @@ urlpatterns = [
     path("api/", include("drafting.urls")),
 ]
 
-# The admin's sign-in page has no rate limit, so a public host can switch it off
-# (DJANGO_ADMIN_ENABLED=0). It is on by default.
+# The admin's sign-in shares the app's attempt limit (#45), and a public host can
+# still switch the admin off (DJANGO_ADMIN_ENABLED=0). It is on by default.
 if settings.ADMIN_ENABLED:
     urlpatterns.insert(0, path("admin/", admin.site.urls))
