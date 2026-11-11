@@ -12,6 +12,13 @@ class ExactCountMixin:
     transaction opened here, a few milliseconds later; the request itself (a draft can run for minutes) is not
     inside it. Without PostgreSQL there is nothing to lock with and the count is DRF's own.
 
+    What this depends on (each is tested in core/test_exact_throttles.py):
+    - No transaction around the whole request. Inside one, the lock would last until it ends: with
+      ATOMIC_REQUESTS on, a second draft would wait for the first draft to finish.
+    - READ COMMITTED (PostgreSQL's default), so the read inside the lock sees the previous holder's commit.
+    - The cache table exists. If it does not, the check raises (a 500) and nobody gets through: it fails closed.
+    There is no lock timeout. Nothing holds the lock for long, so a wait only means another check is running.
+
     Put it first in the bases: `class MyThrottle(ExactCountMixin, SimpleRateThrottle)`.
     """
 

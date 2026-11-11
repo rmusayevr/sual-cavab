@@ -10,10 +10,11 @@ import time
 from types import SimpleNamespace
 from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import caches
 from django.core.cache.backends.db import DatabaseCache
-from django.db import connection, connections
+from django.db import ProgrammingError, connection, connections, transaction
 from django.test import TransactionTestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -99,17 +100,66 @@ class ExactThrottleTests(TransactionTestCase):
 
         self.assertEqual(allowed, limit)
 
-    def test_different_accounts_do_not_wait_for_each_other_or_share_a_count(self):
-        def attempt(i):
-            return LoginPerAccountThrottle().allow_request(SimpleNamespace(data={"email": f"person{i}@example.com"}), None)
+    def test_a_check_waits_only_for_the_same_account(self):
+        # Hold the lock of ada's key the way a check in progress does. Another account's check must go straight
+        # through; a second check for ada must wait (so the lock is on the account's own key, not on all of them).
+        ada, grace = SimpleNamespace(data={"email": "ada@example.com"}), SimpleNamespace(data={"email": "grace@example.com"})
+        key = LoginPerAccountThrottle().get_cache_key(ada, None)
+        outcome = {}
 
-        results = at_the_same_moment(12, attempt)
+        def check(name, request):
+            outcome[name] = LoginPerAccountThrottle().allow_request(request, None)
+            connections.close_all()
 
-        self.assertEqual(results, [True] * 12)
+        other = threading.Thread(target=check, args=("grace", grace))
+        same = threading.Thread(target=check, args=("ada", ada))
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", [key])
+            other.start()
+            other.join(timeout=10)
+            same.start()
+            same.join(timeout=0.5)
+            self.assertFalse(other.is_alive(), "another account's check waited for ada's lock")
+            self.assertEqual(outcome, {"grace": True})
+            self.assertTrue(same.is_alive(), "ada's second check did not wait for the first")
+        same.join(timeout=10)
+        self.assertEqual(outcome, {"grace": True, "ada": True})
 
-    def test_no_lock_is_left_behind_once_the_check_is_over(self):
-        # The check is milliseconds; the request that follows it (a draft can run for minutes) must not hold the
-        # account's lock, or the next attempt for it would wait for the whole draft.
+    def test_a_refused_attempt_is_told_how_long_to_wait_by_the_count_it_was_refused_on(self):
+        request = SimpleNamespace(data={"email": "ada@example.com"})
+        for _ in range(10):
+            self.assertTrue(LoginPerAccountThrottle().allow_request(request, None))
+
+        refused = LoginPerAccountThrottle()
+
+        self.assertFalse(refused.allow_request(request, None))
+        self.assertGreater(refused.wait(), 50)  # the oldest of ten attempts in the last minute, not a guess
+
+    def test_a_missing_counter_table_refuses_instead_of_letting_everyone_through(self):
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER TABLE throttle_cache RENAME TO throttle_cache_away")
+        self.addCleanup(self.put_the_table_back)
+
+        with self.assertRaises(ProgrammingError):
+            MemberAddThrottle().allow_request(self.signed_in_as(11), None)
+
+    def put_the_table_back(self):
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER TABLE IF EXISTS throttle_cache_away RENAME TO throttle_cache")
+
+    def test_what_the_exact_count_depends_on_is_still_true(self):
+        # The lock is held by the transaction opened around a check, so a request-wide transaction would hold it
+        # for the whole request (a draft runs for minutes); and exactness needs READ COMMITTED, where each
+        # statement sees the previous holder's commit (REPEATABLE READ let 35 of 20 through in review of #104).
+        self.assertFalse(settings.DATABASES["default"].get("ATOMIC_REQUESTS"))
+        with connection.cursor() as cursor:
+            cursor.execute("SHOW transaction_isolation")
+            self.assertEqual(cursor.fetchone()[0], "read committed")
+
+    def test_a_check_made_on_its_own_leaves_no_lock_behind(self):
+        # The check is milliseconds and ends its transaction. (Inside an enclosing transaction the lock would last
+        # until that one ends: see the test of ATOMIC_REQUESTS above.)
         MemberAddThrottle().allow_request(self.signed_in_as(9), None)
 
         with connection.cursor() as cursor:
