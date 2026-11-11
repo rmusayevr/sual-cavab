@@ -316,6 +316,37 @@ you are not on is a 404, the same as one that does not exist.
   about 30 an hour per user, failures included (a burst of parallel requests
   can slightly exceed it).
 
+### When someone leaves: deactivate, do not delete (#39)
+
+The supported way to offboard a person is to untick **Active** on their account in `/admin/` (Accounts, Users, the
+person, Save). The owner's decision on #39: nothing else is built, and the access rules above do not change.
+
+- They are signed out on their next request (an open session gets a 403) and cannot sign back in (the same
+  "Email or password is incorrect" as a wrong password). The project is gone from their view. In the app they may
+  be told to sign in, which they cannot do: that is the end of access, not a fault. It also ends their `/admin/`
+  access if they were staff.
+- **Nothing they wrote is lost**: the projects they created, the questions they wrote and the answers they
+  recorded stay as they were, and the other members still see all of it. In the app only an answer shows who
+  recorded it (their email); who created a project or a question is kept in the database and `/admin/`.
+- **Deleting the account is refused**, on purpose: any one of a project they created (`Project.created_by`), a
+  question they wrote (`Question.created_by`) or an answer they recorded (`Answer.recorded_by`) is enough, and
+  each is `PROTECT`. There is no tool to reassign the creator (not built: deactivation is enough).
+  Deleting someone who wrote none of these does work, but prefer deactivating anyway: it deletes their
+  memberships (which can leave a project with no owner at all) and, for a staff user, their `/admin/` history.
+- **A project's only owner: hand it over before deactivating.** A deactivated owner cannot manage the project,
+  and the app has no way to change a member's role or to see who is deactivated (the members list still shows
+  them as owner). So before you deactivate the only owner, either have them make someone else an owner (remove
+  the person, add them again with the owner role: the add-member API takes a role; whether the screens offer it was not checked), or change the role yourself in `/admin/` (Projects, the project,
+  Memberships). The second route has not been tried by hand.
+- **Ticking Active again gives everything back, including old sessions**: deactivating does not delete a
+  person's open sessions, so a browser they were signed in on works again at once. If the account goes to
+  someone else, or after a dispute, change the password first (Django ends old sessions when it changes; this
+  was not run here).
+
+Tested in `backend/projects/test_offboarding.py` (a signed-in user loses access, cannot sign back in, nothing is
+lost and the recorder is still named, deletion is refused for each kind of record on its own, reactivation
+restores access). Not tried in `/admin/` by hand.
+
 ## Questions, statuses and answers
 
 Questions belong to a project and are numbered Q1, Q2... per project. A number
