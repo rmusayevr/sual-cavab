@@ -8,10 +8,12 @@ from django.http import HttpResponse
 from django.utils.cache import add_never_cache_headers
 from rest_framework.throttling import SimpleRateThrottle
 
+from core.throttles import ExactCountMixin
+
 from .models import normalize_email
 
 
-class LoginPerAccountThrottle(SimpleRateThrottle):
+class LoginPerAccountThrottle(ExactCountMixin, SimpleRateThrottle):
     """Limits sign-in attempts per account (normalized email), not per address.
 
     Behind the Next.js /api proxy every request reaches Django from the same
