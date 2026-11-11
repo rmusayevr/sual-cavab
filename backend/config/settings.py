@@ -180,7 +180,8 @@ CACHES = {
     # can't push a real account's counter out (the 300-entry in-memory default
     # evicted it). Culling only runs once the table passes MAX_ENTRIES: it then
     # deletes expired rows, and live ones only if still over the limit. Until
-    # then expired rows accumulate (follow-up). DRF's update isn't atomic, so
+    # then expired rows accumulate: `manage.py purge_expired_cache` removes them
+    # (run at every start on Render, #40). DRF's update isn't atomic, so
     # simultaneous requests can exceed the rate slightly. Needs
     # `createcachetable`; without the table, sign-in, member-adds and drafting fail closed
     # with a 500, and `manage.py check --database default` (and `migrate`) warn with the

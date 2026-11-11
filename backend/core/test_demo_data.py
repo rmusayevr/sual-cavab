@@ -239,7 +239,7 @@ class StartCommandTests(TestCase):
 
         text = (Path(settings.BASE_DIR).parent / "render.yaml").read_text(encoding="utf-8")
         start = text.index("startCommand: >-")
-        return " ".join(line.strip() for line in text[start:].splitlines()[1:8] if line.strip() and not line.strip().startswith("#"))
+        return " ".join(line.strip() for line in text[start:].splitlines()[1:16] if line.strip() and not line.strip().startswith("#"))
 
     def test_the_site_starts_even_if_the_demo_loader_fails(self):
         command = self.start_command()
