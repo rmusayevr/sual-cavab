@@ -316,6 +316,26 @@ you are not on is a 404, the same as one that does not exist.
   about 30 an hour per user, failures included (a burst of parallel requests
   can slightly exceed it).
 
+### When someone leaves: deactivate, do not delete (#39)
+
+The supported way to offboard a person is to untick **Active** on their account in `/admin/` (Users, then the
+person, then Save). The owner's decision on #39: nothing else is built, and the access rules above do not change.
+
+- They are signed out at once (an open session stops working on its next request) and cannot sign back in.
+  The project is gone from their view. In the app they may be told to sign in, which they cannot do: that is the
+  expected end of access, not a fault.
+- **Nothing they wrote is lost**: the projects they created, the questions they wrote and the answers they
+  recorded stay as they were, with their name on them, and the other members still see all of it.
+- **Deleting the account is refused**, on purpose: a project, a question or an answer still points at the person
+  (`created_by` and `recorded_by` are `PROTECT`, and so are the links from a project to its questions and a
+  question to its answers). Any one of them is enough to refuse; there is no tool to reassign the creator (not
+  built: deactivation is enough). Removing someone who never wrote anything is the only deletion that works.
+- If they are a project's only active owner, make someone else an owner first: a deactivated owner cannot manage
+  the project (see the rule above). Ticking **Active** again gives everything back.
+
+Tested in `backend/projects/test_offboarding.py` (a signed-in user loses access, cannot sign back in, nothing is
+lost, delete is refused, reactivation restores access). Not tried in `/admin/` by hand.
+
 ## Questions, statuses and answers
 
 Questions belong to a project and are numbered Q1, Q2... per project. A number
