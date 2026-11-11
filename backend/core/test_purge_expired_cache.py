@@ -1,3 +1,4 @@
+import threading
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
@@ -5,9 +6,11 @@ from pathlib import Path
 from django.conf import settings
 from django.core.cache import caches
 from django.core.management import call_command
-from django.db import connection
-from django.test import TestCase, override_settings
+from django.db import connection, connections, transaction
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
+
+from projects.test_concurrency import wait_until_a_session_waits_for_a_lock
 
 TABLE = "invented_purge_cache_table"
 DB_CACHE = "django.core.cache.backends.db.DatabaseCache"
@@ -61,6 +64,8 @@ class PurgeExpiredCacheTests(TestCase):
 
         self.assertEqual(self.keys(), ["live0", "live1"])
         self.assertIn("removed 3 expired row(s)", output)
+        self.assertIn("in 1 batch(es)", output)  # fewer than a batch deleted: that was the last one, no empty extra look
+        self.assertNotIn("still there", output)  # a finished run does not claim it left work
         self.assertIn(TABLE, output)
 
     def test_a_live_counter_still_counts_after_a_purge(self):
@@ -90,6 +95,18 @@ class PurgeExpiredCacheTests(TestCase):
         output = self.run_command()
 
         self.assertIn("removed 0 expired row(s)", output)
+        self.assertNotIn("still there", output)
+
+    def test_a_run_that_fills_every_batch_goes_on_until_the_rows_are_gone(self):
+        for n in range(20):
+            self.add_row(f"old{n:02d}", expired=True)
+
+        output = self.run_command("--batch-size", "10", "--max-batches", "5")
+
+        self.assertEqual(self.keys(), [])
+        self.assertIn("removed 20 expired row(s)", output)
+        self.assertIn("in 3 batch(es)", output)  # 10, 10, then an empty look that shows nothing is left
+        self.assertNotIn("still there", output)
 
     def test_the_work_is_bounded_and_a_later_run_finishes_it(self):
         for n in range(25):
@@ -99,7 +116,7 @@ class PurgeExpiredCacheTests(TestCase):
 
         self.assertEqual(len(self.keys()), 5)  # 20 removed: two batches of 10
         self.assertIn("removed 20 expired row(s)", first)
-        self.assertIn("5 expired row(s) are left", first)  # said, so a run that stopped early is not mistaken for done
+        self.assertIn("5 expired row(s) are still there", first)  # said, so a run that stopped early is not mistaken for done
 
         second = self.run_command("--batch-size", "10", "--max-batches", "2")
 
@@ -128,6 +145,59 @@ class PurgeExpiredCacheTests(TestCase):
                 self.run_command(*args)
 
 
+class PurgeRaceTests(TransactionTestCase):
+    """A counter renewed while the purge runs must survive (review of #101): the purge picked the row as expired,
+    then waited for the lock of the request that was renewing it; when that request committed, the purge must
+    look at the row again instead of deleting what is live."""
+
+    databases = {"default"}
+
+    def setUp(self):
+        override = override_settings(CACHES=cache_settings())
+        override.enable()
+        self.addCleanup(override.disable)
+        call_command("createcachetable", TABLE, verbosity=0)
+        self.addCleanup(self.drop_table)
+
+    def drop_table(self):
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP TABLE IF EXISTS {TABLE}")
+
+    def value(self, hours):
+        return connection.ops.adapt_datetimefield_value(timezone.now() + timedelta(hours=hours))
+
+    def test_a_counter_renewed_during_the_purge_is_not_deleted(self):
+        with connection.cursor() as cursor:
+            for key in ("renewed", "old"):
+                cursor.execute(
+                    f"INSERT INTO {TABLE} (cache_key, value, expires) VALUES (%s, %s, %s)", [key, "x", self.value(-1)]
+                )
+        problems = []
+
+        def purge():
+            try:
+                call_command("purge_expired_cache", stdout=StringIO(), stderr=StringIO())
+            except Exception as exc:  # reported on the test thread
+                problems.append(exc)
+            finally:
+                connections.close_all()
+
+        worker = threading.Thread(target=purge)
+        with transaction.atomic():
+            with connection.cursor() as cursor:  # a sign-in renewing its counter: the row is locked, not yet committed
+                cursor.execute(f"UPDATE {TABLE} SET expires = %s WHERE cache_key = %s", [self.value(1), "renewed"])
+            worker.start()
+            waited = wait_until_a_session_waits_for_a_lock()
+        worker.join(timeout=30)
+
+        self.assertTrue(waited, "the purge never reached the locked row, so this test did not test the race")
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(problems, [])
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT cache_key FROM {TABLE} ORDER BY cache_key")
+            self.assertEqual([row[0] for row in cursor.fetchall()], ["renewed"])
+
+
 class StartCommandTests(TestCase):
     """render.yaml runs the purge at every start (the owner's choice on #40: Render's free tier has no cron,
     and a free service restarts when it wakes)."""
@@ -135,7 +205,7 @@ class StartCommandTests(TestCase):
     def start_command(self):
         text = (Path(settings.BASE_DIR).parent / "render.yaml").read_text(encoding="utf-8")
         start = text.index("startCommand: >-")
-        lines = [line.strip() for line in text[start:].splitlines()[1:12] if line.strip() and not line.strip().startswith("#")]
+        lines = [line.strip() for line in text[start:].splitlines()[1:16] if line.strip() and not line.strip().startswith("#")]
         return " ".join(lines)
 
     def test_it_runs_after_the_table_exists_and_before_the_server_starts(self):
@@ -149,3 +219,6 @@ class StartCommandTests(TestCase):
 
         self.assertIn("(python manage.py purge_expired_cache ||", command)
         self.assertNotIn("&& python manage.py purge_expired_cache &&", command)
+        group = command[command.index("(python manage.py purge_expired_cache") :].split(") &&")[0]
+        self.assertIn("|| echo", group)  # what runs when the purge fails is a message, not an exit
+        self.assertNotIn("exit", group)

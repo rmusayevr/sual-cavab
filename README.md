@@ -243,9 +243,11 @@ run that removed 0 is normal), and says when it stopped at `--max-batches` with 
 
 **How it runs (the owner's choice on #40):** Render's free tier has no cron, so the start command in
 `render.yaml` runs it at every start, after `createcachetable` and before the server: a free service
-restarts when it wakes, so that is each deploy and each wake-up. It is wrapped in `( ... || echo ...)`, like
+restarts when it wakes (Render's documentation says an idle free service spins down and starts again on the
+next request; that was not tested here), so that is each deploy and, if so, each wake-up. It is wrapped in `( ... || echo ...)`, like
 the demo loader: a failed purge never keeps the site down.
-- **Overlap:** two starts at once are harmless: it deletes only rows that are already expired, picked by key.
+- **Overlap:** two starts at once are harmless: it deletes only rows that are expired, picked by key, and a
+  counter renewed while it runs is kept (it looks at the row again once the lock is free; tested with a real lock).
 - **Missed runs:** nothing is lost; it looks for what is expired now, so any gap is caught up on the next run.
 - **Not running at all:** nothing alerts on that (no scheduler or monitor on the free tier). The consequence
   is the table growing slowly, as it did before this command; `--dry-run` shows how many rows are waiting.
@@ -454,7 +456,7 @@ has no backups and is deleted 30 days after it is created.
   visitor to a fully asleep site may wait about two minutes (not measured end to
   end). The app says so after five seconds of waiting (`WakingNote`).
   Everything the API needs is done in its start command (`migrate`,
-  `createcachetable`, `load_demo_data`), because free instances have no shell.
+  `createcachetable`, `purge_expired_cache`, `load_demo_data`), because free instances have no shell.
 - **The database expires 30 days after creation**, with 14 days to upgrade, then
   it and its data are deleted. To renew: delete the database resource, then sync
   the Blueprint (Render recreates it); the API restarts, migrates and reloads

@@ -54,11 +54,12 @@ class Command(BaseCommand):
             removed = batches = 0
             while batches < max_batches:
                 with connection.cursor() as cursor:
-                    # a bounded delete: the rows are picked by key, so two runs at once cannot delete the same row twice
+                    # A bounded delete. The outer "expires < now" is re-checked when the row is locked: a counter that
+                    # was renewed after the subselect picked it (its expiry moved to the future) must not be deleted.
                     cursor.execute(
-                        f"DELETE FROM {name} WHERE cache_key IN "
+                        f"DELETE FROM {name} WHERE expires < %s AND cache_key IN "
                         f"(SELECT cache_key FROM {name} WHERE expires < %s LIMIT %s)",
-                        [now, batch_size],
+                        [now, now, batch_size],
                     )
                     deleted = cursor.rowcount
                 batches += 1
@@ -73,5 +74,5 @@ class Command(BaseCommand):
                 f"{time.monotonic() - started:.2f} s"
             )
             if left:
-                message += f"; {left} expired row(s) are left (this run stopped at --max-batches; run it again)"
+                message += f"; {left} expired row(s) are still there (run it again)"
             self.stdout.write(message)
