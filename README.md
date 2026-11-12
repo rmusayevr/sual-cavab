@@ -643,11 +643,14 @@ under real traffic, drafting against this database.
 
 ### Backups and restore (#35)
 
-**There is no automatic backup.** Supabase's documentation says automatic daily backups are for Pro, Team and Enterprise
-projects (7 days of them on Pro) and recommends that Free projects "regularly export their data" and keep copies elsewhere.
-Staging holds invented demo data only, so this is acceptable for it; it is **not** acceptable for real data. Two owner
-decisions are still open: where production runs and on which database plan, and whether staging ever moves to a paid plan
-(which would bring daily backups). Until then the routine below is manual, and it is the evidence the `review-for-data-loss`
+**There is no automatic backup, and the owner has decided there will not be one.** Supabase's documentation says automatic
+daily backups are for Pro, Team and Enterprise projects (7 days of them on Pro) and recommends that Free projects
+"regularly export their data" and keep copies elsewhere. **Decision (owner, 2026-11-12): production stays on Supabase's Free
+plan** (Render keeps the API and the frontend), and so does staging. That means **the manual routine below is the only
+backup**: if the production database is lost, or the free project is paused and not restored, everything written since the
+last dump you took and stored elsewhere is gone. Staging holds invented demo data only, so this costs nothing there; for
+production it is a risk the owner has accepted knowingly; moving to Pro later would bring daily backups (not tried, so how the
+upgrade works is unchecked). The routine below is the evidence the `review-for-data-loss`
 skill asks for: a backup that was **restored**, not one that reported success.
 
 **Set up (once).** Create `backend/.env.backup` with one line:
