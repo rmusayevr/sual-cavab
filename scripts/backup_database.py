@@ -9,7 +9,7 @@ command line and out of every message, writes no temporary files in the containe
 there), and refuses to put a dump inside this repository.
 
 The database to back up is named by BACKUP_DATABASE_URL, the Supabase *session pooler* address
-(postgresql://postgres.<ref>:<password>@<host>:5432/postgres?sslmode=require), taken from the environment or, if
+(postgresql://postgres.<ref>:<your database password>@<host>:5432/postgres?sslmode=require), taken from the environment or, if
 it is not set, from backend/.env (git-ignored; keep it OUT of DJANGO_DATABASE_URL, which would point the tests at it).
 The address is split into PGHOST, PGUSER, PGPASSWORD ... and handed to the container by NAME, so it never appears in
 an argument list; a message that mentions the password has it replaced.
@@ -82,7 +82,7 @@ def parse_source(url):
     except ValueError:
         raise Fail("BACKUP_DATABASE_URL is not a valid address.") from None
     if parts.scheme not in ("postgres", "postgresql") or not parts.hostname or not parts.username or parts.password is None:
-        raise Fail("BACKUP_DATABASE_URL must look like postgresql://user:password@host:5432/database?sslmode=require.")
+        raise Fail("BACKUP_DATABASE_URL must look like postgresql://<user>:<your database password>@<host>:5432/<database>?sslmode=require.")
     name = unquote(parts.path.lstrip("/"))
     if not name:
         raise Fail("BACKUP_DATABASE_URL needs a database name after the host.")

@@ -61,7 +61,7 @@ class ParseSourceTests(SimpleTestCase):
     def test_a_bad_address_is_refused_without_quoting_the_address_or_the_password(self):
         bad = {
             "scheme typo": f"postgresq://u:{SECRET}@host:5432/x",
-            "no password": "postgresql://u@host:5432/x",
+            "user only": "postgresql://u@host:5432/x",
             "no database": f"postgresql://u:{SECRET}@host:5432",
             "no user": f"postgresql://:{SECRET}@host:5432/x",
             "port not a number": f"postgresql://u:{SECRET}@host:port/x",
