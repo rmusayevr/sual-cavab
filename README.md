@@ -643,12 +643,29 @@ under real traffic, drafting against this database.
 
 ### Backups and restore (#35)
 
-**There is no automatic backup.** Supabase's documentation says automatic daily backups are for Pro, Team and Enterprise
-projects (7 days of them on Pro) and recommends that Free projects "regularly export their data" and keep copies elsewhere.
-Staging holds invented demo data only, so this is acceptable for it; it is **not** acceptable for real data. Two owner
-decisions are still open: where production runs and on which database plan, and whether staging ever moves to a paid plan
-(which would bring daily backups). Until then the routine below is manual, and it is the evidence the `review-for-data-loss`
-skill asks for: a backup that was **restored**, not one that reported success.
+**There is no automatic backup, by decision.** Supabase's documentation says automatic daily backups are for Pro, Team and
+Enterprise projects (7 days of them on Pro) and recommends that Free projects "regularly export their data" and keep copies
+elsewhere.
+
+**Decision (owner, 2026-11-12): when production exists, its database stays on Supabase's Free plan, like staging's.** Nothing
+of production is set up yet (`render.yaml` is the staging site's), and which Render plan its API and frontend would use is not
+decided. It is revisitable: moving to Pro would bring daily backups (not tried, so how the upgrade works is unchecked).
+Until then **the manual routine below is the only backup**, and what the owner accepted is this:
+
+- **Data.** If the production database is lost, everything written since the last dump that someone took *and stored
+  elsewhere* is gone. Nothing runs the routine on a schedule.
+- **Recovery is unproven.** The routine was only ever restored into a local copy, never into Supabase, never off-site, never
+  at real volumes (see "Not covered" below).
+- **Availability.** A free Supabase project pauses after about a week without use, and while it is paused the API does not
+  start (see "The database is Supabase's"). No keep-alive is built.
+- **Real data on a developer machine.** `check` restores into the local Docker database, so a production check puts real
+  client data on that machine and in a dump file; treat both as credentials, and keep dumps outside the repository.
+
+The script and the examples below were written and tested for **staging**. Backing up production means pointing
+`BACKUP_DATABASE_URL` at it, which nothing has done. The staging rule against real client data (it has a public demo password
+and no backups) stands; production's no-backup risk is the one accepted here. Not checked: whether one Supabase organization
+may hold two free projects, and whether the free plan's size and traffic limits are enough for production. The routine is the
+evidence the `review-for-data-loss` skill asks for: a backup that was **restored**, not one that reported success.
 
 **Set up (once).** Create `backend/.env.backup` with one line:
 `BACKUP_DATABASE_URL=postgresql://postgres.<ref>:<your database password>@<pooler host>:5432/postgres?sslmode=require`
