@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import ProjectList from "./ProjectList";
@@ -15,6 +15,7 @@ const project = (id: number, name: string, role: "owner" | "member" = "member", 
 });
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+const page = (results: unknown[], count = results.length) => ({ count, page: 1, page_size: 25, results });
 
 describe("ProjectList", () => {
   afterEach(() => {
@@ -30,7 +31,7 @@ describe("ProjectList", () => {
   });
 
   it("lists my projects with a link to each", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner"), project(2, "Refunds")])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(1, "Ticketing", "owner"), project(2, "Refunds")]))));
 
     render(<ProjectList />);
 
@@ -39,7 +40,7 @@ describe("ProjectList", () => {
   });
 
   it("shows how many questions are still open on each project, including none", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3), project(2, "Refunds")])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(1, "Ticketing", "owner", 3), project(2, "Refunds")]))));
 
     render(<ProjectList />);
 
@@ -49,7 +50,7 @@ describe("ProjectList", () => {
   });
 
   it("says so when I am on no project", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([]))));
 
     render(<ProjectList />);
 
@@ -76,7 +77,7 @@ describe("ProjectList", () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
       if (init?.method === "POST") return json(201, project(7, "Brand New", "owner"));
-      return json(200, []);
+      return json(200, page([]));
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<ProjectList />);
@@ -94,7 +95,7 @@ describe("ProjectList", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
       if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
       if (init?.method === "POST") return json(400, { name: ["This field is required."] });
-      return json(200, []);
+      return json(200, page([]));
     }));
     render(<ProjectList />);
 
@@ -113,7 +114,7 @@ describe("ProjectList look (#55)", () => {
   });
 
   it("shows the client, the role and the count under the project's name", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3)])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(1, "Ticketing", "owner", 3)]))));
 
     render(<ProjectList />);
 
@@ -122,7 +123,7 @@ describe("ProjectList look (#55)", () => {
   });
 
   it("the new-project form uses the shared fields and button", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([]))));
 
     render(<ProjectList />);
 
@@ -142,7 +143,7 @@ describe("ProjectList look (#55)", () => {
   });
 
   it("each project is a card, and its name is a link that is easy to tap", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3)])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(1, "Ticketing", "owner", 3)]))));
 
     render(<ProjectList />);
 
@@ -158,7 +159,7 @@ describe("ProjectList: no bullets (#55)", () => {
   });
 
   it("the list of projects is a card list without bullet markers (there is no browser reset)", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3)])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(1, "Ticketing", "owner", 3)]))));
 
     render(<ProjectList />);
 
@@ -172,7 +173,7 @@ describe("ProjectList: the ledger (#72)", () => {
   });
 
   it("numbers the projects like ledger lines, in monospace and red", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3), project(2, "Refunds")])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(1, "Ticketing", "owner", 3), project(2, "Refunds")]))));
 
     render(<ProjectList />);
 
@@ -182,7 +183,7 @@ describe("ProjectList: the ledger (#72)", () => {
   });
 
   it("marks a project that is still waiting with a saffron count, like the example's rail, and no mark for 0", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3), project(2, "Refunds", "member", 0)])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(1, "Ticketing", "owner", 3), project(2, "Refunds", "member", 0)]))));
 
     const { container } = render(<ProjectList />);
 
@@ -195,7 +196,7 @@ describe("ProjectList: the ledger (#72)", () => {
   });
 
   it("an empty list is a card that says what to do next, true at every width, and adds no carpet strip (the page header has the one)", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([]))));
 
     const { container } = render(<ProjectList />);
 
@@ -207,7 +208,7 @@ describe("ProjectList: the ledger (#72)", () => {
   });
 
   it("names each project in a level-2 heading that holds the link, so a screen reader can move between projects", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [project(1, "Ticketing", "owner", 3), project(2, "Refunds")])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(1, "Ticketing", "owner", 3), project(2, "Refunds")]))));
 
     render(<ProjectList />);
 
@@ -226,7 +227,7 @@ describe("ProjectList: the ledger (#72)", () => {
   });
 
   it("the new-project card has a saffron rule on top (not a carpet strip: the page has one already), a monospace eyebrow and a heading", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, [])));
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([]))));
 
     const { container } = render(<ProjectList />);
 
@@ -235,5 +236,150 @@ describe("ProjectList: the ledger (#72)", () => {
     expect(card).toHaveClass("border-t-4", "border-t-saffron");
     expect(within(card).getByText("New line")).toHaveClass("font-mono", "uppercase");
     expect(container.querySelectorAll(".pattern-carpet")).toHaveLength(0);
+  });
+
+  describe("pages (#49)", () => {
+    const many = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, k) => project(from + k, `Invented ${from + k}`));
+    const paged = (results: unknown[], pageNo: number, count: number) => ({ count, page: pageNo, page_size: 25, results });
+
+    it("says how many are shown of how many, and offers more when there are more", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => json(200, paged(many(1, 25), 1, 30))));
+
+      render(<ProjectList />);
+
+      await screen.findByRole("link", { name: "Invented 1" });
+      expect(screen.getByText("Showing 25 of 30")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Show more" })).toBeInTheDocument();
+    });
+
+    it("has no Show more button when the first page is exactly full and that is everything", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => json(200, paged(many(1, 25), 1, 25))));
+
+      render(<ProjectList />);
+
+      await screen.findByText("Showing 25 of 25");
+      expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+    });
+
+    it("announces the count as a status", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => json(200, paged(many(1, 3), 1, 3))));
+
+      render(<ProjectList />);
+
+      await screen.findByText("Showing 3 of 3");
+      expect(screen.getByText("Showing 3 of 3")).toHaveAttribute("role", "status");
+    });
+
+    it("sends one request for the next page however fast Show more is pressed", async () => {
+      const fetchMock = vi.fn(async (url: string) =>
+        url.includes("page=2") ? json(200, paged(many(26, 30), 2, 30)) : json(200, paged(many(1, 25), 1, 30)),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      render(<ProjectList />);
+      const button = await screen.findByRole("button", { name: "Show more" });
+
+      act(() => {
+        button.click();
+        button.click();
+      });
+
+      await screen.findByText("Showing 30 of 30");
+      expect(fetchMock.mock.calls.filter(([u]) => String(u).includes("page=2"))).toHaveLength(1);
+    });
+
+    it("stops offering more when the next page no longer exists (the list got shorter)", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => (url.includes("page=2") ? json(404, { detail: "Invalid page." }) : json(200, paged(many(1, 25), 1, 26)))),
+      );
+      render(<ProjectList />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
+
+      await screen.findByText("Showing 25 of 25");
+      expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("keeps the keyboard in the list when the last page arrives and the button goes", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) =>
+          url.includes("page=2") ? json(200, paged(many(26, 30), 2, 30)) : json(200, paged(many(1, 25), 1, 30)),
+        ),
+      );
+      render(<ProjectList />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
+
+      await screen.findByText("Showing 30 of 30");
+      expect(screen.getByRole("status")).toHaveFocus();
+    });
+
+    it("has no Show more button when everything is shown", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => json(200, paged(many(1, 3), 1, 3))));
+
+      render(<ProjectList />);
+
+      await screen.findByRole("link", { name: "Invented 1" });
+      expect(screen.getByText("Showing 3 of 3")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+    });
+
+    it("asks for the next page and adds it below, once, then hides the button", async () => {
+      const fetchMock = vi.fn(async (url: string) =>
+        url.includes("page=2") ? json(200, paged(many(26, 30), 2, 30)) : json(200, paged(many(1, 25), 1, 30)),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      render(<ProjectList />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
+
+      expect(await screen.findByRole("link", { name: "Invented 30" })).toBeInTheDocument();
+      expect(screen.getAllByRole("link", { name: /^Invented/ })).toHaveLength(30);
+      expect(screen.getByText("Showing 30 of 30")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+      expect(fetchMock.mock.calls.filter(([u]) => String(u).includes("page=2"))).toHaveLength(1);
+    });
+
+    it("says so and keeps what is shown when the next page fails, and lets the person try again", async () => {
+      let fail = true;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          if (!url.includes("page=2")) return json(200, paged(many(1, 25), 1, 30));
+          return fail ? json(500, {}) : json(200, paged(many(26, 30), 2, 30));
+        }),
+      );
+      render(<ProjectList />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
+
+      expect(await screen.findByText("Could not load more projects. Try again.")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Invented 1" })).toBeInTheDocument();
+      fail = false;
+      fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+      expect(await screen.findByRole("link", { name: "Invented 30" })).toBeInTheDocument();
+    });
+
+    it("does not show a project twice when one created here also arrives on a later page", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init?: RequestInit) => {
+          if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+          if (init?.method === "POST") return json(201, project(26, "Invented 26", "owner"));
+          return url.includes("page=2") ? json(200, paged(many(26, 26), 2, 26)) : json(200, paged(many(1, 25), 1, 26));
+        }),
+      );
+      render(<ProjectList />);
+      fireEvent.change(await screen.findByLabelText("Project name"), { target: { value: "Invented 26" } });
+      fireEvent.change(screen.getByLabelText("Client"), { target: { value: "Invented Client" } });
+      fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+      await screen.findByText("Showing 26 of 27");
+      fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+      await screen.findByText("Showing 26 of 26");
+      expect(screen.getAllByRole("link", { name: "Invented 26" })).toHaveLength(1);
+    });
   });
 });

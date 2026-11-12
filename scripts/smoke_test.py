@@ -92,7 +92,8 @@ def run(base, password, draft=False, out=print):
     owner = Session(base)
     check("the demo owner can sign in", owner.sign_in(OWNER, password) == 200)
     status, projects = owner.call("GET", "/api/projects/")
-    projects = projects if status == 200 and isinstance(projects, list) else []
+    projects = projects.get("results") if status == 200 and isinstance(projects, dict) else projects  # a page (#49); a list from before it
+    projects = projects if isinstance(projects, list) else []
     by_name = {p["name"]: p for p in projects}
     for name, expected in EXPECTED_STILL_OPEN.items():
         got = by_name.get(name, {}).get("open_question_count")
@@ -112,6 +113,7 @@ def run(base, password, draft=False, out=print):
     outsider = Session(base)
     check("the demo outsider can sign in", outsider.sign_in(OUTSIDER, password) == 200)
     status, theirs = outsider.call("GET", "/api/projects/")
+    theirs = theirs.get("results") if isinstance(theirs, dict) else theirs
     check("a person on no project sees no projects", status == 200 and theirs == [], f"{status} {theirs}")
     if ticketing:
         status, _ = outsider.call("GET", f"/api/projects/{ticketing['id']}/")

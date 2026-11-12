@@ -8,6 +8,7 @@ import ProjectsPage from "@/app/projects/page";
 import { setLanguage, translate, type Key, type Language } from "./index";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+const page = (results: unknown[], count = results.length) => ({ count, page: 1, page_size: 25, results });
 const project = (id: number, role: "owner" | "member", open: number) => ({
   id,
   name: `Invented project ${id}`,
@@ -63,7 +64,7 @@ for (const lang of ["en", "az"] as Language[]) {
       vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) =>
-          url.includes("/auth/me") ? json(200, { id: 1, email: "a@example.invalid", name: "Ada" }) : json(200, [project(1, "owner", 3), project(2, "member", 0)]),
+          url.includes("/auth/me") ? json(200, { id: 1, email: "a@example.invalid", name: "Ada" }) : json(200, page([project(1, "owner", 3), project(2, "member", 0)])),
         ),
       );
 
@@ -108,7 +109,7 @@ for (const lang of ["en", "az"] as Language[]) {
         vi.fn(async (url: string, init?: RequestInit) => {
           if (url.includes("/auth/me")) return json(200, { id: 1, email: "a@example.invalid", name: "Ada" });
           if (init?.method === "POST") throw new Error("offline");
-          return json(200, []);
+          return json(200, page([]));
         }),
       );
       render(<ProjectsPage />);
@@ -125,7 +126,7 @@ for (const lang of ["en", "az"] as Language[]) {
       act(() => setLanguage(lang));
       vi.stubGlobal(
         "fetch",
-        vi.fn(async (url: string) => (url.includes("/auth/me") ? json(200, { id: 1, email: "a@example.invalid", name: "Ada" }) : json(200, []))),
+        vi.fn(async (url: string) => (url.includes("/auth/me") ? json(200, { id: 1, email: "a@example.invalid", name: "Ada" }) : json(200, page([])))),
       );
 
       render(<ProjectsPage />);
@@ -140,7 +141,7 @@ for (const lang of ["en", "az"] as Language[]) {
         vi.fn(async (url: string, init?: RequestInit) => {
           if (url.includes("/auth/me")) return json(200, { id: 1, email: "a@example.invalid", name: "Ada" });
           if (init?.method === "POST") return json(400, {});
-          return json(200, []);
+          return json(200, page([]));
         }),
       );
       render(<ProjectsPage />);
@@ -174,7 +175,7 @@ describe("an error already on screen", () => {
       vi.fn(async (url: string, init?: RequestInit) => {
         if (url.includes("/auth/me")) return json(200, { id: 1, email: "a@example.invalid", name: "Ada" });
         if (init?.method === "POST") return json(400, {});
-        return json(200, []);
+        return json(200, page([]));
       }),
     );
     render(<ProjectsPage />);

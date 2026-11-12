@@ -64,12 +64,12 @@ class SeeTests(ProjectAccessTestCase):
     def test_list_shows_only_my_projects(self):
         Project.objects.create(name="Someone else's", client_name="Other", created_by=self.outsider)
 
-        names = [p["name"] for p in self.as_user(self.member).get("/api/projects/").json()]
+        names = [p["name"] for p in self.as_user(self.member).get("/api/projects/").json()["results"]]
 
         self.assertEqual(names, ["Ticketing"])
 
     def test_outsider_lists_no_projects(self):
-        self.assertEqual(self.as_user(self.outsider).get("/api/projects/").json(), [])
+        self.assertEqual(self.as_user(self.outsider).get("/api/projects/").json()["results"], [])
 
     def test_superuser_who_is_not_a_member_gets_404(self):
         admin = get_user_model().objects.create_superuser(email="root@example.com", password=PASSWORD)
@@ -388,7 +388,7 @@ class OpenQuestionCountTests(ProjectAccessTestCase):
         )
 
     def count_for(self, user, project):
-        rows = self.as_user(user).get("/api/projects/").json()
+        rows = self.as_user(user).get("/api/projects/").json()["results"]
         return next(r["open_question_count"] for r in rows if r["id"] == project.pk)
 
     def test_counts_open_and_asked_only(self):
@@ -425,5 +425,5 @@ class OpenQuestionCountTests(ProjectAccessTestCase):
 
     def test_an_outsider_learns_nothing(self):
         self.add(self.project, "open", 1)
-        self.assertEqual(self.as_user(self.outsider).get("/api/projects/").json(), [])
+        self.assertEqual(self.as_user(self.outsider).get("/api/projects/").json()["results"], [])
         self.assertEqual(self.as_user(self.outsider).get(self.detail()).status_code, 404)
