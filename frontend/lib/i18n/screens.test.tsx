@@ -12,7 +12,7 @@ import { statusLabel } from "@/lib/status";
 import { en } from "./en";
 import { setLanguage, translate, type Key, type Language } from "./index";
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: "5" }), useRouter: () => ({ replace: () => {} }) }));
+vi.mock("next/navigation", () => ({ useParams: () => ({ id: "5" }), useRouter: () => ({ replace: () => {}, push: () => {} }) }));
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 const page = (results: unknown[], count = results.length) => ({ count, page: 1, page_size: 25, results });

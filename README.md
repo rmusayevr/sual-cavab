@@ -306,6 +306,15 @@ you are not on is a 404, the same as one that does not exist.
 | Delete the project                  | nobody in v1 (there is no delete endpoint) |
 
 - Any signed-in user can create a project and becomes its first owner.
+- **Adding and removing members from the screen (#33).** On the project page an owner sees a **Manage members**
+  section: the members with a Remove button (asks "Remove ... from this project?" first), and a form with an
+  email and a role (member or owner). An owner who wants to hand a project over adds the new owner here before
+  leaving. A member does not see the section, and the API still refuses them (403). Messages from the server
+  (unknown email, already a member, "a project needs at least one active owner", the 30-an-hour limit) show next
+  to the field or above the form in the server's words, which stay English. After a change the list is read again
+  from the server; an owner who removes themselves is taken to the projects list. Changing a member's role in
+  place, and showing who is deactivated, are not built (the API has neither). Tested with the API mocked
+  (`MembersPanel.test.tsx`) and against the server's real rules in the backend tests; not tried in a browser.
 - **The project list comes in pages of 25** (#49), by name then id. `GET /api/projects/?page=2` answers
   `{count, page, page_size, results}`; the page size cannot be chosen, and a page number that does not exist is a 404 (DRF also accepts `?page=last`).
   The projects screen shows "Showing 25 of 30" and a **Show more** button. The project screen asks for its own
