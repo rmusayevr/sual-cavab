@@ -489,7 +489,8 @@ described by `render.yaml` (the API, the frontend and a PostgreSQL 17 database,
 all on Render's free plan, in Frankfurt) and deploys from the `staging` branch.
 
 **Never put real client questions, names or messages on it.** The free database
-has no backups and is deleted 30 days after it is created.
+has no backups and is deleted 30 days after it is created (to keep the data longer,
+see "Using Supabase for the database instead of Render's" below).
 
 ### First deploy (once; needs a Render account, so the owner does it)
 
@@ -537,6 +538,63 @@ has no backups and is deleted 30 days after it is created.
 - Drafting is **off** until you add `ANTHROPIC_API_KEY` in the API service's
   Environment tab; without it the draft button says "not set up". A real draft
   there sends the demo question text to the Claude API, as anywhere else.
+
+### Using Supabase for the database instead of Render's
+
+Render's free database is deleted after 30 days (see below). Supabase's free PostgreSQL is not deleted, but it **pauses**
+after about a week with little activity and has **no backups** on the free plan. The app only needs plain PostgreSQL, so the
+only thing that changes is `DJANGO_DATABASE_URL`; there is no code change. This is a procedure for the owner (it needs
+the Supabase and Render accounts); nothing here has been done on Render yet.
+
+**Do this once**
+
+1. In Supabase: **New project**. Region **Frankfurt (eu-central-1)**, the same region as Render. Generate a database password
+   of letters and digits only (anything else must be percent-encoded in the URL). Under **Security**, turn **Enable Data API
+   off** (and leave "automatically expose new tables" and "automatic RLS" off): Django keeps all its tables, including the
+   users table, in the `public` schema, and the Data API would put them behind a public REST endpoint. The app does not
+   use it.
+2. Wait until the project is ready. A new project took about **7 minutes** before the pooler accepted connections
+   (the first attempts answered `tenant/user ... not found`, which is not a password error).
+3. **Connect**, then **Session pooler**: host `aws-N-<region>.pooler.supabase.com`, port **5432**, user
+   `postgres.<project-ref>`. Use this one, not the others:
+   - *Direct connection*: IPv6 only on the free plan; whether Render's free services can reach IPv6 was not checked.
+   - *Transaction pooler* (port 6543): no session-level state, no prepared statements. The app's request limits take a
+     **transaction-level** advisory lock (`core/throttles.py`), which the Supabase documentation says works there, but this
+     was not tested; the session pooler was.
+4. Build the URL: `postgresql://postgres.<project-ref>:<password>@<pooler host>:5432/postgres?sslmode=require`
+   (`sslmode` is the only option `config/dburl.py` accepts).
+5. In Render, on the API service, **Environment**: set `DJANGO_DATABASE_URL` to that URL and save; the service redeploys, and
+   its start command migrates, creates the cache table, purges expired counters and loads the demo data. `render.yaml`
+   marks the variable `sync: false`, so a later Blueprint sync leaves your value alone (Render's documentation says
+   `sync: false` variables are ignored after the first creation; not tested here).
+6. Run the smoke test (`scripts/smoke_test.py`, usage in its header) against the frontend's address.
+7. Only after that works: delete the old database in Render by hand. `render.yaml` still has its `databases:` block, on
+   purpose: Render's documentation does not say what removing a block does, so it is removed in a later change, after the
+   database is gone.
+
+**Things to know**
+
+- **15 connections at once.** On the project this was tried on, the session pooler allowed 15 clients (`EMAXCONNSESSION ...
+  pool_size: 15`). The API (one worker, four threads) needs a few. The burst tests in `core/test_exact_throttles.py` open
+  25 to 45 connections and fail against it for that reason, not because the counting is wrong.
+- **Never put this URL in `backend/.env`.** While `DJANGO_DATABASE_URL` is set, every local run and every test goes to
+  that database. The tests create and drop their own `test_*` databases there (a teardown error left three behind in one
+  trial), and some assume the local database. Local work and the tests use the Docker database.
+- **Pausing.** A free project is paused after about a week without enough database activity (a few requests a day usually
+  keep it awake; opening it in the dashboard counts). Supabase emails a warning about a week before. A paused project is
+  restored from the dashboard (the documentation says up to a year after pausing); until then the API's database calls
+  fail. A Render service that sleeps makes no requests, so a quiet week pauses the database. No keep-alive is built.
+- **Limits and backups (free plan).** 500 MB per project; 5 GB of egress for the organization; the dashboard showed "No
+  backups". The rule above still holds: invented demo data only.
+
+**What was checked** (on the Supabase project itself, from a developer machine, not from Render): the URL is read as
+intended; `migrate` and `createcachetable` ran; `manage.py check --database default` was clean; a 12-way simultaneous
+burst of sign-in checks let exactly 4 through against a limit of 4 (12 without the lock); the backend suite ran against it
+with 371 of 380 tests passing. The nine that failed are the five connection-count tests above, three that test how
+`POSTGRES_*` is read while a URL is set (the URL wins, as designed), and one that sends 400 requests after a one-minute
+lock and takes about 90 seconds over the internet, so the lock had expired (it passes with an hourly window).
+**Not checked:** a deploy on Render with this database, the transaction pooler, the direct connection, a pause and a
+restore, behaviour under real traffic.
 
 ### Things to know (Render's free plan, from its documentation)
 
