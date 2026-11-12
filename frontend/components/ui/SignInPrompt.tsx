@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { useT, type Key } from "@/lib/i18n";
+import { useLoginHref } from "@/lib/useLoginHref";
 
 import { buttonClasses } from "./Button";
 
@@ -14,6 +15,7 @@ import { buttonClasses } from "./Button";
  */
 export function SignInPrompt({ line }: { line: Key }) {
   const t = useT();
+  const href = useLoginHref();
   return (
     <p className="flex flex-wrap items-center gap-2">
       {t(line)
@@ -21,7 +23,7 @@ export function SignInPrompt({ line }: { line: Key }) {
         .flatMap((part, i, parts) => [
           part.trim() ? <span key={`t${i}`}>{part}</span> : null,
           i < parts.length - 1 ? (
-            <Link key={`l${i}`} href="/login" className={buttonClasses("primary")}>
+            <Link key={`l${i}`} href={href} className={buttonClasses("primary")}>
               {t("session.signIn")}
             </Link>
           ) : null,

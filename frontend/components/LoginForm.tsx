@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { useT, type Key } from "@/lib/i18n";
+import { safeNext } from "@/lib/safeNext";
 
 import { Alert } from "./ui/Alert";
 import { Button } from "./ui/Button";
@@ -26,7 +27,9 @@ export default function LoginForm() {
     try {
       const response = await apiFetch("/api/auth/login/", { method: "POST", body: { email, password } });
       if (response.ok) {
-        router.replace("/");
+        // Read when the form is sent, from the address the person is on: back to the page that asked for the
+        // sign-in (#96), only if it is a page of this app.
+        router.replace(safeNext(new URLSearchParams(window.location.search).get("next")) ?? "/");
         return;
       }
       if (response.status === 429) setError("login.tooMany");
