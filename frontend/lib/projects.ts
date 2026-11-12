@@ -13,6 +13,25 @@ export type Project = {
   updated_at: string;
 };
 
+/** One page of the project list (#49): `count` is every project the person is on, `page_size` how many a page holds. */
+export type ProjectPage = {
+  count: number;
+  page: number;
+  page_size: number;
+  results: Project[];
+};
+
+/** Whether there is a page after the ones loaded: pages are counted from `count` and `page_size`, not from links. */
+export function hasMoreProjects(page: Pick<ProjectPage, "count" | "page" | "page_size">): boolean {
+  return page.page * page.page_size < page.count;
+}
+
+/** `more` added after `have`, leaving out any project already in `have` (one created here can also come in on a later page). */
+export function addProjects(have: Project[], more: Project[]): Project[] {
+  const seen = new Set(have.map((p) => p.id));
+  return [...have, ...more.filter((p) => !seen.has(p.id))];
+}
+
 export type Member = {
   user_id: number;
   email: string;

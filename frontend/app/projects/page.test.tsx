@@ -6,6 +6,7 @@ import { WAKING_TEXT } from "@/components/ui/WakingNote";
 import ProjectsPage from "./page";
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+const page = (results: unknown[], count = results.length) => ({ count, page: 1, page_size: 25, results });
 
 // The projects page (#72): a navy header band with a carpet seam, then the ledger of projects.
 describe("ProjectsPage", () => {
@@ -43,7 +44,7 @@ describe("ProjectsPage", () => {
   });
 
   it("has exactly one carpet strip with a list of projects and the new-project card", async () => {
-    stubApi(user(), json(200, [project]));
+    stubApi(user(), json(200, page([project])));
 
     const { container } = render(<ProjectsPage />);
 
@@ -52,7 +53,7 @@ describe("ProjectsPage", () => {
   });
 
   it("has exactly one carpet strip when the list is empty", async () => {
-    stubApi(user(), json(200, []));
+    stubApi(user(), json(200, page([])));
 
     const { container } = render(<ProjectsPage />);
 
@@ -70,7 +71,7 @@ describe("ProjectsPage", () => {
   });
 
   it("has one h1 and no other level-1 heading", async () => {
-    stubApi(user(), json(200, [project]));
+    stubApi(user(), json(200, page([project])));
 
     render(<ProjectsPage />);
 
@@ -82,7 +83,7 @@ describe("ProjectsPage", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) =>
-        url.includes("/auth/me") ? json(200, { id: 1, email: "ada@example.com", name: "Ada Lovelace" }) : json(200, []),
+        url.includes("/auth/me") ? json(200, { id: 1, email: "ada@example.com", name: "Ada Lovelace" }) : json(200, page([])),
       ),
     );
 

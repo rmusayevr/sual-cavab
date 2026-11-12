@@ -6,6 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from .models import Membership, Project
+from .pagination import ProjectPagination
 from .permissions import lock_caller_membership, role_may_manage_members
 from .serializers import AddMemberSerializer, MemberSerializer, ProjectSerializer
 from .throttles import MemberAddThrottle
@@ -40,8 +41,17 @@ class ProjectViewSet(
 
     serializer_class = ProjectSerializer
 
+    pagination_class = ProjectPagination
+
     def get_queryset(self):
-        return Project.objects.visible_to(self.request.user).with_open_count().prefetch_related("memberships")
+        # Ordered here on purpose: the open-question count groups the query, and Django then drops the model's
+        # Meta.ordering, so without this the list had no defined order and pages could repeat or skip (#49).
+        return (
+            Project.objects.visible_to(self.request.user)
+            .with_open_count()
+            .prefetch_related("memberships")
+            .order_by("name", "id")
+        )
 
     def get_throttles(self):
         # Only adding a member is limited: it answers "does this email have an

@@ -20,6 +20,19 @@ const project = (id: number, name: string, open: number) => ({
 });
 const projects = [project(5, "Ticketing", 2), project(6, "Portal", 0)];
 
+/** One page of the project list (#49), the way the API answers it. */
+const pageOf = (results: unknown[], count = results.length) => ({ count, page: 1, page_size: 25, results });
+
+/** What the API answers for a project URL: the list as a page, one project by its own address (404 if the person is not on it). */
+function projectsReply(url: string): Response {
+  const one = /^\/api\/projects\/(\d+)\/$/.exec(url);
+  if (one) {
+    const found = projects.find((p) => String(p.id) === one[1]);
+    return found ? json(200, found) : json(404, { detail: "Not found." });
+  }
+  return json(200, pageOf(projects));
+}
+
 const q = (number: number, status: string, text: string) => ({
   id: number,
   number,
@@ -57,7 +70,7 @@ function api(overrides: Record<string, () => Response> = {}) {
       }
       if (url.includes("/questions/")) return json(200, served);
       if (url.endsWith("/members/")) return json(200, members);
-      return json(200, projects);
+      return projectsReply(url);
     }),
   );
 }
@@ -278,7 +291,7 @@ describe("Workspace (#70)", () => {
       vi.fn(async (url: string) => {
         if (url.endsWith("/members/")) throw new Error("offline");
         if (url.includes("/questions/")) return json(200, served);
-        return json(200, projects);
+        return projectsReply(url);
       }),
     );
     render(<Workspace />);
@@ -302,7 +315,7 @@ describe("Workspace (#70)", () => {
       vi.fn((url: string) => {
         if (url.endsWith("/members/")) return new Promise<Response>(() => {});
         if (url.includes("/questions/")) return Promise.resolve(json(200, served));
-        return Promise.resolve(json(200, projects));
+        return Promise.resolve(projectsReply(url));
       }),
     );
     render(<Workspace />);
@@ -346,7 +359,7 @@ describe("Workspace (#70)", () => {
         if (method === "POST" && url.endsWith("/questions/")) return onAdd(body);
         if (url.includes("/questions/")) return json(200, list);
         if (url.endsWith("/members/")) return json(200, members);
-        return json(200, projects);
+        return projectsReply(url);
       }),
     );
     return sent;
@@ -476,7 +489,7 @@ describe("Workspace (#70)", () => {
         if (url.endsWith("/draft/")) return draftAnswer();
         if (url.includes("/questions/")) return json(200, served);
         if (url.endsWith("/members/")) return json(200, members);
-        return json(200, projects);
+        return projectsReply(url);
       }),
     );
 
@@ -594,7 +607,7 @@ describe("Workspace (#70)", () => {
       "fetch",
       vi.fn(async (url: string) => {
         if (url.includes("/questions/")) throw new Error("offline");
-        return json(200, url.endsWith("/members/") ? members : projects);
+        return (url.endsWith("/members/") ? json(200, members) : projectsReply(url));
       }),
     );
     render(<Workspace />);
@@ -626,7 +639,7 @@ describe("Workspace (#70)", () => {
         if (url === "/api/projects/5/questions/1/") return json(200, { ...questions[0], status: "dropped" });
         if (url.includes("/questions/")) return json(200, served);
         if (url.endsWith("/members/")) return json(200, members);
-        return json(200, projects);
+        return projectsReply(url);
       }),
     );
     render(<Workspace />);
@@ -700,7 +713,7 @@ describe("Workspace (#70)", () => {
       vi.fn(async (url: string) => {
         if (url.includes("/questions/")) return json(403, { detail: "Authentication credentials were not provided." });
         if (url.endsWith("/members/")) return json(200, members);
-        return json(200, projects);
+        return projectsReply(url);
       }),
     );
     render(<Workspace />);
@@ -722,5 +735,65 @@ describe("Workspace (#70)", () => {
 
     expect(await screen.findByText(/to see this project\./)).toBeInTheDocument();
     expect(screen.queryByText("Project not found.")).not.toBeInTheDocument();
+  });
+
+  describe("the project list in pages (#49)", () => {
+    it("asks for the project by its own address, so a project past the first page still opens", async () => {
+      const fetchMock = vi.fn(async (url: string) => {
+        if (url === "/api/projects/") return json(200, { count: 40, page: 1, page_size: 25, results: [project(6, "Portal", 0)] });
+        if (url === "/api/projects/5/") return json(200, projects[0]);
+        if (url.includes("/questions/")) return json(200, served);
+        return json(200, members);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      render(<Workspace />);
+
+      const rail = await screen.findByRole("navigation", { name: "Your projects" });
+      expect(within(rail).getByText("Ticketing").closest("a")).toHaveAttribute("aria-current", "page");
+      expect(fetchMock).toHaveBeenCalledWith("/api/projects/5/", expect.anything());
+    });
+
+    it("links to the whole list when the rail shows only some of the projects", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          if (url === "/api/projects/") return json(200, { count: 40, page: 1, page_size: 25, results: projects });
+          if (url.includes("/questions/")) return json(200, served);
+          if (url.endsWith("/members/")) return json(200, members);
+          return projectsReply(url);
+        }),
+      );
+
+      render(<Workspace />);
+
+      const link = await screen.findByRole("link", { name: "All projects (40)" });
+      expect(link).toHaveAttribute("href", "/projects");
+    });
+
+    it("has no such link when the rail shows every project", async () => {
+      api();
+
+      render(<Workspace />);
+
+      await screen.findByRole("navigation", { name: "Your projects" });
+      expect(screen.queryByRole("link", { name: /^All projects/ })).not.toBeInTheDocument();
+    });
+
+    it("says not found when the project's own address answers 404, even though the list loads", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          if (url === "/api/projects/5/") return json(404, { detail: "Not found." });
+          if (url.includes("/questions/")) return json(200, served);
+          if (url.endsWith("/members/")) return json(200, members);
+          return json(200, { count: 1, page: 1, page_size: 25, results: [projects[1]] });
+        }),
+      );
+
+      render(<Workspace />);
+
+      expect(await screen.findByText("Project not found.")).toBeInTheDocument();
+    });
   });
 });

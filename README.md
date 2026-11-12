@@ -306,6 +306,12 @@ you are not on is a 404, the same as one that does not exist.
 | Delete the project                  | nobody in v1 (there is no delete endpoint) |
 
 - Any signed-in user can create a project and becomes its first owner.
+- **The project list comes in pages of 25** (#49), by name then id. `GET /api/projects/?page=2` answers
+  `{count, page, page_size, results}`; the page size cannot be chosen, and a page that does not exist is a 404.
+  The projects screen shows "Showing 25 of 30" and a **Show more** button. The project screen asks for its own
+  project (`/api/projects/<id>/`, a 404 means not found) and its side rail shows the first page, plus the open
+  project if it is further down, with an "All projects" link. Who sees what is unchanged. Tested with 30
+  projects in the backend and with the screens' mocks; not tried with hundreds of real projects or in a browser.
 - The last active owner of a project cannot be removed (a deactivated owner
   does not count, because they cannot manage the project).
 - Superusers have no special access through the API; they use `/admin/`.

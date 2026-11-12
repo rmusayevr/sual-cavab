@@ -15,6 +15,7 @@ import { setLanguage, translate, type Key, type Language } from "./index";
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: "5" }), useRouter: () => ({ replace: () => {} }) }));
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+const page = (results: unknown[], count = results.length) => ({ count, page: 1, page_size: 25, results });
 const q = (n: number, status: string) => ({
   id: n,
   number: n,
@@ -36,7 +37,7 @@ beforeEach(() => {
       if (url.endsWith("/draft/")) return json(200, { draft: "Invented draft text." });
       if (url.includes("/questions/")) return json(200, [q(1, "open"), q(2, "asked"), q(3, "answered"), q(4, "dropped")]);
       if (url.includes("/auth/me")) return json(200, { id: 1, email: "ada@example.invalid", name: "Ada" });
-      return json(200, [project]);
+      return /^\/api\/projects\/\d+\/$/.test(url) ? json(200, project) : json(200, page([project]));
     }),
   );
 });

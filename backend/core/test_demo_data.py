@@ -208,14 +208,14 @@ class SignInTests(TestCase):
             with self.subTest(who=who):
                 client, response = self.sign_in(who)
                 self.assertEqual(response.status_code, 200, response.content)
-                listed = client.get("/api/projects/").json()
+                listed = client.get("/api/projects/").json()["results"]
                 ticketing = next(p for p in listed if p["id"] == self.project.pk)
                 self.assertEqual(ticketing["open_question_count"], 3)
 
     def test_the_demo_outsider_signs_in_but_sees_neither_project(self):
         client, response = self.sign_in("outsider")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(client.get("/api/projects/").json(), [])
+        self.assertEqual(client.get("/api/projects/").json()["results"], [])
         self.assertEqual(client.get(f"/api/projects/{self.project.pk}/").status_code, 404)
 
     def test_a_wrong_password_does_not_sign_in(self):

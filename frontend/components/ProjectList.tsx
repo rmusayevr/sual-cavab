@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { useT, type Key } from "@/lib/i18n";
-import type { Project } from "@/lib/projects";
+import { addProjects, hasMoreProjects, type Project, type ProjectPage } from "@/lib/projects";
 
 import { Alert } from "./ui/Alert";
 import { Button } from "./ui/Button";
@@ -16,7 +16,7 @@ import { EmptyState, Eyebrow, LedgerLoading } from "./ui/Ledger";
 
 type State =
   | { kind: "loading" }
-  | { kind: "ready"; projects: Project[] }
+  | { kind: "ready"; projects: Project[]; total: number; page: number; pageSize: number; more: "idle" | "loading" | "error" }
   | { kind: "signed-out" }
   | { kind: "error" };
 
@@ -29,7 +29,10 @@ export default function ProjectList() {
     apiFetch("/api/projects/")
       .then(async (response) => {
         if (cancelled) return;
-        if (response.ok) setState({ kind: "ready", projects: (await response.json()) as Project[] });
+        if (response.ok) {
+          const body = (await response.json()) as ProjectPage;
+          setState({ kind: "ready", projects: body.results, total: body.count, page: body.page, pageSize: body.page_size, more: "idle" });
+        }
         else if (response.status === 401 || response.status === 403) setState({ kind: "signed-out" });
         else setState({ kind: "error" });
       })
@@ -51,7 +54,25 @@ export default function ProjectList() {
   if (state.kind === "error") return <Alert tone="error">{t("projects.loadError")}</Alert>;
 
   const added = (project: Project) =>
-    setState((s) => (s.kind === "ready" ? { kind: "ready", projects: [...s.projects, project] } : s));
+    setState((s) => (s.kind === "ready" ? { ...s, projects: addProjects(s.projects, [project]), total: s.total + 1 } : s));
+
+  async function showMore() {
+    if (state.kind !== "ready" || state.more === "loading") return;
+    const next = state.page + 1;
+    setState({ ...state, more: "loading" });
+    try {
+      const response = await apiFetch(`/api/projects/?page=${next}`);
+      if (!response.ok) throw new Error(String(response.status));
+      const body = (await response.json()) as ProjectPage;
+      setState((s) =>
+        s.kind === "ready"
+          ? { ...s, projects: addProjects(s.projects, body.results), total: body.count, page: body.page, pageSize: body.page_size, more: "idle" }
+          : s,
+      );
+    } catch {
+      setState((s) => (s.kind === "ready" ? { ...s, more: "error" } : s));
+    }
+  }
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_22rem] lg:items-start">
@@ -60,6 +81,7 @@ export default function ProjectList() {
           <p>{t("projects.empty")}</p>
         </EmptyState>
       ) : (
+        <div className="grid min-w-0 gap-4">
         <ul className="grid list-none gap-3">
           {state.projects.map((p, index) => (
             <li key={p.id}>
@@ -88,6 +110,18 @@ export default function ProjectList() {
             </li>
           ))}
         </ul>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-muted-foreground" role="status">
+            {t("projects.shown", { n: state.projects.length, total: state.total })}
+          </p>
+          {hasMoreProjects({ count: state.total, page: state.page, page_size: state.pageSize }) && (
+            <Button variant="secondary" onClick={showMore} disabled={state.more === "loading"}>
+              {state.more === "loading" ? t("projects.showingMore") : t("projects.showMore")}
+            </Button>
+          )}
+        </div>
+        {state.more === "error" && <Alert tone="error">{t("projects.moreError")}</Alert>}
+        </div>
       )}
       <NewProjectForm onCreated={added} />
     </div>

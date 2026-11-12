@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { cx } from "@/lib/cx";
-import { ageKey, daysOpen, type Member, type Project, type QuestionStatus } from "@/lib/projects";
+import { ageKey, daysOpen, type Member, type Project, type ProjectPage, type QuestionStatus } from "@/lib/projects";
 import type { FullQuestion } from "@/lib/questions";
 import { STATUSES } from "@/lib/status";
 import { LanguageSwitch, useT } from "@/lib/i18n";
@@ -26,7 +26,7 @@ import { Wordmark } from "./ui/Wordmark";
 
 type State =
   | { kind: "loading" }
-  | { kind: "ready"; projects: Project[]; questions: FullQuestion[] }
+  | { kind: "ready"; projects: Project[]; total: number; questions: FullQuestion[] }
   | { kind: "signed-out" }
   | { kind: "not-found" }
   | { kind: "error" };
@@ -34,7 +34,8 @@ type State =
 type Filter = "all" | QuestionStatus;
 
 /**
- * One screen for a project: the person's projects (rail), the project's questions with counts and
+ * One screen for a project: the person's projects (rail: the first page of the list, plus this project
+ * if it is not on it, #49), the project's questions with counts and
  * filters (middle), the selected question and the draft (right). The counts and filters are worked
  * out from the questions already loaded. Drafting never sends anything (#70).
  */
@@ -57,21 +58,24 @@ export default function Workspace() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([apiFetch("/api/projects/"), apiFetch(base)])
-      .then(async ([projectsRes, questionsRes]) => {
+    // The project itself is asked for on its own: the list is in pages (#49), so this project may not be on the
+    // first one, and "is it yours" is answered by its own 404, not by looking for it in the list.
+    Promise.all([apiFetch(`/api/projects/${id}/`), apiFetch("/api/projects/"), apiFetch(base)])
+      .then(async ([projectRes, projectsRes, questionsRes]) => {
         if (cancelled) return;
         // The backend's SessionAuthentication answers 403 (never 401) when nobody is signed in, and 404 for a
         // project the person is not on, so only a 404 means "not found" (#91). 401 is kept for a proxy or a
         // future authentication class.
         const signedOut = (r: Response) => r.status === 401 || r.status === 403;
-        if (signedOut(questionsRes) || signedOut(projectsRes)) return setState({ kind: "signed-out" });
-        if (questionsRes.status === 404) return setState({ kind: "not-found" });
-        if (!projectsRes.ok || !questionsRes.ok) return setState({ kind: "error" });
-        const projects = (await projectsRes.json()) as Project[];
-        const questions = (await questionsRes.json()) as FullQuestion[];
+        if (signedOut(questionsRes) || signedOut(projectRes) || signedOut(projectsRes)) return setState({ kind: "signed-out" });
         // A project you are not on is the same as one that does not exist.
-        if (!projects.some((p) => String(p.id) === id)) return setState({ kind: "not-found" });
-        setState({ kind: "ready", projects, questions });
+        if (questionsRes.status === 404 || projectRes.status === 404) return setState({ kind: "not-found" });
+        if (!projectRes.ok || !projectsRes.ok || !questionsRes.ok) return setState({ kind: "error" });
+        const current = (await projectRes.json()) as Project;
+        const page = (await projectsRes.json()) as ProjectPage;
+        const questions = (await questionsRes.json()) as FullQuestion[];
+        const projects = page.results.some((p) => p.id === current.id) ? page.results : [current, ...page.results];
+        setState({ kind: "ready", projects, total: page.count, questions });
       })
       .catch(() => {
         if (!cancelled) setState({ kind: "error" });
@@ -154,7 +158,7 @@ export default function Workspace() {
       </div>,
     );
 
-  const { projects, questions } = state;
+  const { projects, total, questions } = state;
   const project = projects.find((p) => String(p.id) === id)!;
   const count = (s: QuestionStatus) => questions.filter((q) => q.status === s).length;
   const shown = filter === "all" ? questions : questions.filter((q) => q.status === filter);
@@ -216,6 +220,11 @@ export default function Workspace() {
             );
           })}
         </ul>
+        {total > projects.length && (
+          <Link href="/projects" className="mt-2 flex min-h-11 items-center px-2 text-sm hover:underline">
+            {t("workspace.allProjects", { n: total })}
+          </Link>
+        )}
       </nav>
 
       <main className="grid min-w-0 content-start gap-4">
