@@ -307,10 +307,10 @@ you are not on is a 404, the same as one that does not exist.
 
 - Any signed-in user can create a project and becomes its first owner.
 - **The project list comes in pages of 25** (#49), by name then id. `GET /api/projects/?page=2` answers
-  `{count, page, page_size, results}`; the page size cannot be chosen, and a page that does not exist is a 404.
+  `{count, page, page_size, results}`; the page size cannot be chosen, and a page number that does not exist is a 404 (DRF also accepts `?page=last`).
   The projects screen shows "Showing 25 of 30" and a **Show more** button. The project screen asks for its own
-  project (`/api/projects/<id>/`, a 404 means not found) and its side rail shows the first page, plus the open
-  project if it is further down, with an "All projects" link. Who sees what is unchanged. Tested with 30
+  project (`/api/projects/<id>/`, a 404 means not found; `/projects/05` is project 5) and its side rail shows the first page, plus the open
+  project if it is further down, with an "All projects" link. "Show more" uses page numbers, so if projects are removed or renamed while the list is open, one can be missed until the page is reloaded. Who sees what is unchanged. Tested with 30
   projects in the backend and with the screens' mocks; not tried with hundreds of real projects or in a browser.
 - The last active owner of a project cannot be removed (a deactivated owner
   does not count, because they cannot manage the project).

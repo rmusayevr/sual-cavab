@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Workspace from "./Workspace";
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: "5" }) }));
+const route = vi.hoisted(() => ({ id: "5" }));
+vi.mock("next/navigation", () => ({ useParams: () => ({ id: route.id }) }));
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -738,6 +739,29 @@ describe("Workspace (#70)", () => {
   });
 
   describe("the project list in pages (#49)", () => {
+    afterEach(() => {
+      route.id = "5";
+    });
+
+    it("opens /projects/05 as project 5 instead of crashing (the server reads 05 as 5)", async () => {
+      route.id = "05";
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          if (url.includes("/questions/")) return json(200, served);
+          if (url.endsWith("/members/")) return json(200, members);
+          if (/^\/api\/projects\/0*5\/$/.test(url)) return json(200, projects[0]);
+          return json(200, pageOf(projects));
+        }),
+      );
+
+      render(<Workspace />);
+
+      expect(await screen.findByRole("heading", { level: 1, name: "Ticketing" })).toBeInTheDocument();
+      const rail = screen.getByRole("navigation", { name: "Your projects" });
+      expect(within(rail).getByText("Ticketing").closest("a")).toHaveAttribute("aria-current", "page");
+    });
+
     it("asks for the project by its own address, so a project past the first page still opens", async () => {
       const fetchMock = vi.fn(async (url: string) => {
         if (url === "/api/projects/") return json(200, { count: 40, page: 1, page_size: 25, results: [project(6, "Portal", 0)] });

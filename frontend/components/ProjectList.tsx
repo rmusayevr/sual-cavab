@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { useT, type Key } from "@/lib/i18n";
@@ -23,6 +23,8 @@ type State =
 export default function ProjectList() {
   const t = useT();
   const [state, setState] = useState<State>({ kind: "loading" });
+  const statusLine = useRef<HTMLParagraphElement>(null);
+  const fetchingMore = useRef(false); // a ref: two presses in one tick both see the same state
 
   useEffect(() => {
     let cancelled = false;
@@ -57,11 +59,18 @@ export default function ProjectList() {
     setState((s) => (s.kind === "ready" ? { ...s, projects: addProjects(s.projects, [project]), total: s.total + 1 } : s));
 
   async function showMore() {
-    if (state.kind !== "ready" || state.more === "loading") return;
+    if (state.kind !== "ready" || state.more === "loading" || fetchingMore.current) return;
+    fetchingMore.current = true;
     const next = state.page + 1;
     setState({ ...state, more: "loading" });
     try {
       const response = await apiFetch(`/api/projects/?page=${next}`);
+      if (response.status === 404) {
+        // The list got shorter since it was loaded: there is no such page. Count what is here as the end.
+        setState((s) => (s.kind === "ready" ? { ...s, total: s.projects.length, more: "idle" } : s));
+        statusLine.current?.focus();
+        return;
+      }
       if (!response.ok) throw new Error(String(response.status));
       const body = (await response.json()) as ProjectPage;
       setState((s) =>
@@ -69,8 +78,11 @@ export default function ProjectList() {
           ? { ...s, projects: addProjects(s.projects, body.results), total: body.count, page: body.page, pageSize: body.page_size, more: "idle" }
           : s,
       );
+      statusLine.current?.focus(); // the button may have gone (last page): keep the keyboard where the list is
     } catch {
       setState((s) => (s.kind === "ready" ? { ...s, more: "error" } : s));
+    } finally {
+      fetchingMore.current = false;
     }
   }
 
@@ -111,7 +123,7 @@ export default function ProjectList() {
           ))}
         </ul>
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-sm text-muted-foreground" role="status">
+          <p ref={statusLine} tabIndex={-1} className="text-sm text-muted-foreground outline-none" role="status">
             {t("projects.shown", { n: state.projects.length, total: state.total })}
           </p>
           {hasMoreProjects({ count: state.total, page: state.page, page_size: state.pageSize }) && (

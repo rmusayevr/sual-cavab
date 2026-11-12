@@ -62,6 +62,18 @@ class ProjectPaginationTests(TestCase):
 
     def test_the_size_of_a_page_cannot_be_asked_for(self):
         self.assertEqual(len(self.page(page_size=1000).json()["results"]), PAGE)
+        self.assertEqual(len(self.page(page_size=1).json()["results"]), PAGE)
+
+    def test_projects_with_the_same_name_keep_one_order_and_repeat_nowhere(self):
+        for _ in range(30):
+            project = Project.objects.create(name="Same", client_name="Invented Client", created_by=self.me)
+            Membership.objects.create(project=project, user=self.me, role=Membership.Role.OWNER)
+
+        ids = [p["id"] for number in (1, 2, 3) for p in self.page(number).json()["results"] if p["name"] == "Same"]
+
+        self.assertEqual(len(ids), 30)
+        self.assertEqual(ids, sorted(ids))
+        self.assertEqual(len(set(ids)), 30)
 
     def test_nobody_else_s_project_appears_on_any_page(self):
         names = [p["name"] for number in (1, 2) for p in self.page(number).json()["results"]]

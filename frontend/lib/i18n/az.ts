@@ -120,7 +120,7 @@ export const az: Record<Key, string> = {
   "projects.shown": "Göstərilir: {n} / {total}",
   "projects.showMore": "Daha çox göstər",
   "projects.showingMore": "Yüklənir…",
-  "projects.moreError": "Daha çox layihə yüklənmədi. Yenidən cəhd edin.",
+  "projects.moreError": "Qalan layihələri yükləmək alınmadı. Yenidən cəhd edin.",
   "workspace.allProjects": "Bütün layihələr ({n})",
   "projects.newEyebrow": "Yeni sətir",
   "projects.newTitle": "Yeni layihə",

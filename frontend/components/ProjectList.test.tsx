@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import ProjectList from "./ProjectList";
@@ -250,6 +250,70 @@ describe("ProjectList: the ledger (#72)", () => {
       await screen.findByRole("link", { name: "Invented 1" });
       expect(screen.getByText("Showing 25 of 30")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Show more" })).toBeInTheDocument();
+    });
+
+    it("has no Show more button when the first page is exactly full and that is everything", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => json(200, paged(many(1, 25), 1, 25))));
+
+      render(<ProjectList />);
+
+      await screen.findByText("Showing 25 of 25");
+      expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+    });
+
+    it("announces the count as a status", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => json(200, paged(many(1, 3), 1, 3))));
+
+      render(<ProjectList />);
+
+      await screen.findByText("Showing 3 of 3");
+      expect(screen.getByText("Showing 3 of 3")).toHaveAttribute("role", "status");
+    });
+
+    it("sends one request for the next page however fast Show more is pressed", async () => {
+      const fetchMock = vi.fn(async (url: string) =>
+        url.includes("page=2") ? json(200, paged(many(26, 30), 2, 30)) : json(200, paged(many(1, 25), 1, 30)),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      render(<ProjectList />);
+      const button = await screen.findByRole("button", { name: "Show more" });
+
+      act(() => {
+        button.click();
+        button.click();
+      });
+
+      await screen.findByText("Showing 30 of 30");
+      expect(fetchMock.mock.calls.filter(([u]) => String(u).includes("page=2"))).toHaveLength(1);
+    });
+
+    it("stops offering more when the next page no longer exists (the list got shorter)", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => (url.includes("page=2") ? json(404, { detail: "Invalid page." }) : json(200, paged(many(1, 25), 1, 26)))),
+      );
+      render(<ProjectList />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
+
+      await screen.findByText("Showing 25 of 25");
+      expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("keeps the keyboard in the list when the last page arrives and the button goes", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) =>
+          url.includes("page=2") ? json(200, paged(many(26, 30), 2, 30)) : json(200, paged(many(1, 25), 1, 30)),
+        ),
+      );
+      render(<ProjectList />);
+
+      fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
+
+      await screen.findByText("Showing 30 of 30");
+      expect(screen.getByRole("status")).toHaveFocus();
     });
 
     it("has no Show more button when everything is shown", async () => {

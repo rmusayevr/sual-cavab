@@ -26,7 +26,7 @@ import { Wordmark } from "./ui/Wordmark";
 
 type State =
   | { kind: "loading" }
-  | { kind: "ready"; projects: Project[]; total: number; questions: FullQuestion[] }
+  | { kind: "ready"; projects: Project[]; currentId: number; total: number; questions: FullQuestion[] }
   | { kind: "signed-out" }
   | { kind: "not-found" }
   | { kind: "error" };
@@ -75,7 +75,7 @@ export default function Workspace() {
         const page = (await projectsRes.json()) as ProjectPage;
         const questions = (await questionsRes.json()) as FullQuestion[];
         const projects = page.results.some((p) => p.id === current.id) ? page.results : [current, ...page.results];
-        setState({ kind: "ready", projects, total: page.count, questions });
+        setState({ kind: "ready", projects, currentId: current.id, total: page.count, questions });
       })
       .catch(() => {
         if (!cancelled) setState({ kind: "error" });
@@ -158,8 +158,9 @@ export default function Workspace() {
       </div>,
     );
 
-  const { projects, total, questions } = state;
-  const project = projects.find((p) => String(p.id) === id)!;
+  const { projects, currentId, total, questions } = state;
+  // By the number the server answered with, not the address: /projects/05 is project 5 (review of #105).
+  const project = projects.find((p) => p.id === currentId)!;
   const count = (s: QuestionStatus) => questions.filter((q) => q.status === s).length;
   const shown = filter === "all" ? questions : questions.filter((q) => q.status === filter);
   const current = questions.find((q) => q.number === selected) ?? null;
@@ -190,7 +191,7 @@ export default function Workspace() {
         </Eyebrow>
         <ul className="grid list-none gap-1">
           {projects.map((p) => {
-            const active = String(p.id) === id;
+            const active = p.id === currentId;
             return (
               <li key={p.id}>
                 <Link
