@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
@@ -38,6 +38,29 @@ export default function MembersPanel({
   const [removing, setRemoving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
+  const [meId, setMeId] = useState<number | null>(null); // who is signed in, to word the question for removing yourself
+  const returnFocusTo = useRef<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/auth/me/")
+      .then(async (response) => (response.ok ? await response.json() : null))
+      .then((me) => {
+        if (!cancelled && me && typeof me.id === "number") setMeId(me.id);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // After Cancel the question goes away and the Remove button it replaced comes back: put the keyboard on it.
+  useEffect(() => {
+    if (asking === null && returnFocusTo.current !== null) {
+      document.getElementById(`remove-${returnFocusTo.current}`)?.focus();
+      returnFocusTo.current = null;
+    }
+  }, [asking]);
 
   const who = (m: Member) => m.name || m.email;
 
@@ -67,9 +90,11 @@ export default function MembersPanel({
         setEmail("");
         setRole("member");
         setNotice(t("members.added", { who: added.name || added.email }));
+        onMembers([...members.filter((m) => m.user_id !== added.user_id), added]); // shown now; the read below confirms it
         await refresh();
       } else {
         setErrors(await failure(response, t("members.addFailed"), ["email", "role"]));
+        if (response.status === 404) await refresh(); // the project is gone for this person: refresh sends them away
       }
     } catch {
       setErrors({ form: t("error.server") });
@@ -86,6 +111,7 @@ export default function MembersPanel({
       const response = await apiFetch(`${base}${member.user_id}/`, { method: "DELETE" });
       if (response.status === 204) {
         setAsking(null);
+        if (member.user_id === meId) return router.push("/projects"); // they removed themselves: the project is gone for them
         setNotice(t("members.removed", { who: who(member) }));
         await refresh();
       } else {
@@ -111,18 +137,32 @@ export default function MembersPanel({
             <li key={m.user_id} className="flex flex-wrap items-center justify-between gap-2">
               <span>{`${who(m)} · ${t(`role.${m.role}`)}`}</span>
               {asking === m.user_id ? (
-                <span className="flex flex-wrap items-center gap-2">
-                  <span>{t("members.removeAsk", { who: who(m) })}</span>
+                <span
+                  role="group"
+                  aria-label={m.user_id === meId ? t("members.removeSelfAsk") : t("members.removeAsk", { who: who(m) })}
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <span>{m.user_id === meId ? t("members.removeSelfAsk") : t("members.removeAsk", { who: who(m) })}</span>
                   <Button variant="danger" onClick={() => onRemove(m)} disabled={removing}>
                     {removing ? t("members.removing") : t("members.removeYes")}
                   </Button>
-                  <Button variant="secondary" onClick={() => setAsking(null)} disabled={removing}>
+                  <Button
+                    variant="secondary"
+                    autoFocus
+                    onClick={() => {
+                      returnFocusTo.current = m.user_id;
+                      setAsking(null);
+                    }}
+                    disabled={removing}
+                  >
                     {t("members.removeNo")}
                   </Button>
                 </span>
               ) : (
                 <Button
+                  id={`remove-${m.user_id}`}
                   variant="secondary"
+                  disabled={removing}
                   onClick={() => {
                     setListError(null);
                     setNotice(null);
@@ -147,6 +187,7 @@ export default function MembersPanel({
                 name="email"
                 autoComplete="off"
                 required
+                disabled={adding}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 {...props}

@@ -146,6 +146,7 @@ export const en = {
   "members.remove": "Remove",
   "members.removeLabel": "Remove {who}",
   "members.removeAsk": "Remove {who} from this project?",
+  "members.removeSelfAsk": "Remove yourself from this project? You will lose access, and an owner will have to add you again.",
   "members.removeYes": "Yes, remove",
   "members.removeNo": "Cancel",
   "members.removing": "Removing…",

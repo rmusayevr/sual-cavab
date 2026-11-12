@@ -317,7 +317,7 @@ you are not on is a 404, the same as one that does not exist.
   leaving. A member does not see the section, and the API still refuses them (403). Messages from the server
   (unknown email, already a member, "a project needs at least one active owner", the 30-an-hour limit) show next
   to the field or above the form in the server's words, which stay English. After a change the list is read again
-  from the server; an owner who removes themselves is taken to the projects list. Changing a member's role in
+  from the server; an owner who removes themselves is asked a different question ("Remove yourself... an owner will have to add you again") and is then taken to the projects list. Changing a member's role in
   place, and showing who is deactivated, are not built (the API has neither). Tested with the API mocked
   (`MembersPanel.test.tsx`) and against the server's real rules in the backend tests; not tried in a browser.
 - **The project list comes in pages of 25** (#49), by name then id. `GET /api/projects/?page=2` answers

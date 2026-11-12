@@ -230,7 +230,7 @@ describe("MembersPanel (#33)", () => {
 
       expect(screen.getByText("Üzvləri idarə et")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Üzv əlavə et" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "max@example.invalid üzvünü çıxar" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Çıxar: max@example.invalid" })).toBeInTheDocument();
       expect(screen.getByText("Olga Owner · sahib")).toBeInTheDocument();
     } finally {
       act(() => setLanguage("en"));
@@ -243,5 +243,236 @@ describe("MembersPanel (#33)", () => {
     const section = screen.getByText("Manage members").closest("details")!;
     expect(section).not.toHaveAttribute("open");
     expect(within(section).getByText(/The person needs an account already/)).toBeInTheDocument();
+  });
+
+  describe("review of #108", () => {
+    const named = member(3, "new@example.invalid", "member", "Nora Newcomer");
+    const me = (id: number) => (c: Call) =>
+      c.url === "/api/auth/me/" ? json(200, { id, email: "olga@example.invalid", name: "Olga Owner" }) : undefined;
+
+    it("asks differently when the person is removing themselves, and goes to the projects list at once", async () => {
+      const calls = api((c) => me(1)(c) ?? (c.method === "DELETE" ? new Response(null, { status: 204 }) : undefined));
+      open();
+      await waitFor(() => expect(calls.some((c) => c.url === "/api/auth/me/")).toBe(true));
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove Olga Owner" }));
+
+      expect(await screen.findByText(/Remove yourself from this project\? You will lose access/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Yes, remove" }));
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/projects"));
+      expect(calls.filter((c) => c.method === "GET" && c.url === "/api/projects/5/members/")).toHaveLength(0);
+    });
+
+    it("asks about the other person by name when it is not them", async () => {
+      const calls = api((c) => me(1)(c));
+      open();
+      await waitFor(() => expect(calls.some((c) => c.url === "/api/auth/me/")).toBe(true));
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove max@example.invalid" }));
+
+      expect(screen.getByText("Remove max@example.invalid from this project?")).toBeInTheDocument();
+      expect(screen.queryByText(/Remove yourself/)).not.toBeInTheDocument();
+    });
+
+    it("puts the keyboard on Cancel when the question opens, and back on Remove after Cancel", () => {
+      api(() => undefined);
+      open();
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove max@example.invalid" }));
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+      expect(screen.getByRole("group", { name: "Remove max@example.invalid from this project?" })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.getByRole("button", { name: "Remove max@example.invalid" })).toHaveFocus();
+    });
+
+    it("shows a 403 on add above the form", async () => {
+      api((c) => (c.method === "POST" ? json(403, { detail: "Only an owner can add members." }) : undefined));
+      open();
+
+      fill("new@example.invalid");
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Only an owner can add members.");
+    });
+
+    it("reads the list again, and so leaves the project, when an add finds the project gone (404)", async () => {
+      api((c) => {
+        if (c.method === "POST") return json(404, { detail: "No Project matches the given query." });
+        if (c.method === "GET") return json(404, { detail: "Not found." });
+      });
+      open();
+
+      fill("new@example.invalid");
+
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/projects"));
+    });
+
+    it("names the new member by name in the notice, and shows them at once even if the read afterwards fails", async () => {
+      api((c) => {
+        if (c.method === "POST") return json(201, named);
+        if (c.method === "GET") return json(500, {});
+      });
+      const onMembers = open();
+
+      fill("new@example.invalid");
+
+      expect(await screen.findByText("Nora Newcomer was added.")).toBeInTheDocument();
+      expect(onMembers).toHaveBeenCalledWith([OWNER, MEMBER, named]);
+    });
+
+    it("names the removed member by name in the notice", async () => {
+      const bob = member(4, "bob@example.invalid", "member", "Bob Builder");
+      api((c) => (c.method === "DELETE" ? new Response(null, { status: 204 }) : undefined), [OWNER]);
+      open(vi.fn(), [OWNER, bob]);
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove Bob Builder" }));
+      fireEvent.click(screen.getByRole("button", { name: "Yes, remove" }));
+
+      expect(await screen.findByText("Bob Builder was removed.")).toBeInTheDocument();
+    });
+
+    it("announces the outcome in a status region", async () => {
+      api((c) => (c.method === "POST" ? json(201, named) : undefined));
+      open();
+
+      fill("new@example.invalid");
+
+      await screen.findByText("Nora Newcomer was added.");
+      expect(screen.getByText("Nora Newcomer was added.")).toHaveAttribute("role", "status");
+    });
+
+    it("resets the role to member after an add", async () => {
+      api((c) => (c.method === "POST" ? json(201, member(3, "o2@example.invalid", "owner")) : undefined));
+      open();
+
+      fill("o2@example.invalid", "owner");
+
+      await screen.findByText("o2@example.invalid was added.");
+      expect(screen.getByLabelText("Role")).toHaveValue("member");
+    });
+
+    it("shows a role error by the Role field", async () => {
+      api((c) => (c.method === "POST" ? json(400, { role: ["That is not a valid choice."] }) : undefined));
+      open();
+
+      fill("new@example.invalid");
+
+      await screen.findByText("That is not a valid choice.");
+      expect(screen.getByLabelText("Role")).toHaveAttribute("aria-invalid", "true");
+    });
+
+    it("clears the last add's errors when the next add is sent", async () => {
+      let first = true;
+      api((c) => {
+        if (c.method !== "POST") return undefined;
+        if (first) {
+          first = false;
+          return json(400, { email: ["This user is already a member."] });
+        }
+        return json(201, named);
+      });
+      open();
+      fill("max@example.invalid");
+      await screen.findByText("This user is already a member.");
+
+      fill("new@example.invalid");
+
+      await screen.findByText("Nora Newcomer was added.");
+      expect(screen.queryByText("This user is already a member.")).not.toBeInTheDocument();
+    });
+
+    it("clears the last message when Remove is pressed again", async () => {
+      api((c) => (c.method === "DELETE" ? json(400, { detail: "A project needs at least one active owner." }) : undefined));
+      open();
+      fireEvent.click(screen.getByRole("button", { name: "Remove Olga Owner" }));
+      fireEvent.click(screen.getByRole("button", { name: "Yes, remove" }));
+      await screen.findByRole("alert");
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove max@example.invalid" }));
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("says the server could not be reached when removing, and keeps the list", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init?: RequestInit) => {
+          if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+          if (init?.method === "DELETE") throw new Error("offline");
+          return json(200, [OWNER, MEMBER]);
+        }),
+      );
+      const onMembers = open();
+      fireEvent.click(screen.getByRole("button", { name: "Remove max@example.invalid" }));
+
+      fireEvent.click(screen.getByRole("button", { name: "Yes, remove" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Could not reach the server.");
+      expect(onMembers).not.toHaveBeenCalled();
+    });
+
+    it("does not leave the project because of a server error on the read after a change", async () => {
+      api((c) => {
+        if (c.method === "DELETE") return new Response(null, { status: 204 });
+        if (c.method === "GET") return json(500, {});
+      });
+      open();
+      fireEvent.click(screen.getByRole("button", { name: "Remove max@example.invalid" }));
+
+      fireEvent.click(screen.getByRole("button", { name: "Yes, remove" }));
+
+      await screen.findByText("max@example.invalid was removed.");
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("cannot be pressed twice while a removal is on its way, nor can the other Remove buttons", async () => {
+      let release: (r: Response) => void = () => {};
+      const calls: Call[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((url: string, init?: RequestInit) => {
+          calls.push({ method: init?.method ?? "GET", url });
+          if (url === "/api/auth/csrf/") return Promise.resolve(new Response(null, { status: 204 }));
+          if (init?.method === "DELETE") return new Promise<Response>((resolve) => (release = resolve));
+          return Promise.resolve(json(200, [OWNER]));
+        }),
+      );
+      open();
+      fireEvent.click(screen.getByRole("button", { name: "Remove max@example.invalid" }));
+
+      fireEvent.click(screen.getByRole("button", { name: "Yes, remove" }));
+
+      expect(await screen.findByRole("button", { name: "Removing…" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Remove Olga Owner" })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "Removing…" }));
+      release(new Response(null, { status: 204 }));
+      await screen.findByText("max@example.invalid was removed.");
+      expect(calls.filter((c) => c.method === "DELETE")).toHaveLength(1);
+    });
+
+    it("cannot be sent twice while an add is on its way, and the email cannot be edited meanwhile", async () => {
+      let release: (r: Response) => void = () => {};
+      const calls: Call[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((url: string, init?: RequestInit) => {
+          calls.push({ method: init?.method ?? "GET", url });
+          if (url === "/api/auth/csrf/") return Promise.resolve(new Response(null, { status: 204 }));
+          if (init?.method === "POST") return new Promise<Response>((resolve) => (release = resolve));
+          return Promise.resolve(json(200, [OWNER, MEMBER]));
+        }),
+      );
+      open();
+
+      fill("new@example.invalid");
+
+      const sending = await screen.findByRole("button", { name: "Adding…" });
+      expect(sending).toBeDisabled();
+      expect(screen.getByLabelText("Email")).toBeDisabled();
+      fireEvent.click(sending);
+      release(json(201, named));
+      await screen.findByText("Nora Newcomer was added.");
+      expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
+    });
   });
 });
