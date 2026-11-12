@@ -39,3 +39,6 @@ backend/staticfiles/
 
 # database dumps hold every row (README, "Backups and restore")
 *.dump
+*.dump.*
+*.backup
+*.sql.gz

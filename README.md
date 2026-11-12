@@ -650,52 +650,65 @@ decisions are still open: where production runs and on which database plan, and 
 (which would bring daily backups). Until then the routine below is manual, and it is the evidence the `review-for-data-loss`
 skill asks for: a backup that was **restored**, not one that reported success.
 
-**Back up** (needs Docker with the project's database container, and the Supabase session pooler URL from the section above,
-in an environment variable so it never goes on a command line, in the repository or in a chat: `export BACKUP_DATABASE_URL=...`
-in bash; in PowerShell `$env:BACKUP_DATABASE_URL = Read-Host "URL"`). The dump holds the whole `public` schema, which is all
-the app's data (users, sessions, projects, memberships, questions, answers, the sign-in counters, migrations); Supabase's own
-schemas are not used by the app and are left out. The container's `pg_dump` is 17, the same major version as Supabase's server.
+**Set up (once).** Put the Supabase **session pooler** address (the section above) in `backend/.env` as
+`BACKUP_DATABASE_URL=postgresql://postgres.<ref>:<password>@<pooler host>:5432/postgres?sslmode=require`, or in the
+environment. `backend/.env` is git-ignored and is typed into an editor, not a terminal, so it does not end up in a shell
+history. **Never** use the name `DJANGO_DATABASE_URL` for it: that would point every local run and every test at the
+live database. Needs Docker with the project's database container up.
 
 ```bash
-docker exec -e BACKUP_DATABASE_URL sual-cavab-db-1 sh -c 'pg_dump "$BACKUP_DATABASE_URL" -n public -Fc --no-owner --no-acl -f /tmp/staging.dump'
-docker cp sual-cavab-db-1:/tmp/staging.dump ./staging-YYYY-MM-DD.dump
+python scripts/backup_database.py backup ../backups/staging-YYYY-MM-DD.dump
+python scripts/backup_database.py check  ../backups/staging-YYYY-MM-DD.dump [copy_name]    # default copy: restore_check
 ```
 
-Keep the file **outside the repository** (`*.dump` is git-ignored as a second line of defence) and somewhere that is not the
-same machine as the only copy; it contains every row. It goes through a file inside the container and `docker cp` on purpose:
-PowerShell's `>` rewrites binary output and would corrupt a dump.
+(`python` is the project's virtual environment's; the script needs no packages.) What they do:
 
-**Prove it restores, on a copy** (never into the live database):
+- **`backup FILE`** dumps the whole `public` schema, which is all the app's data (users, sessions, projects, memberships,
+  questions, answers, the sign-in counters, migrations), with the container's `pg_dump` 17 (the same major version as
+  Supabase's 17). It refuses a file **inside this repository** or one that **already exists**, and deletes its own
+  half-written file if the dump fails. The dump goes through Python, not a shell `>`: Windows PowerShell 5.1's `>` rewrites binary output.
+- **`check FILE [COPY]`** restores the dump into a **new local database** (the copy must not exist, or be empty; it is never
+  dropped or overwritten), then compares it with the source and exits 0 only if everything matches. For every table it
+  compares the number of rows and a checksum of their contents; it also compares the columns (with types, defaults and
+  identity), the indexes, the constraints and the sequence positions. The checksum is made in the "C" collation and in
+  UTC: without that, two servers showed false differences in three tables because they sorted the same rows differently.
+  Views, functions and grants are not compared (the app has none).
+- The password is split into `PGPASSWORD` and the other `PG*` variables and handed to the container **by name**, so it is in
+  no argument list (on the host or inside the container's process list), and it is replaced in any message the script
+  prints. A malformed address gets a generic message that does not quote it (libpq would echo pieces of it).
 
-```bash
-docker exec sual-cavab-db-1 sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE restore_check"'
-docker exec sual-cavab-db-1 sh -c 'psql -U "$POSTGRES_USER" -d restore_check -c "DROP SCHEMA public"'   # a new database has an empty one; the dump creates it
-docker cp ./staging-YYYY-MM-DD.dump sual-cavab-db-1:/tmp/restore.dump
-docker exec sual-cavab-db-1 sh -c 'pg_restore -U "$POSTGRES_USER" -d restore_check --no-owner --no-acl --exit-on-error /tmp/restore.dump'
-python scripts/compare_databases.py restore_check     # needs BACKUP_DATABASE_URL set; exits 0 only if every table matches
-```
+**A dump is a credential.** It holds every row: password hashes and the **live session keys** in `django_session` (a key is
+the `sessionid` cookie, so whoever holds the dump or a restored copy can sign in as those users until the sessions expire, two
+weeks by default). Keep dumps outside the repository (`*.dump` is also git-ignored as a second line of defence), not on the same
+machine as the only copy, and delete them when they are no longer needed. A restored copy holds the same: delete its
+`django_session` rows if you keep it.
 
-`scripts/compare_databases.py` prints, for every table, the number of rows and a checksum of its contents on both sides. The
-checksum is made in the "C" collation and in UTC: without that, two servers showed false differences in three tables
-(40, 10 and 22 rows) because they sorted the same rows differently. To see Django itself accept the copy, run
-`POSTGRES_DB=restore_check python manage.py showmigrations --plan` and `check` in `backend/` with the URL of the live
-database *not* in `backend/.env` (all 22 migrations should show as applied).
+**Clean up by hand** (nothing here deletes anything for you): `DROP DATABASE <copy_name>` in the container's `psql`, and
+the dump file.
 
-**Clean up by hand** when you are done (nothing here deletes anything for you): the two files in the container's `/tmp`
-(`docker exec sual-cavab-db-1 rm /tmp/staging.dump /tmp/restore.dump`), the copy (`DROP DATABASE restore_check` in the container's
-`psql`), and the dump file when it is no longer needed.
+**Things to know.** If the free Supabase project is paused the pooler refuses connections: restore the project in the
+dashboard first. `pg_dump` must be at least the server's major version: if Supabase moves to 18, change the image of the
+database container in `docker-compose.yml`. The folder for the dump must already exist (the script does not create it); a path with spaces was not tried. To see
+Django itself accept the copy, run `POSTGRES_DB=<copy> python manage.py showmigrations --plan` and `check` in `backend/`
+with `DJANGO_DATABASE_URL` set neither in the shell nor in `backend/.env` (`BACKUP_DATABASE_URL` does not matter).
 
-**What was run (2026-11-12, on the staging database, from a developer machine):** the dump was 50 KB and took about 4
-seconds; it restored into a new local database with no error; the two sides had the same 15 tables and the same row counts
-and checksums in all of them (3 users, 2 projects, 4 memberships, 8 questions, 3 answers, 22 migrations, ...); Django on the
-copy reported all 22 migrations applied and no check issues. The commands above were run as written, into a copy named
-`restore_check2`. The comparison was also run against the local development database and against a database that does not
-exist, and it reported the differences and failed (exit 1) both times.
+**What was run (2026-11-12).** On the **staging database on Supabase** (17.11), with the final script, through the session
+pooler: `backup` wrote a 50 KB dump; `check` restored it into a new local database with no error and reported **0
+differences**: the same 15 tables with the same rows and checksums (3 users, 2 projects, 4 memberships, 8 questions, 3
+answers, 22 migrations, ...), and the same 82 columns, 46 indexes, 43 constraints and 13 sequences; exit 0. Django on an
+earlier copy of the same dump reported all 22 migrations applied and no check issues. On **local scratch databases** the
+comparison was exercised with a source holding NULLs, duplicate rows, jsonb, timestamptz, numeric, float, bytea, arrays, a
+foreign key, an index and a table named with quotes: it caught **all 22 deliberate changes** made to the copy one at a time
+(a changed, deleted, added or swapped value, NULL changed to empty text, a duplicate row removed, a different instant, a
+last digit of a number, a float, a byte, an array element or a jsonb value; a sequence reset; a dropped primary key, foreign
+key, default or index; a changed column type; an added column; an extra or missing table), went back to "same" after each
+undo, and did not report a changed server time zone as a difference. 17 unit tests cover the address parsing, the secret
+handling and the refusals (`core/test_backup_script.py`), with 12 mutations all caught.
 
 **Not covered:** a schedule (nothing runs this); a restore **into Supabase** after a loss (only into a local copy); off-site
 storage of the dumps; how long it takes with real volumes (the data here is a few dozen rows); the Supabase CLI's `db dump`,
-which its documentation recommends (not tried); the Supabase `auth`, `storage` and other schemas (the app does not use them).
-The script itself has no automated test; it was checked by hand as described.
+which its documentation recommends (not tried); Supabase's `auth`, `storage` and other schemas (the app does not use them);
+a source that is not 17.x. A check is about what the app wrote: it does not prove the dump holds data nobody wrote.
 
 ### Things to know (Render's free plan, from its documentation)
 
