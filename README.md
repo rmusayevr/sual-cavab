@@ -650,65 +650,78 @@ decisions are still open: where production runs and on which database plan, and 
 (which would bring daily backups). Until then the routine below is manual, and it is the evidence the `review-for-data-loss`
 skill asks for: a backup that was **restored**, not one that reported success.
 
-**Set up (once).** Put the Supabase **session pooler** address (the section above) in `backend/.env` as
-`BACKUP_DATABASE_URL=postgresql://postgres.<ref>:<password>@<pooler host>:5432/postgres?sslmode=require`, or in the
-environment. `backend/.env` is git-ignored and is typed into an editor, not a terminal, so it does not end up in a shell
-history. **Never** use the name `DJANGO_DATABASE_URL` for it: that would point every local run and every test at the
+**Set up (once).** Create `backend/.env.backup` with one line:
+`BACKUP_DATABASE_URL=postgresql://postgres.<ref>:<your database password>@<pooler host>:5432/postgres?sslmode=require`
+(the Supabase **session pooler** address from the section above), or set the variable in the environment. The file is
+git-ignored (`.env.*`) and **Django never loads it**. Do **not** put the address in `backend/.env`: every line of that file is
+loaded into Django's environment, which a debug error page shows unmasked (Django masks only names that contain words like
+`KEY`, `SECRET` or `PASS`), and never name it `DJANGO_DATABASE_URL`, which would point every local run and test at the
 live database. Needs Docker with the project's database container up.
 
 ```bash
-python scripts/backup_database.py backup ../backups/staging-YYYY-MM-DD.dump
-python scripts/backup_database.py check  ../backups/staging-YYYY-MM-DD.dump [copy_name]    # default copy: restore_check
+python scripts/backup_database.py backup  C:\backups\staging-YYYY-MM-DD.dump     # the folder must already exist, outside the repository
+python scripts/backup_database.py check   C:\backups\staging-YYYY-MM-DD.dump [copy_name]    # default copy: restore_check
 ```
 
 (`python` is the project's virtual environment's; the script needs no packages.) What they do:
 
 - **`backup FILE`** dumps the whole `public` schema, which is all the app's data (users, sessions, projects, memberships,
   questions, answers, the sign-in counters, migrations), with the container's `pg_dump` 17 (the same major version as
-  Supabase's 17). It refuses a file **inside this repository** or one that **already exists**, and deletes its own
-  half-written file if the dump fails. The dump goes through Python, not a shell `>`: Windows PowerShell 5.1's `>` rewrites binary output.
-- **`check FILE [COPY]`** restores the dump into a **new local database** (the copy must not exist, or be empty; it is never
-  dropped or overwritten), then compares it with the source and exits 0 only if everything matches. For every table it
-  compares the number of rows and a checksum of their contents; it also compares the columns (with types, defaults and
-  identity), the indexes, the constraints and the sequence positions. The checksum is made in the "C" collation and in
-  UTC: without that, two servers showed false differences in three tables because they sorted the same rows differently.
-  Views, functions and grants are not compared (the app has none).
-- The password is split into `PGPASSWORD` and the other `PG*` variables and handed to the container **by name**, so it is in
-  no argument list (on the host or inside the container's process list), and it is replaced in any message the script
-  prints. A malformed address gets a generic message that does not quote it (libpq would echo pieces of it).
+  Supabase's 17). It refuses a file **inside this repository**, a network or `\\?\` path, a file that **already exists** and
+  a missing folder. The dump is written to `FILE.partial` and renamed only when it is whole; any failure or interruption
+  removes the partial file. It goes through Python, not a shell `>`: Windows PowerShell 5.1's `>` rewrites binary output.
+- **`check FILE [COPY]`** restores the dump into a **new local database** and compares it with the source; it exits 0 only
+  if everything matches. The copy's name must be lower case letters, digits and underscores and not `postgres`,
+  `template0`, `template1` or `sual_cavab`; it must not exist, or be a plain empty database (no tables, sequences, views,
+  functions or other schemas, not a template). Nothing is ever dropped or overwritten. For every table it compares the number
+  of rows and a checksum of their contents; it also compares the columns (exact types such as `varchar(50)`, nullability,
+  defaults, identity, collation, order), indexes, constraints, sequences (definition and position), table options
+  (persistence, row-level security, comments), triggers, views and functions. The checksums are made in the "C" collation and
+  in UTC with the text formats pinned (`DateStyle`, `IntervalStyle`, `bytea_output`, `extra_float_digits`, `search_path`),
+  so two servers with different settings do not report false differences. If the restore fails, the message names the copy
+  that was left behind. Grants and owners are not compared (the dump leaves them out), nor other schemas.
+- The address is split into `PGHOST`, `PGUSER`, `PGPASSWORD` and the rest and handed to the container **by name**, so it is in
+  no argument list (on the host or in the container's process list); the password is replaced in any message the script
+  prints; a malformed address gets a generic message that does not quote it (libpq would echo pieces of it); an unexpected
+  error is reported by its class only.
 
 **A dump is a credential.** It holds every row: password hashes and the **live session keys** in `django_session` (a key is
 the `sessionid` cookie, so whoever holds the dump or a restored copy can sign in as those users until the sessions expire, two
-weeks by default). Keep dumps outside the repository (`*.dump` is also git-ignored as a second line of defence), not on the same
-machine as the only copy, and delete them when they are no longer needed. A restored copy holds the same: delete its
-`django_session` rows if you keep it.
+weeks by default). Keep dumps outside the repository (`*.dump` and `*.backup` are also git-ignored as a second line of defence),
+not on the same machine as the only copy, and delete them when they are no longer needed. A restored copy holds the same: delete
+its `django_session` rows if you keep it.
 
 **Clean up by hand** (nothing here deletes anything for you): `DROP DATABASE <copy_name>` in the container's `psql`, and
 the dump file.
 
 **Things to know.** If the free Supabase project is paused the pooler refuses connections: restore the project in the
 dashboard first. `pg_dump` must be at least the server's major version: if Supabase moves to 18, change the image of the
-database container in `docker-compose.yml`. The folder for the dump must already exist (the script does not create it); a path with spaces was not tried. To see
-Django itself accept the copy, run `POSTGRES_DB=<copy> python manage.py showmigrations --plan` and `check` in `backend/`
-with `DJANGO_DATABASE_URL` set neither in the shell nor in `backend/.env` (`BACKUP_DATABASE_URL` does not matter).
+database container in `docker-compose.yml`. A path with spaces was not tried. To see Django itself accept a copy, run
+`POSTGRES_DB=<copy> python manage.py showmigrations --plan` and `check` in `backend/` with `DJANGO_DATABASE_URL` set neither in the
+shell nor in `backend/.env`.
 
 **What was run (2026-11-12).** On the **staging database on Supabase** (17.11), with the final script, through the session
 pooler: `backup` wrote a 50 KB dump; `check` restored it into a new local database with no error and reported **0
 differences**: the same 15 tables with the same rows and checksums (3 users, 2 projects, 4 memberships, 8 questions, 3
-answers, 22 migrations, ...), and the same 82 columns, 46 indexes, 43 constraints and 13 sequences; exit 0. Django on an
-earlier copy of the same dump reported all 22 migrations applied and no check issues. On **local scratch databases** the
-comparison was exercised with a source holding NULLs, duplicate rows, jsonb, timestamptz, numeric, float, bytea, arrays, a
-foreign key, an index and a table named with quotes: it caught **all 22 deliberate changes** made to the copy one at a time
-(a changed, deleted, added or swapped value, NULL changed to empty text, a duplicate row removed, a different instant, a
-last digit of a number, a float, a byte, an array element or a jsonb value; a sequence reset; a dropped primary key, foreign
-key, default or index; a changed column type; an added column; an extra or missing table), went back to "same" after each
-undo, and did not report a changed server time zone as a difference. 17 unit tests cover the address parsing, the secret
-handling and the refusals (`core/test_backup_script.py`), with 12 mutations all caught.
+answers, 22 migrations, ...), and the same columns (82), indexes (46), constraints (43), sequences (13) and table options (15);
+there are no triggers, views or functions; exit 0. On **local scratch databases** the comparison was exercised with a source
+holding NULLs, duplicate rows, jsonb, timestamptz, numeric, float, bytea, arrays, a `varchar(50)` column, a dropped column, a
+foreign key, an index, a view, a function, a trigger, a table comment and a table named with quotes: it caught **all 31
+deliberate changes** made to the copy one at a time (a changed, deleted, added or swapped value; NULL changed to empty text; a
+duplicate row removed; a different instant; the last digit of a number, a float, a byte, an array element or a jsonb value; a
+sequence reset or increment; a dropped primary key, foreign key, default, index or trigger; a changed column type,
+`varchar(50)` to `varchar(200)`, or collation; an added column; a changed function or view body; a changed table comment;
+row-level security switched on; a table made unlogged; an extra or missing table), went back to "same" after each undo, did
+not report a source with a dropped column or a different `DateStyle`, `IntervalStyle`, `bytea_output`, `extra_float_digits`,
+`search_path` or time zone as a difference, and refused `postgres`, `template1`, `sual_cavab`, an upper-case name and a copy that
+already holds data. `core/test_backup_script.py` has 48 unit tests (address parsing, secret handling, the refusals, the partial
+file, the copy rules, the exit status, the comparison with fakes), and 45 mutations of the script all fail a test.
 
 **Not covered:** a schedule (nothing runs this); a restore **into Supabase** after a loss (only into a local copy); off-site
 storage of the dumps; how long it takes with real volumes (the data here is a few dozen rows); the Supabase CLI's `db dump`,
-which its documentation recommends (not tried); Supabase's `auth`, `storage` and other schemas (the app does not use them);
-a source that is not 17.x. A check is about what the app wrote: it does not prove the dump holds data nobody wrote.
+which its documentation recommends (not tried); Supabase's `auth`, `storage` and other schemas (the app does not use them); a
+source that is not 17.x; a path with spaces; Ctrl+C during a dump (the partial file is removed by a `finally`, covered by a
+unit test, not tried by hand). A check is about what the app wrote: it does not prove the dump holds data nobody wrote.
 
 ### Things to know (Render's free plan, from its documentation)
 
