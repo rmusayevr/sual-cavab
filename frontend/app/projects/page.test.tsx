@@ -5,6 +5,8 @@ import { WAKING_TEXT } from "@/components/ui/WakingNote";
 
 import ProjectsPage from "./page";
 
+vi.mock("next/navigation", () => ({ usePathname: () => "/projects" }));
+
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 const page = (results: unknown[], count = results.length) => ({ count, page: 1, page_size: 25, results });
 
@@ -33,6 +35,14 @@ describe("ProjectsPage", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => (url.includes("/auth/me") ? me.clone() : projects.clone())));
   const user = () => json(200, { id: 1, email: "ada@example.com", name: "Ada Lovelace" });
   const project = { id: 1, name: "Ticketing", client_name: "Invented Client", description: "", my_role: "owner", open_question_count: 3 };
+
+  it("sends a signed-out person to sign in and back to the projects page (#96)", async () => {
+    stubApi(user(), json(403, { detail: "Authentication credentials were not provided." }));
+
+    render(<ProjectsPage />);
+
+    expect(await screen.findByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login?next=%2Fprojects");
+  });
 
   it("has exactly one carpet strip while loading", () => {
     quiet();

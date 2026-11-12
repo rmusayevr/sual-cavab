@@ -13,11 +13,14 @@ export function safeNext(value: string | null | undefined): string | null {
     const base = "http://app.invalid";
     const url = new URL(value, base);
     if (url.origin !== base) return null;
+    // The router resolves dot segments, so "/.//host" is "//host" by the time it navigates (review of #107):
+    // check, and return, the path as the browser will read it, not the string as it was written.
+    if (url.pathname.startsWith("//")) return null;
     if (url.pathname === "/login" || url.pathname.startsWith("/login/")) return null;
+    return url.pathname + url.search + url.hash;
   } catch {
     return null;
   }
-  return value;
 }
 
 /** The sign-in address that brings the person back to `from` (a page of the app), or plain `/login`. */

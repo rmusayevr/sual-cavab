@@ -19,6 +19,13 @@ describe("safeNext (#96): only a place inside this app", () => {
       "\\\\example.invalid",
       "/\t/example.invalid",
       "/\n/example.invalid",
+      "/.//example.invalid",
+      "/..//example.invalid",
+      "/%2e//example.invalid",
+      "/%2E%2E//example.invalid",
+      "/.///example.invalid",
+      "/login/",
+      "/login/x",
       "javascript:alert(1)",
       "projects/5",
       "example.invalid",
@@ -27,6 +34,12 @@ describe("safeNext (#96): only a place inside this app", () => {
     ]) {
       expect(safeNext(bad), JSON.stringify(bad)).toBeNull();
     }
+  });
+
+  it("gives back the path the browser will read, with dot segments resolved", () => {
+    expect(safeNext("/./projects/5")).toBe("/projects/5");
+    expect(safeNext("/projects/../projects/5")).toBe("/projects/5");
+    expect(safeNext("/projects/5#top")).toBe("/projects/5#top");
   });
 
   it("refuses nothing, and the sign-in page itself (it would send the person round in a circle)", () => {
