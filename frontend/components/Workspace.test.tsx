@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import Workspace from "./Workspace";
 
 const route = vi.hoisted(() => ({ id: "5" }));
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: route.id }) }));
+vi.mock("next/navigation", () => ({ useParams: () => ({ id: route.id }), usePathname: () => `/projects/${route.id}` }));
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -679,7 +679,7 @@ describe("Workspace (#70)", () => {
 
       const sentence = (await screen.findByText(/to see this project\./)).closest("p")!;
       expect(sentence.textContent).toBe("Sign in to see this project.");
-      expect(within(sentence).getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+      expect(within(sentence).getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login?next=%2Fprojects%2F5");
       expect(screen.queryByText("Project not found.")).not.toBeInTheDocument();
       expect(screen.queryByText("Back to your projects")).not.toBeInTheDocument();
     });
