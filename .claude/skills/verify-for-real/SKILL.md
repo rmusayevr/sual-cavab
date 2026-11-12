@@ -62,3 +62,7 @@ reported honestly, because the honest one gets checked.
 - **Client questions tracker (2026-11).** Unit tests passed while every sign-in
   POST returned 500 through the frontend proxy. Only a request through the
   proxy, as a browser sends it, found it.
+- **Mutation run reverted uncommitted work (2026-11, PR #98).** The script restored
+  each mutated file with `git checkout -- <file>`; three files held uncommitted
+  edits for the same PR and were reverted. Copy the file aside before mutating and
+  copy it back after (in a `finally`, so a crash cannot skip it); never restore with git.
