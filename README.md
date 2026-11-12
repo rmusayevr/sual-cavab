@@ -485,17 +485,19 @@ The interface is English by default, with Azerbaijani as a second language (#71)
 ## Staging on Render
 
 A staging site for looking at the app with **invented demo data**. It is
-described by `render.yaml` (the API, the frontend and a PostgreSQL 17 database,
-all on Render's free plan, in Frankfurt) and deploys from the `staging` branch.
+described by `render.yaml` (the API and the frontend, on Render's free plan, in Frankfurt) and deploys from the
+`staging` branch. Its database is a **Supabase** PostgreSQL project, set up by hand (see "The database is Supabase's,
+not Render's" below), not a Render one.
 
 **Never put real client questions, names or messages on it.** The free database
-has no backups and is deleted 30 days after it is created (to keep the data longer,
-see "Using Supabase for the database instead of Render's" below).
+has no backups (Render's free database was also deleted 30 days after creation).
 
 ### First deploy (once; needs a Render account, so the owner does it)
 
 1. In Render: **New > Blueprint**, connect this GitHub repository, choose the
-   `staging` branch. Render reads `render.yaml` and asks for three values:
+   `staging` branch. Render reads `render.yaml` and asks for four values (create the Supabase project first: see below):
+   - `DJANGO_DATABASE_URL`: the Supabase **session pooler** URL, built as described below. It contains the
+     database password; it is stored only in Render.
    - `DEMO_PASSWORD`: the shared password of the demo accounts. Choose one with
      12 or more characters. It is stored only in Render.
    - `DJANGO_CSRF_TRUSTED_ORIGINS`: the frontend's address, normally
@@ -539,62 +541,98 @@ see "Using Supabase for the database instead of Render's" below).
   Environment tab; without it the draft button says "not set up". A real draft
   there sends the demo question text to the Claude API, as anywhere else.
 
-### Using Supabase for the database instead of Render's
+### The database is Supabase's, not Render's
 
-Render's free database is deleted after 30 days (see below). Supabase's free PostgreSQL is not deleted, but it **pauses**
-after about a week with little activity and has **no backups** on the free plan. The app only needs plain PostgreSQL, so the
-only thing that changes is `DJANGO_DATABASE_URL`; there is no code change. This is a procedure for the owner (it needs
-the Supabase and Render accounts); nothing here has been done on Render yet.
+Render's free database is deleted after 30 days. Supabase's free PostgreSQL is not deleted, but it **pauses** after about
+a week with little activity and has **no backups** on the free plan. The app only needs plain PostgreSQL, so the only
+thing that changes is `DJANGO_DATABASE_URL`; there is no code change. `render.yaml` no longer has a database: that
+variable is entered by hand (`sync: false`). This is a procedure for the owner (it needs the Supabase and Render
+accounts); the Render and Supabase menu names below are from memory.
 
-**Do this once**
+**1. Create the Supabase project (once)**
 
-1. In Supabase: **New project**. Region **Frankfurt (eu-central-1)**, the same region as Render. Generate a database password
-   of letters and digits only (anything else must be percent-encoded in the URL). Under **Security**, turn **Enable Data API
-   off** (and leave "automatically expose new tables" and "automatic RLS" off): Django keeps all its tables, including the
-   users table, in the `public` schema, and the Data API would put them behind a public REST endpoint. The app does not
-   use it.
-2. Wait until the project is ready. A new project took about **7 minutes** before the pooler accepted connections
-   (the first attempts answered `tenant/user ... not found`, which is not a password error).
+1. In Supabase: **New project**. Region **Frankfurt (eu-central-1)**, the same region as Render. Generate a database
+   password of letters and digits only (anything else must be percent-encoded in the URL). Under **Security**, turn
+   **Enable Data API off** (and leave "automatically expose new tables" and "automatic RLS" off): Django keeps all its
+   tables, including the users table, in the `public` schema, and the Data API would put them behind a public REST
+   endpoint. The app does not use it.
+2. Wait until the project is ready. A new project took about **7 minutes** before the pooler accepted connections (the
+   first attempts answered `tenant/user ... not found`, which is not a password error).
 3. **Connect**, then **Session pooler**: host `aws-N-<region>.pooler.supabase.com`, port **5432**, user
    `postgres.<project-ref>`. Use this one, not the others:
    - *Direct connection*: IPv6 only on the free plan; whether Render's free services can reach IPv6 was not checked.
-   - *Transaction pooler* (port 6543): no session-level state, no prepared statements. The app's request limits take a
-     **transaction-level** advisory lock (`core/throttles.py`), which the Supabase documentation says works there, but this
-     was not tested; the session pooler was.
+   - *Transaction pooler* (port 6543): no session-level state and no prepared statements. The app's request limits take a
+     **transaction-level** advisory lock (`core/throttles.py`), which Supabase's documentation implies works there, but
+     this was not tested; the session pooler was.
 4. Build the URL: `postgresql://postgres.<project-ref>:<password>@<pooler host>:5432/postgres?sslmode=require`
-   (`sslmode` is the only option `config/dburl.py` accepts).
-5. In Render, on the API service, **Environment**: set `DJANGO_DATABASE_URL` to that URL and save; the service redeploys, and
-   its start command migrates, creates the cache table, purges expired counters and loads the demo data. `render.yaml`
-   marks the variable `sync: false`, so a later Blueprint sync leaves your value alone (Render's documentation says
-   `sync: false` variables are ignored after the first creation; not tested here).
-6. Run the smoke test (`scripts/smoke_test.py`, usage in its header) against the frontend's address.
-7. Only after that works: delete the old database in Render by hand. `render.yaml` still has its `databases:` block, on
-   purpose: Render's documentation does not say what removing a block does, so it is removed in a later change, after the
-   database is gone.
+   (`sslmode` is the only option `config/dburl.py` accepts). **Never paste this URL into a chat, an issue or a PR**: it
+   contains the database password.
+
+**2. Switch Render over (in this order)**
+
+1. **Merge the change that made `DJANGO_DATABASE_URL` `sync: false` and removed the database from `render.yaml` first.**
+   Render's documentation says a Blueprint sync ignores `sync: false` variables on an existing service and that a
+   service keeps the variable values the Blueprint does not overwrite, so the API should keep pointing at Render's database
+   after the merge. The documentation does not state this exact change (from `fromDatabase` to `sync: false` on the same
+   variable), so look: open the API service's **Environment** tab after the sync and check that `DJANGO_DATABASE_URL` is still
+   set. If it is blank, the API cannot start (it falls back to a local database and `migrate` fails): continue with the next step.
+   Setting the variable *before* the merge would leave a window in which any sync restores the old wiring.
+   **A sync may not happen by itself.** On 2026-11-12 a deploy of the API ran a start command without the
+   `purge_expired_cache` step that had been merged into `render.yaml` the day before (#101), so Render had not applied
+   that change. If the Blueprint's Auto Sync is off, a merge changes nothing on Render until someone presses **Sync** on
+   the Blueprint's page; check that page for a pending change. Until it is synced, the service keeps the start command
+   (and the variables) it already has, and that includes the old purge-less start command.
+2. Set `DJANGO_DATABASE_URL` to the Supabase URL in the API service's **Environment** tab and choose **Save, rebuild, and
+   deploy** ("Save only" does not redeploy). Render's free services redeploy only for changes under `backend/`, so a
+   merge on its own may not restart the API.
+3. Watch the deploy log: `migrate`, the cache table, the purge, the demo-data load, then gunicorn. An `OperationalError`
+   about the database means the URL is wrong: fix the value and deploy again.
+4. Run the smoke test (`scripts/smoke_test.py`, usage in its header) against the frontend's address.
+5. **Only then delete Render's old database** (its page in the dashboard, **Settings**, **Delete**). It is no longer in
+   `render.yaml`, so Render will not recreate it (its documentation: removing a definition does not delete the resource,
+   and a resource deleted by hand while still defined is recreated at the next sync, which is why the definition went
+   first). Free Render allows one free database per workspace.
+
+**Rolling back:** until step 5, set `DJANGO_DATABASE_URL` back to the Render database's connection string (on its page
+in the dashboard) and deploy. After step 5 there is nothing to go back to: the data in Supabase is the only copy.
 
 **Things to know**
 
 - **15 connections at once.** On the project this was tried on, the session pooler allowed 15 clients (`EMAXCONNSESSION ...
   pool_size: 15`). The API (one worker, four threads) needs a few. The burst tests in `core/test_exact_throttles.py` open
   25 to 45 connections and fail against it for that reason, not because the counting is wrong.
-- **Never put this URL in `backend/.env`.** While `DJANGO_DATABASE_URL` is set, every local run and every test goes to
-  that database. The tests create and drop their own `test_*` databases there (a teardown error left three behind in one
-  trial), and some assume the local database. Local work and the tests use the Docker database.
-- **Pausing.** A free project is paused after about a week without enough database activity (a few requests a day usually
-  keep it awake; opening it in the dashboard counts). Supabase emails a warning about a week before. A paused project is
-  restored from the dashboard (the documentation says up to a year after pausing); until then the API's database calls
-  fail. A Render service that sleeps makes no requests, so a quiet week pauses the database. No keep-alive is built.
-- **Limits and backups (free plan).** 500 MB per project; 5 GB of egress for the organization; the dashboard showed "No
-  backups". The rule above still holds: invented demo data only.
+- **Never put this URL in `backend/.env`.** While `DJANGO_DATABASE_URL` is set there, every local run and every test goes
+  to that database. The tests create and drop their own `test_*` databases there (a teardown error left three behind in
+  one trial; they were dropped by hand), and some assume the local database. Local work and the tests use the Docker database.
+- **Pausing stops the whole API, not only the database calls.** A free project is paused after about a week without enough
+  database activity (a few requests a day usually keep it awake; opening it in the dashboard counts). Supabase emails a
+  warning about a week before. A Render service that sleeps makes no requests, so a quiet week pauses the database. When
+  Render then wakes the API, `migrate` cannot connect, the start command stops there and gunicorn never starts (the health
+  check fails too). Restore the project in the Supabase dashboard (its documentation says up to a year after pausing), then
+  redeploy or wake the API. No keep-alive is built.
+- **The data now stays.** Nothing wipes the database every 30 days any more, so anything typed into staging stays until
+  someone deletes it. The rule is unchanged: invented demo data only, and the free plan has no backups (the dashboard
+  showed "No backups").
+- **Changing the demo password.** `load_demo_data` leaves an existing demo account's password alone, so changing
+  `DEMO_PASSWORD` in Render changes nothing for accounts that already exist (it did not matter while the database was
+  recreated every 30 days). Staging has no shell and the admin is off. To change it: make a hash on your machine (`python
+  manage.py shell -c "from django.contrib.auth.hashers import make_password; print(make_password('<new password>'))"`),
+  then in Supabase's SQL editor `update accounts_user set password = '<the hash>' where email like 'demo.%@example.invalid';`.
+  Not run; check the rows with a `select` first.
+- **Changing the database password.** Reset it in Supabase (the database settings), then put the new one in the URL in
+  Render and deploy.
+- **Limits (free plan).** 500 MB per project; 5 GB of egress for the organization (both as read on Supabase's pages when this was
+  written).
 
 **What was checked** (on the Supabase project itself, from a developer machine, not from Render): the URL is read as
-intended; `migrate` and `createcachetable` ran; `manage.py check --database default` was clean; a 12-way simultaneous
-burst of sign-in checks let exactly 4 through against a limit of 4 (12 without the lock); the backend suite ran against it
-with 371 of 380 tests passing. The nine that failed are the five connection-count tests above, three that test how
-`POSTGRES_*` is read while a URL is set (the URL wins, as designed), and one that sends 400 requests after a one-minute
-lock and takes about 90 seconds over the internet, so the lock had expired (it passes with an hourly window).
-**Not checked:** a deploy on Render with this database, the transaction pooler, the direct connection, a pause and a
-restore, behaviour under real traffic.
+intended; `migrate` and `createcachetable` ran; `manage.py check --database default` was clean; a 12-way simultaneous burst of
+sign-in checks let exactly 4 through against a limit of 4 (12 without the lock); the backend suite ran against it with 371 of
+380 tests passing. The nine that failed are the five connection-count tests above, three that test how `POSTGRES_*` is read
+while a URL is set (the URL wins, as designed; they pass once the URL is out of `backend/.env`), and one that sends 400
+requests after a one-minute lock and takes about 90 seconds over the internet, so the lock had expired (it passes with an
+hourly window). Only `migrate` and `createcachetable` were run there by hand: the demo data was not loaded from a developer
+machine, so the first start on Render loads it. **Not checked:** a deploy on Render with this database, how Render treats
+the sync described in step 1, the transaction pooler, the direct connection, a pause and a restore, behaviour under real traffic.
 
 ### Things to know (Render's free plan, from its documentation)
 
@@ -606,10 +644,9 @@ restore, behaviour under real traffic.
   end). The app says so after five seconds of waiting (`WakingNote`).
   Everything the API needs is done in its start command (`migrate`,
   `createcachetable`, `purge_expired_cache`, `load_demo_data`), because free instances have no shell.
-- **The database expires 30 days after creation**, with 14 days to upgrade, then
-  it and its data are deleted. To renew: delete the database resource, then sync
-  the Blueprint (Render recreates it); the API restarts, migrates and reloads
-  the demo data. Not tested.
+- **Render's own free database expires 30 days after creation** (14 days to upgrade, then it and its data are deleted).
+  Staging does not use one any more (see "The database is Supabase's" above); if you go back to one, it needs a
+  `databases:` entry in `render.yaml` and a `fromDatabase` wiring, which were removed.
 - **A drafting reply can take up to about 135 seconds.** Render's documentation
   states no limit on request duration, so whether a free instance allows it is
   untested.
@@ -624,7 +661,8 @@ restore, behaviour under real traffic.
   the smoke test fail.
 - Anyone with the demo password can create projects and, once a Claude key is
   set, make paid drafting calls (20 an hour per demo account). Choose a
-  password you do not use anywhere else and change it in Render if it leaks.
+  password you do not use anywhere else. If it leaks, changing `DEMO_PASSWORD` in Render is not enough
+  now that the database persists: see "Changing the demo password" above.
 - Not known: which Host header Render's health check sends. If the first
   deploy fails its health check with a 400, add that host to
   `DJANGO_ALLOWED_HOSTS`. The health endpoint does not touch the database.

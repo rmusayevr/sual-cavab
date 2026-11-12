@@ -2,8 +2,8 @@
 #
 # Staging holds INVENTED demo data only (backend/core/management/commands/load_demo_data.py).
 # Never put real client questions, names or messages on it: the free database has
-# no backups and is deleted 30 days after creation (Render's database; the README
-# also says how to use a Supabase one). The README ("Staging on Render") says what to
+# no backups (Render's free database was also deleted 30 days after creation, which is
+# why the database is Supabase's now). The README ("Staging on Render") says what to
 # click and what to enter.
 #
 # Free plan facts this file is built around (Render's docs, not tested here):
@@ -12,15 +12,7 @@
 # API at its PUBLIC address (BACKEND_URL), migrations and the demo data run in the
 # API's start command, and nothing depends on a private network.
 #
-# Region is fixed at creation and must be the same for all three resources.
-
-databases:
-  - name: sual-cavab-staging-db
-    plan: free
-    region: frankfurt
-    postgresMajorVersion: "17"
-    databaseName: sual_cavab
-    user: sual_cavab
+# Region is fixed at creation and must be the same for both services (and the Supabase project is in Frankfurt too).
 
 services:
   # ---- the Django API --------------------------------------------------------
@@ -65,11 +57,10 @@ services:
       # demo accounts come from load_demo_data.
       - key: DJANGO_ADMIN_ENABLED
         value: "0"
-      # The database address. Render's own database is NOT wired in here any more: the value is
-      # entered by hand (sync: false, so a later Blueprint sync leaves it alone) so that it can be
-      # a Supabase pooler URL instead (README: "Using Supabase for the database instead of
-      # Render's"). Until it is set the API has no database to connect to. The `databases:` block above is kept
-      # on purpose, unused, until the old database has been deleted by hand.
+      # The database address: a Supabase session-pooler URL, entered by hand (README: "The database is
+      # Supabase's, not Render's"). sync: false, so Render asks for it when the Blueprint is created and a later
+      # sync leaves a hand-entered value alone. It holds the database password: never commit it. Without it
+      # the API falls back to a local database and its start command stops at `migrate`.
       - key: DJANGO_DATABASE_URL
         sync: false
       # The frontend's public origin, e.g. https://sual-cavab-web.onrender.com
