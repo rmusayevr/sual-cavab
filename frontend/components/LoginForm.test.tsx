@@ -7,6 +7,11 @@ import { WAKING_TEXT } from "./ui/WakingNote";
 const replace = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
 
+/** The address bar, as the sign-in page is opened from a prompt: /login?next=... */
+function openedWith(search: string) {
+  window.history.replaceState(null, "", `/login${search}`);
+}
+
 /** Login responds with `status`; the CSRF priming call always succeeds. */
 function stubLogin(status: number) {
   const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async (url) =>
@@ -31,6 +36,47 @@ describe("LoginForm", () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  describe("returning to the page that asked for the sign-in (#96)", () => {
+    afterEach(() => openedWith(""));
+
+    it("goes back to that page after a successful sign-in", async () => {
+      openedWith("?next=%2Fprojects%2F5");
+      stubLogin(200);
+      render(<LoginForm />);
+
+      submit();
+
+      await vi.waitFor(() => expect(replace).toHaveBeenCalledWith("/projects/5"));
+    });
+
+    it("goes to the home page when the destination is another site", async () => {
+      for (const next of ["https://example.invalid", "//example.invalid", "/\\example.invalid"]) {
+        replace.mockReset();
+        openedWith(`?next=${encodeURIComponent(next)}`);
+        stubLogin(200);
+        const { unmount } = render(<LoginForm />);
+
+        submit();
+
+        await vi.waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+        expect(replace).toHaveBeenCalledWith("/");
+        unmount();
+      }
+    });
+
+    it("stays on the sign-in page, with the destination kept, when the sign-in fails", async () => {
+      openedWith("?next=%2Fprojects%2F5");
+      stubLogin(400);
+      render(<LoginForm />);
+
+      submit();
+
+      expect(await screen.findByRole("alert")).toBeInTheDocument();
+      expect(replace).not.toHaveBeenCalled();
+      expect(window.location.search).toBe("?next=%2Fprojects%2F5");
+    });
   });
 
   it("goes to the home page after a successful sign-in", async () => {

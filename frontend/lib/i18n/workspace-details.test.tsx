@@ -5,7 +5,11 @@ import Workspace from "@/components/Workspace";
 
 import { setLanguage, translate, type Key, type Language } from "./index";
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: "5" }), useRouter: () => ({ push: () => {} }) }));
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ id: "5" }),
+  usePathname: () => "/projects/5",
+  useRouter: () => ({ push: () => {} }),
+}));
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 const page = (results: unknown[], count = results.length) => ({ count, page: 1, page_size: 25, results });

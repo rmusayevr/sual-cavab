@@ -209,6 +209,11 @@ same language, inside its rules; each item is a choice the owner can reject:
 
 - **Sign-in** (`/login`): a navy lattice page with the wordmark, and the form on a
   cream card topped by a carpet strip, with the eyebrow "Access".
+  The "Sign in" button on the projects and project screens opens `/login?next=<that page>`, and after a
+  successful sign-in the person goes back to it (#96). `next` is used only if it is a path inside the app
+  (`frontend/lib/safeNext.ts`: no `https://...`, `//host`, backslash or control character, and never `/login`
+  itself); anything else, or no `next`, goes to `/` as before. The landing page's own Sign in button is unchanged.
+  Tested with the component tests; not tried in a browser against the real backend.
 - **Header band** (`components/ui/AppHeader.tsx`): the landing header made
   reusable (wordmark, session actions, eyebrow, title, a sentence, carpet seam);
   the projects page uses it.
