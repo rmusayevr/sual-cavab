@@ -65,4 +65,4 @@ reported honestly, because the honest one gets checked.
 - **Mutation run reverted uncommitted work (2026-11, PR #98).** The script restored
   each mutated file with `git checkout -- <file>`; three files held uncommitted
   edits for the same PR and were reverted. Copy the file aside before mutating and
-  copy it back after; never restore with git.
+  copy it back after (in a `finally`, so a crash cannot skip it); never restore with git.

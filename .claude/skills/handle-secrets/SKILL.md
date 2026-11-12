@@ -66,4 +66,4 @@ disappears.
   `PASSWORD` and a guard test's own sample literals failed the check although
   nothing was real; fixing it cost an amend, a force-push and another review round.
   Scanners read names and shapes: name test values for what they are
-  (`TYPED = crypto.randomUUID()`), and build credential-shaped samples from fragments.
+  (`TYPED = crypto.randomUUID()`), and build credential-shaped samples (invented test samples only) from fragments.
