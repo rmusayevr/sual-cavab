@@ -12,6 +12,7 @@ import { STATUSES } from "@/lib/status";
 import { LanguageSwitch, useT } from "@/lib/i18n";
 import { MAX_QUESTIONS, useDraft } from "@/lib/useDraft";
 
+import MembersPanel from "./MembersPanel";
 import QuestionForm, { type QuestionFields, type SubmitResult } from "./QuestionForm";
 import { QUESTION_FIELDS, QuestionItem, failure } from "./QuestionItem";
 import SessionStatus from "./SessionStatus";
@@ -239,6 +240,7 @@ export default function Workspace() {
               ))}
             </ul>
           )}
+          {project.my_role === "owner" && <MembersPanel projectId={project.id} members={members} onMembers={setMembers} />}
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -5,7 +5,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import Workspace from "./Workspace";
 
 const route = vi.hoisted(() => ({ id: "5" }));
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: route.id }), usePathname: () => `/projects/${route.id}` }));
+const push = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ id: route.id }),
+  usePathname: () => `/projects/${route.id}`,
+  useRouter: () => ({ push }),
+}));
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
@@ -818,6 +823,48 @@ describe("Workspace (#70)", () => {
       render(<Workspace />);
 
       expect(await screen.findByText("Project not found.")).toBeInTheDocument();
+    });
+  });
+
+  describe("members: who sees the controls (#33)", () => {
+    const withRole = (role: "owner" | "member" | null) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          if (url.includes("/questions/")) return json(200, served);
+          if (url.endsWith("/members/")) return json(200, members);
+          const mine = { ...projects[0], my_role: role };
+          if (url === "/api/projects/5/") return json(200, mine);
+          return json(200, pageOf([mine, projects[1]]));
+        }),
+      );
+    };
+
+    it("shows an owner the Manage members section", async () => {
+      withRole("owner");
+
+      render(<Workspace />);
+
+      expect(await screen.findByText("Manage members")).toBeInTheDocument();
+    });
+
+    it("shows nothing to a person whose role is not known", async () => {
+      withRole(null);
+
+      render(<Workspace />);
+
+      await screen.findByRole("list", { name: "Members" });
+      expect(screen.queryByText("Manage members")).not.toBeInTheDocument();
+    });
+
+    it("shows a member the list of members and no controls", async () => {
+      withRole("member");
+
+      render(<Workspace />);
+
+      await screen.findByRole("list", { name: "Members" });
+      expect(screen.queryByText("Manage members")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add member" })).not.toBeInTheDocument();
     });
   });
 });
