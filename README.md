@@ -572,16 +572,17 @@ accounts); the Render and Supabase menu names below are from memory.
 
 1. **Merge the change that made `DJANGO_DATABASE_URL` `sync: false` and removed the database from `render.yaml` first.**
    Render's documentation says a Blueprint sync ignores `sync: false` variables on an existing service and that a
-   service keeps the variable values the Blueprint does not overwrite, so the API should keep pointing at Render's database
-   after the merge. The documentation does not state this exact change (from `fromDatabase` to `sync: false` on the same
-   variable), so look: open the API service's **Environment** tab after the sync and check that `DJANGO_DATABASE_URL` is still
-   set. If it is blank, the API cannot start (it falls back to a local database and `migrate` fails): continue with the next step.
+   service keeps the variable values the Blueprint does not overwrite. The documentation does not state this exact change
+   (from `fromDatabase` to `sync: false` on the same variable), so look: open the API service's **Environment** tab after the
+   sync and check that `DJANGO_DATABASE_URL` is still set. **Observed on 2026-11-12: it was kept** (the part of the sync's list
+   that was looked at showed the new start command and no change to the variable). If it is ever blank, the API cannot start (it falls back to a local database and `migrate`
+   fails): continue with the next step.
    Setting the variable *before* the merge would leave a window in which any sync restores the old wiring.
-   **A sync may not happen by itself.** On 2026-11-12 a deploy of the API ran a start command without the
-   `purge_expired_cache` step that had been merged into `render.yaml` the day before (#101), so Render had not applied
-   that change. If the Blueprint's Auto Sync is off, a merge changes nothing on Render until someone presses **Sync** on
-   the Blueprint's page; check that page for a pending change. Until it is synced, the service keeps the start command
-   (and the variables) it already has, and that includes the old purge-less start command.
+   **A sync may be late.** On 2026-11-12 a deploy of the API ran a start command without the `purge_expired_cache` step
+   that had been merged into `render.yaml` the day before (#101): the Blueprint's **Syncs** list showed one sync only,
+   from the first deploy four days earlier, although Auto Sync was **Yes** (the cause was not found). A **Manual Sync**
+   then applied it (whether Auto Sync would have, was not seen). So look at the Blueprint's **Syncs** list after a merge that changes `render.yaml`,
+   and press **Manual Sync** if the change is not there; until it is synced, the service keeps the start command it has.
 2. Set `DJANGO_DATABASE_URL` to the Supabase URL in the API service's **Environment** tab and choose **Save, rebuild, and
    deploy** ("Save only" does not redeploy). Render's free services redeploy only for changes under `backend/`, so a
    merge on its own may not restart the API.
@@ -631,8 +632,14 @@ sign-in checks let exactly 4 through against a limit of 4 (12 without the lock);
 while a URL is set (the URL wins, as designed; they pass once the URL is out of `backend/.env`), and one that sends 400
 requests after a one-minute lock and takes about 90 seconds over the internet, so the lock had expired (it passes with an
 hourly window). Only `migrate` and `createcachetable` were run there by hand: the demo data was not loaded from a developer
-machine, so the first start on Render loads it. **Not checked:** a deploy on Render with this database, how Render treats
-the sync described in step 1, the transaction pooler, the direct connection, a pause and a restore, behaviour under real traffic.
+machine, so the first start on Render loaded it (`Demo data: 2 project(s) created; 3 demo accounts`, then `already loaded`
+on the next start).
+**On Render, 2026-11-12:** with the Supabase URL set, the API started (`migrate`: nothing to apply; the cache table existed;
+`purge_expired_cache`: `removed 0 expired row(s) from throttle_cache in 1 batch(es)`; gunicorn up; health check 200), the
+Blueprint sync kept the variable, and `scripts/smoke_test.py` against the staging frontend passed all 12 checks (sign-in as
+the demo owner and outsider, the project list and open counts, the still-open view, a misspelt status refused, the 404 rule,
+a wrong password refused). **Not checked:** the transaction pooler, the direct connection, a pause and a restore, behaviour
+under real traffic, drafting against this database.
 
 ### Things to know (Render's free plan, from its documentation)
 
