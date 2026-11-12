@@ -641,6 +641,62 @@ the demo owner and outsider, the project list and open counts, the still-open vi
 a wrong password refused). **Not checked:** the transaction pooler, the direct connection, a pause and a restore, behaviour
 under real traffic, drafting against this database.
 
+### Backups and restore (#35)
+
+**There is no automatic backup.** Supabase's documentation says automatic daily backups are for Pro, Team and Enterprise
+projects (7 days of them on Pro) and recommends that Free projects "regularly export their data" and keep copies elsewhere.
+Staging holds invented demo data only, so this is acceptable for it; it is **not** acceptable for real data. Two owner
+decisions are still open: where production runs and on which database plan, and whether staging ever moves to a paid plan
+(which would bring daily backups). Until then the routine below is manual, and it is the evidence the `review-for-data-loss`
+skill asks for: a backup that was **restored**, not one that reported success.
+
+**Back up** (needs Docker with the project's database container, and the Supabase session pooler URL from the section above,
+in an environment variable so it never goes on a command line, in the repository or in a chat: `export BACKUP_DATABASE_URL=...`
+in bash; in PowerShell `$env:BACKUP_DATABASE_URL = Read-Host "URL"`). The dump holds the whole `public` schema, which is all
+the app's data (users, sessions, projects, memberships, questions, answers, the sign-in counters, migrations); Supabase's own
+schemas are not used by the app and are left out. The container's `pg_dump` is 17, the same major version as Supabase's server.
+
+```bash
+docker exec -e BACKUP_DATABASE_URL sual-cavab-db-1 sh -c 'pg_dump "$BACKUP_DATABASE_URL" -n public -Fc --no-owner --no-acl -f /tmp/staging.dump'
+docker cp sual-cavab-db-1:/tmp/staging.dump ./staging-YYYY-MM-DD.dump
+```
+
+Keep the file **outside the repository** (`*.dump` is git-ignored as a second line of defence) and somewhere that is not the
+same machine as the only copy; it contains every row. It goes through a file inside the container and `docker cp` on purpose:
+PowerShell's `>` rewrites binary output and would corrupt a dump.
+
+**Prove it restores, on a copy** (never into the live database):
+
+```bash
+docker exec sual-cavab-db-1 sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE restore_check"'
+docker exec sual-cavab-db-1 sh -c 'psql -U "$POSTGRES_USER" -d restore_check -c "DROP SCHEMA public"'   # a new database has an empty one; the dump creates it
+docker cp ./staging-YYYY-MM-DD.dump sual-cavab-db-1:/tmp/restore.dump
+docker exec sual-cavab-db-1 sh -c 'pg_restore -U "$POSTGRES_USER" -d restore_check --no-owner --no-acl --exit-on-error /tmp/restore.dump'
+python scripts/compare_databases.py restore_check     # needs BACKUP_DATABASE_URL set; exits 0 only if every table matches
+```
+
+`scripts/compare_databases.py` prints, for every table, the number of rows and a checksum of its contents on both sides. The
+checksum is made in the "C" collation and in UTC: without that, two servers showed false differences in three tables
+(40, 10 and 22 rows) because they sorted the same rows differently. To see Django itself accept the copy, run
+`POSTGRES_DB=restore_check python manage.py showmigrations --plan` and `check` in `backend/` with the URL of the live
+database *not* in `backend/.env` (all 22 migrations should show as applied).
+
+**Clean up by hand** when you are done (nothing here deletes anything for you): the two files in the container's `/tmp`
+(`docker exec sual-cavab-db-1 rm /tmp/staging.dump /tmp/restore.dump`), the copy (`DROP DATABASE restore_check` in the container's
+`psql`), and the dump file when it is no longer needed.
+
+**What was run (2026-11-12, on the staging database, from a developer machine):** the dump was 50 KB and took about 4
+seconds; it restored into a new local database with no error; the two sides had the same 15 tables and the same row counts
+and checksums in all of them (3 users, 2 projects, 4 memberships, 8 questions, 3 answers, 22 migrations, ...); Django on the
+copy reported all 22 migrations applied and no check issues. The commands above were run as written, into a copy named
+`restore_check2`. The comparison was also run against the local development database and against a database that does not
+exist, and it reported the differences and failed (exit 1) both times.
+
+**Not covered:** a schedule (nothing runs this); a restore **into Supabase** after a loss (only into a local copy); off-site
+storage of the dumps; how long it takes with real volumes (the data here is a few dozen rows); the Supabase CLI's `db dump`,
+which its documentation recommends (not tried); the Supabase `auth`, `storage` and other schemas (the app does not use them).
+The script itself has no automated test; it was checked by hand as described.
+
 ### Things to know (Render's free plan, from its documentation)
 
 - **Services sleep** after 15 minutes without traffic and restart at will.

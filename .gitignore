@@ -36,3 +36,6 @@ docker-compose.override.yml
 
 # collectstatic output (the deploy build step writes it)
 backend/staticfiles/
+
+# database dumps hold every row (README, "Backups and restore")
+*.dump
