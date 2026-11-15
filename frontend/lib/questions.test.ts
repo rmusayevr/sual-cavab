@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CHANNELS, TRANSITIONS, fieldErrors, today, transitionLabel } from "./questions";
+import { TRANSITIONS, fieldErrors, transitionLabel } from "./questions";
 
 describe("fieldErrors", () => {
   it("maps each field to its message", () => {
@@ -48,39 +48,3 @@ describe("transitions", () => {
 // default is the EARLIER of the browser's date and Baku's: never refused, never in the browser's own
 // future. The instants are in UTC and the browser's date is passed in, so the answer is the same on
 // any machine.
-describe("today", () => {
-  it("is just today where the browser and Baku agree, zero-padded", () => {
-    expect(today(new Date("2026-03-05T10:00:00Z"), "2026-03-05")).toBe("2026-03-05");
-    expect(today(new Date("2026-03-05T20:30:00Z"), "2026-03-06")).toBe("2026-03-06"); // a browser in Baku
-  });
-
-  it("is Baku's date for a browser AHEAD of Baku just after its own midnight: the reported bug", () => {
-    // 19:59:59 UTC is 23:59:59 in Baku, but already the next day at UTC+6 or UTC+9
-    expect(today(new Date("2026-03-05T19:59:59Z"), "2026-03-06")).toBe("2026-03-05");
-    expect(today(new Date("2026-03-05T16:00:00Z"), "2026-03-06")).toBe("2026-03-05"); // a Tokyo browser at 01:00
-  });
-
-  it("is the browser's own date for a browser BEHIND Baku, never a date in its own future", () => {
-    // 20:30 UTC is 00:30 the next day in Baku, but still the 5th at UTC or in the Americas
-    expect(today(new Date("2026-03-05T20:30:00Z"), "2026-03-05")).toBe("2026-03-05");
-    expect(today(new Date("2026-03-05T21:00:00Z"), "2026-03-05")).toBe("2026-03-05"); // Los Angeles at 13:00
-  });
-
-  it("crosses a month and a year the way each calendar does", () => {
-    expect(today(new Date("2026-12-31T20:00:00Z"), "2027-01-01")).toBe("2027-01-01");
-    expect(today(new Date("2026-12-31T20:00:00Z"), "2026-12-31")).toBe("2026-12-31");
-    expect(today(new Date("2026-02-28T19:00:00Z"), "2026-03-01")).toBe("2026-02-28");
-  });
-
-  it("uses the browser's own calendar by default, when no date is given, and is never later than it", () => {
-    const now = new Date();
-    const own = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    expect(today(now) <= own).toBe(true);
-  });
-});
-
-describe("CHANNELS (#114)", () => {
-  it("does not offer 'link': it marks an answer accepted from the answer link, and a person cannot pick it", () => {
-    expect(CHANNELS.map((c) => c.value)).toEqual(["chat", "meeting", "email", "other"]);
-  });
-});

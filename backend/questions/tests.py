@@ -27,13 +27,8 @@ def make_user(email):
 
 
 def answer_payload(**overrides):
-    return {
-        "text": "Refunds are allowed within 14 days.",
-        "answered_by": "Invented Contact",
-        "answered_on": timezone.localdate().isoformat(),
-        "channel": "email",
-        **overrides,
-    }
+    """What the app sends to answer a question: the text only (#121). Who answered, when and where are the server's."""
+    return {"text": "Refunds are allowed within 14 days.", **overrides}
 
 
 class QuestionTestCase(TestCase):
@@ -173,16 +168,24 @@ class TransitionApiTests(QuestionTestCase):
 
         self.assertEqual(self.move(1, "asked", answer=answer_payload()).status_code, 400)
 
-    def test_a_member_cannot_record_an_answer_as_coming_from_the_answer_link(self):
-        # "link" is the mark of an answer a member ACCEPTED from a client's submission (#114). It is not a
-        # place a member can say an answer came from, or anyone could forge that provenance by hand.
+    def test_a_member_cannot_say_where_an_answer_came_from_or_who_gave_it(self):
+        # "link" is the mark of an answer a member ACCEPTED from a client's submission (#114), and who answered
+        # and when are the server's. Whatever else is sent along with the text is ignored (#121), so nothing
+        # about an answer's provenance can be forged by hand.
         self.ask()
+        tomorrow = (timezone.localdate() + timezone.timedelta(days=1)).isoformat()
 
-        response = self.move(1, "answered", answer=answer_payload(channel="link"))
+        response = self.move(
+            1, "answered",
+            answer=answer_payload(channel="link", answered_by="Someone Else", answered_on=tomorrow, channel_note="forged"),
+        )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("channel", response.json()["answer"])
-        self.assertEqual(self.db_question(1).status, "open")
+        self.assertEqual(response.status_code, 200)
+        answer = Answer.objects.get()
+        self.assertEqual(
+            (answer.channel, answer.answered_by, answer.answered_on, answer.channel_note),
+            ("app", "owner@example.com", timezone.localdate(), ""),
+        )
         self.assertEqual(Answer.objects.filter(channel="link").count(), 0)
 
     def test_a_refused_transition_names_the_allowed_ones(self):
@@ -212,37 +215,38 @@ class TransitionApiTests(QuestionTestCase):
 
         self.assertEqual(self.move(1, "finished").status_code, 400)
 
-    def test_an_answer_records_who_when_where_and_who_recorded_it(self):
+    def test_an_answer_typed_in_the_app_records_who_gave_it_when_and_that_it_was_in_the_app(self):
         self.ask()
+        self.owner.first_name, self.owner.last_name = "Aysel", "Demo"
+        self.owner.save()
 
-        body = self.move(1, "answered", answer=answer_payload(channel="meeting", channel_note="Kickoff call")).json()
+        body = self.move(1, "answered", answer=answer_payload()).json()
 
         current = body["current_answer"]
         self.assertEqual(
             (current["answered_by"], current["channel"], current["channel_note"], current["recorded_by"]),
-            ("Invented Contact", "meeting", "Kickoff call", "owner@example.com"),
+            ("Aysel Demo", "app", "", "owner@example.com"),
         )
+        self.assertEqual(current["answered_on"], timezone.localdate().isoformat())
         self.assertEqual(body["status"], "answered")
 
-    def test_an_answer_needs_text_and_a_source(self):
+    def test_a_member_without_a_name_is_recorded_by_email(self):
         self.ask()
 
-        for field in ("text", "answered_by", "channel", "answered_on"):
-            with self.subTest(field):
-                payload = answer_payload()
-                del payload[field]
-                self.assertEqual(self.move(1, "answered", answer=payload).status_code, 400)
+        body = self.move(1, "answered", user=self.member, answer=answer_payload()).json()
+
+        self.assertEqual(body["current_answer"]["answered_by"], "member@example.com")
+
+    def test_an_answer_needs_only_its_text(self):
+        self.ask()
+
+        self.assertEqual(self.move(1, "answered", answer={}).status_code, 400)
+        self.assertEqual(self.move(1, "answered", answer=answer_payload()).status_code, 200)
 
     def test_a_blank_answer_is_refused(self):
         self.ask()
 
         self.assertEqual(self.move(1, "answered", answer=answer_payload(text="   ")).status_code, 400)
-
-    def test_an_answer_dated_in_the_future_is_refused(self):
-        self.ask()
-        tomorrow = (timezone.localdate() + timezone.timedelta(days=1)).isoformat()
-
-        self.assertEqual(self.move(1, "answered", answer=answer_payload(answered_on=tomorrow)).status_code, 400)
 
 
 class AnswerHistoryTests(QuestionTestCase):
@@ -719,7 +723,9 @@ class DataSafetyTests(QuestionTestCase):
         text = "Müştəri kartı üçün ödəniş limiti nə qədərdir? Ğ ğ İ ı Ö ö Ü ü Ç ç Ş ş Ə ə"
         answer = "Limit 500 manatdır; “texniki” terminlər English qalır: refund, webhook."
         self.ask(text, why_it_matters="Ödəniş səhifəsi üçün vacibdir", blocks="Çıxış (checkout) axını")
-        self.move(1, "answered", answer=answer_payload(text=answer, answered_by="Əli Məmmədov"))
+        self.owner.first_name, self.owner.last_name = "Əli", "Məmmədov"
+        self.owner.save()
+        self.move(1, "answered", answer=answer_payload(text=answer))
 
         body = self.as_user(self.member).get(self.url(number=1)).json()
 

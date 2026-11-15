@@ -450,14 +450,12 @@ describe("Workspace (#70)", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Q1.*Which payment providers/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "Thirty days, in writing." } });
-    fireEvent.change(screen.getByLabelText("Answered by"), { target: { value: "Invented Person" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
 
     expect(await screen.findByText("A dropped question cannot become answered.")).toBeInTheDocument();
     const detail = screen.getByRole("region", { name: "Selected question" });
     expect(within(detail).getByLabelText("Answer")).toHaveValue("Thirty days, in writing."); // kept through the reload
-    expect(within(detail).getByLabelText("Answered by")).toHaveValue("Invented Person");
     expect(within(detail).queryByRole("button", { name: "Save answer" })).not.toBeInTheDocument();
     expect(within(detail).getByText(/kept below so you can copy it/)).toBeInTheDocument();
     expect(within(detail).getAllByText("Dropped").length).toBeGreaterThan(0); // the card shows the question as it is now

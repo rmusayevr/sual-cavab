@@ -75,10 +75,6 @@ export const az: Record<Key, string> = {
   "form.adding": "Əlavə edilir…",
 
   "answer.text": "Cavab",
-  "answer.by": "Cavab verən",
-  "answer.date": "Tarix",
-  "answer.where": "Kanal",
-  "answer.note": "Qeyd (istəyə bağlı)",
   "answer.save": "Cavabı saxla",
   "answer.keptRetry": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda saxlanır. Suala baxın, sonra yenidən saxlayın.",
   "answer.keptCopy": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda saxlanır və onu kopyalaya bilərsiniz. Bu suala indiki vəziyyətində cavab yazmaq mümkün deyil.",
@@ -86,6 +82,7 @@ export const az: Record<Key, string> = {
   "channel.meeting": "Görüş",
   "channel.email": "E-poçt",
   "channel.other": "Digər",
+  "channel.app": "Tətbiqdə",
 
   "error.addQuestion": "Sualı əlavə etmək alınmadı.",
   "error.changeStatus": "Statusu dəyişmək alınmadı.",

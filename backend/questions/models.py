@@ -57,6 +57,7 @@ class Answer(models.Model):
         EMAIL = "email", "Email"
         OTHER = "other", "Other"
         LINK = "link", "Answer link"  # sent through a project's answer link, accepted by a member (#114)
+        APP = "app", "In the app"  # typed by a member in the app: every new answer of that kind (#121)
 
     question = models.ForeignKey(Question, on_delete=models.PROTECT, related_name="answers")
     text = models.TextField()

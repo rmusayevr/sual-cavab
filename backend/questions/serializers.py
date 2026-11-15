@@ -1,4 +1,3 @@
-from django.utils import timezone
 from rest_framework import serializers
 
 from .models import Answer, Question
@@ -24,18 +23,13 @@ class AnswerSerializer(serializers.ModelSerializer):
 
 
 class AnswerInputSerializer(serializers.Serializer):
-    text = serializers.CharField(allow_blank=False)
-    answered_by = serializers.CharField(max_length=200, allow_blank=False)
-    answered_on = serializers.DateField()
-    # "link" marks an answer a member accepted from a client's submission (answerlinks, #114); a member cannot
-    # type it in by hand, or anyone could forge where an answer came from.
-    channel = serializers.ChoiceField(choices=[c for c in Answer.Channel.choices if c[0] != Answer.Channel.LINK])
-    channel_note = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+    """What a person sends to answer a question: the text, nothing else (#121).
 
-    def validate_answered_on(self, value):
-        if value > timezone.localdate():
-            raise serializers.ValidationError("The answer cannot be dated in the future.")
-        return value
+    Who answered, when and where are the server's to say (questions.services.change_status fills them in), so
+    anything else in the request is ignored and nothing about an answer's provenance, such as the answer-link
+    mark (#114), can be forged by hand."""
+
+    text = serializers.CharField(allow_blank=False)
 
 
 class QuestionSerializer(serializers.ModelSerializer):

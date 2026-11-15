@@ -277,17 +277,13 @@ describe("QuestionItem: edit", () => {
 describe("QuestionItem: record an answer", () => {
   const fill = () => {
     fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "30 days." } });
-    fireEvent.change(screen.getByLabelText("Answered by"), { target: { value: "Əli Məmmədov" } });
-    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-03-01" } });
-    fireEvent.change(screen.getByLabelText("Where"), { target: { value: "meeting" } });
-    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Weekly sync" } });
   };
 
-  it("opens a form, posts the answer with the transition and shows it", async () => {
+  it("opens a form, posts ONLY the text with the transition and shows the answer", async () => {
     const calls = backend({
       [LIST]: () => json(200, [question(1)]),
       [TRANSITION_1]: () =>
-        json(200, question(1, { status: "answered", current_answer: answerOf({ channel: "meeting" }) })),
+        json(200, question(1, { status: "answered", current_answer: answerOf({ channel: "app", answered_by: "Aysel Demo" }) })),
     });
     render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
@@ -295,54 +291,25 @@ describe("QuestionItem: record an answer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
 
     expect(await screen.findByRole("button", { name: "Re-open" })).toBeInTheDocument();
+    // Who answered, when and where are the server's (#121): nothing else is sent.
     expect(calls.find((c) => c.method === "POST" && c.url.endsWith("/transition/"))?.body).toEqual({
       to: "answered",
-      answer: {
-        text: "30 days.",
-        answered_by: "Əli Məmmədov",
-        answered_on: "2026-03-01",
-        channel: "meeting",
-        channel_note: "Weekly sync",
-      },
+      answer: { text: "30 days." },
     });
+    expect(screen.getByText("by Aysel Demo · 2026-03-01")).toBeInTheDocument(); // no channel word for an answer given in the app
   });
 
-  // The server refuses an answer date after today in Asia/Baku (#48), so the default must not be after
-  // Baku's date, and not after the browser's own date either (a browser in the Americas must not be
-  // handed its own future). Which of the two it is depends on the machine's time zone, so this checks
-  // the rule at a moment when the calendars differ (20:30 UTC is already the 6th in Baku); the exact
-  // dates per zone are in lib/questions.test.ts.
-  it("starts with a date that is neither after Baku's today nor after the browser's, and the chat channel", async () => {
-    backend({ [LIST]: () => json(200, [question(1)]) });
-    vi.useFakeTimers({ toFake: ["Date"] });
-    const now = new Date("2026-03-05T20:30:00Z");
-    vi.setSystemTime(now);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const own = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const baku = "2026-03-06";
-    try {
-      render(<Board projectId="5" />);
-      fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
-      const value = (screen.getByLabelText("Date") as HTMLInputElement).value;
-      expect(value <= baku).toBe(true);
-      expect(value <= own).toBe(true);
-      expect([own, baku]).toContain(value);
-      expect(screen.getByLabelText("Where")).toHaveValue("chat");
-    } finally {
-      vi.useRealTimers();
-    }
-  });
 
-  it("shows the API's message next to the date and keeps what was typed", async () => {
+  it("shows the API's message next to the answer and keeps what was typed", async () => {
     backend({
       [LIST]: () => json(200, [question(1)]),
-      [TRANSITION_1]: () => json(400, { answer: { answered_on: ["The answer cannot be dated in the future."] } }),
+      [TRANSITION_1]: () => json(400, { answer: { text: ["Ensure this field has no more than 4000 characters."] } }),
     });
     render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
-    expect(await screen.findByText("The answer cannot be dated in the future.")).toBeInTheDocument();
+    expect(await screen.findByText("Ensure this field has no more than 4000 characters.")).toBeInTheDocument();
     expect(screen.getByLabelText("Answer")).toHaveValue("30 days.");
   });
 
@@ -367,8 +334,6 @@ describe("QuestionItem: record an answer", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("A dropped question cannot become answered.");
     expect(await screen.findByText("Dropped")).toBeInTheDocument(); // the question behind the form is up to date
     expect(screen.getByLabelText("Answer")).toHaveValue("30 days."); // nothing typed is lost
-    expect(screen.getByLabelText("Answered by")).toHaveValue("Əli Məmmədov");
-    expect(screen.getByLabelText("Note (optional)")).toHaveValue("Weekly sync");
     expect(screen.queryByRole("button", { name: "Save answer" })).not.toBeInTheDocument(); // nothing the status forbids is offered
     expect(screen.getByRole("status")).toHaveTextContent(KEPT_COPY); // announced, and it says the answer was NOT saved
 
@@ -486,17 +451,17 @@ describe("QuestionItem: record an answer", () => {
     expect(await screen.findByText(/could not change the status/i)).toBeInTheDocument();
   });
 
-  it("links the date's message to the date input", async () => {
+  it("links the answer's message to the answer box", async () => {
     backend({
       [LIST]: () => json(200, [question(1)]),
-      [TRANSITION_1]: () => json(400, { answer: { answered_on: ["The answer cannot be dated in the future."] } }),
+      [TRANSITION_1]: () => json(400, { answer: { text: ["This field may not be blank."] } }),
     });
     render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
-    const message = await screen.findByText("The answer cannot be dated in the future.");
-    const input = screen.getByLabelText("Date");
+    const message = await screen.findByText("This field may not be blank.");
+    const input = screen.getByLabelText("Answer");
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input.getAttribute("aria-describedby")).toBe(message.id);
   });
@@ -610,15 +575,15 @@ describe("QuestionItem: answers", () => {
     expect(screen.getByText("Blocks: Checkout")).toBeInTheDocument();
   });
 
-  it("the answer form uses a date input and a select, all easy to tap", async () => {
+  it("the answer form is one box, easy to tap: no who, date, place or note to fill in", async () => {
     backend({ [LIST]: () => json(200, [question(1)]) });
     render(<Board projectId="5" />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
 
-    expect(await screen.findByLabelText("Date")).toHaveAttribute("type", "date");
-    expect(screen.getByLabelText("Where").tagName).toBe("SELECT");
-    for (const label of ["Answer", "Answered by", "Date", "Where", "Note (optional)"]) expect(screen.getByLabelText(label)).toHaveClass("min-h-11");
+    expect(await screen.findByLabelText("Answer")).toHaveClass("min-h-11");
+    for (const gone of ["Answered by", "Date", "Where", "Note (optional)"]) expect(screen.queryByLabelText(gone)).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save answer" })).toHaveClass("min-h-11");
   });
 
@@ -630,20 +595,19 @@ describe("QuestionItem: answers", () => {
         attempts += 1;
         return attempts === 1
           ? json(400, { to: ["The question was changed. Check it and try again."], allowed: ["answered"] })
-          : json(400, { answer: { answered_on: ["The answer cannot be dated in the future."] } });
+          : json(400, { answer: { text: ["This field may not be blank."] } });
       },
       [QUESTION_1]: () => json(200, question(1, { status: "asked" })),
     });
     render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "30 days." } });
-    fireEvent.change(screen.getByLabelText("Answered by"), { target: { value: "Əli Məmmədov" } });
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
     await screen.findByText("The question was changed. Check it and try again.");
 
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
 
-    expect(await screen.findByText("The answer cannot be dated in the future.")).toBeInTheDocument();
+    expect(await screen.findByText("This field may not be blank.")).toBeInTheDocument();
     expect(screen.queryByText("The question was changed. Check it and try again.")).not.toBeInTheDocument();
   });
 });
@@ -683,5 +647,28 @@ describe("QuestionItem: an answer sent through the answer link (#114)", () => {
 
     expect(await screen.findByText(/by Əli Məmmədov · Email · 2026-03-01/)).toBeInTheDocument();
     expect(screen.queryByText(/name not verified/)).not.toBeInTheDocument();
+  });
+});
+
+describe("QuestionItem: where an answer came from (#121)", () => {
+  it("says nothing about a place for an answer given in the app, only who gave it and when", async () => {
+    backend({
+      [LIST]: () =>
+        json(200, [question(1, { status: "answered", current_answer: answerOf({ channel: "app", answered_by: "Aysel Demo", answered_on: "2026-11-15" }) })]),
+    });
+    render(<Board projectId="5" />);
+
+    expect(await screen.findByText("by Aysel Demo · 2026-11-15")).toBeInTheDocument();
+    for (const word of ["Chat", "Meeting", "Email", "Other", "answer link"]) expect(screen.queryByText(new RegExp(word, "i"))).not.toBeInTheDocument();
+  });
+
+  it("still shows where an answer recorded before that said it came from, with its note", async () => {
+    backend({
+      [LIST]: () =>
+        json(200, [question(1, { status: "answered", current_answer: answerOf({ channel: "meeting", channel_note: "Weekly sync" }) })]),
+    });
+    render(<Board projectId="5" />);
+
+    expect(await screen.findByText(/by Əli Məmmədov · Meeting \(Weekly sync\) · 2026-03-01/)).toBeInTheDocument();
   });
 });

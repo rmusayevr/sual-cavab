@@ -39,7 +39,7 @@ export async function failure(response: Response, fallback: string, shown: strin
 }
 
 export const QUESTION_FIELDS = ["text", "why_it_matters", "blocks"] as const;
-const ANSWER_FIELDS = ["text", "answered_by", "answered_on", "channel", "channel_note"];
+const ANSWER_FIELDS = ["text"];
 
 /**
  * One question of the workspace: its text, why it matters, what it blocks and its answers, with the
@@ -224,7 +224,12 @@ function AnswerView({ answer, heading }: { answer: Answer; heading: string }) {
         <p className="text-sm text-muted-foreground">
           {t("question.viaLink", { who: plainName(answer.answered_by), by: answer.recorded_by, date: answer.answered_on })}
         </p>
+      ) : answer.channel === "app" ? (
+        <p className="text-sm text-muted-foreground">
+          {t("question.by", { who: answer.answered_by })} · {answer.answered_on}
+        </p>
       ) : (
+        // An answer recorded before #121, when a person said where it came from.
         <p className="text-sm text-muted-foreground">
           {t("question.by", { who: answer.answered_by })} · {t(`channel.${answer.channel}`)}
           {answer.channel_note ? ` (${answer.channel_note})` : ""} · {answer.answered_on}

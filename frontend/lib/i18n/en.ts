@@ -73,10 +73,6 @@ export const en = {
   "form.adding": "Adding…",
 
   "answer.text": "Answer",
-  "answer.by": "Answered by",
-  "answer.date": "Date",
-  "answer.where": "Where",
-  "answer.note": "Note (optional)",
   "answer.save": "Save answer",
   "answer.keptRetry": "Your answer was not saved, but it is kept below. Check the question, then save it again.",
   "answer.keptCopy": "Your answer was not saved, but it is kept below so you can copy it. The question cannot be answered in its present state.",
@@ -84,6 +80,7 @@ export const en = {
   "channel.meeting": "Meeting",
   "channel.email": "Email",
   "channel.other": "Other",
+  "channel.app": "In the app",
 
   "error.addQuestion": "Could not add the question.",
   "error.changeStatus": "Could not change the status.",
