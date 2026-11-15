@@ -1,8 +1,7 @@
 # Sual-Cavab
 
-Tracks the open questions a project is waiting on, and drafts short messages
-asking them. Backend: Django + DRF in `backend/`. Frontend: Next.js in
-`frontend/`. Database: PostgreSQL.
+Tracks the open questions a project is waiting on. Backend: Django + DRF in `backend/`.
+Frontend: Next.js in `frontend/`. Database: PostgreSQL.
 
 ## Branches
 
@@ -14,10 +13,13 @@ asking them. Backend: Django + DRF in `backend/`. Frontend: Next.js in
 
 - The repo is public. Demo and test data are invented. Never commit real client
   questions, names or messages.
-- Drafting never sends anything. It returns text for a person to review.
 - Who can see or change a project is a business rule: ask before changing it.
 
-<!-- BEGIN harness v0.2.0 -->
+## Design
+
+UI follows DESIGN.md. Changing the direction takes an issue.
+
+<!-- BEGIN harness v0.3.0 -->
 <!-- Managed by the harness plugin. Edits inside this block are overwritten on
      update unless `install.mjs` detects them, in which case it refuses without
      --force. Write your own rules OUTSIDE this block. -->
@@ -25,9 +27,10 @@ asking them. Backend: Django + DRF in `backend/`. Frontend: Next.js in
 ## Working agreement
 
 Rules below must hold in plain conversation, where no skill has been invoked.
-Anything that is a *procedure* belongs in a skill body, not here — see
-`ARCHITECTURE.md`. Keep this block under 80 lines: it is loaded every session
-and again inside every subagent.
+Anything that is a *procedure* belongs in a skill body, not here; see the
+harness's ARCHITECTURE.md (https://github.com/rmusayevr/claude-harness/blob/main/ARCHITECTURE.md).
+Keep this block under 80 lines: it is loaded every session and again inside
+every subagent.
 
 ### Claims
 
@@ -40,6 +43,8 @@ and again inside every subagent.
 
 ### Changes
 
+- A project's own rules outrank a skill's defaults. If a skill says to use a
+  model, option or default the project's rules forbid, follow the project.
 - State what you will not touch before a multi-file change.
 - An improvement noticed mid-change goes in a separate commit or does not go in.
 - If the change crosses a boundary that was not planned, stop and say so rather
@@ -52,6 +57,18 @@ and again inside every subagent.
 - Do not invent file paths, flags, config keys, or API surfaces. Check, or say
   it is unchecked.
 
+### Skills
+
+Load the matching skill **before** you act, not after, and do not work from
+memory when one applies:
+
+- deleting or overwriting anything not in git, or touching production: `risky-op`
+- adding a package: `review-a-dependency`
+- starting in an area, or after a failure: `recall-lessons`
+- stopping mid-task or handing over: `handoff`
+- writing a bug report or an issue: `write-a-bug-report`
+- the look of a new UI or a redesign, with no DESIGN.md yet: `design-direction`
+
 ### Guards
 
 - The risky-ops hook denies and escalates by design. When it denies, do not look
@@ -63,4 +80,4 @@ and again inside every subagent.
 - When something in this project costs real work through a mistake that was
   foreseeable, run `/harness:promote-lesson` rather than resolving to remember.
 
-<!-- END harness v0.2.0 -->
+<!-- END harness v0.3.0 -->

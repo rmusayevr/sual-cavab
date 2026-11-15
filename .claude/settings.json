@@ -22,12 +22,17 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-merge.mjs\"",
-            "timeout": 10
+            "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-review-before-merge.mjs\"",
+            "timeout": 15
           }
         ]
       },
       {
-        "matcher": "Skill",
+        "matcher": "Skill|Agent|Task",
         "hooks": [
           {
             "type": "command",

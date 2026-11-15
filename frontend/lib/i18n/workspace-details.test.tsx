@@ -1,0 +1,114 @@
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import Workspace from "@/components/Workspace";
+
+import { setLanguage, translate, type Key, type Language } from "./index";
+
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ id: "5" }),
+  usePathname: () => "/projects/5",
+  useRouter: () => ({ push: () => {} }),
+}));
+
+const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+const page = (results: unknown[], count = results.length) => ({ count, page: 1, page_size: 25, results });
+const project = { id: 5, name: "Ticketing", client_name: "Invented Client", description: "", my_role: "owner", open_question_count: 2, created_at: "", updated_at: "" };
+const q = (n: number, status: string) => ({
+  id: n,
+  number: n,
+  label: `Q${n}`,
+  text: `Invented question ${n}`,
+  why_it_matters: "",
+  blocks: "",
+  status,
+  created_at: "2026-01-01T00:00:00Z",
+  current_answer: null,
+  previous_answers: [],
+});
+const members = [
+  { user_id: 1, email: "owner@example.invalid", name: "Olga Owner", role: "owner", added_at: "" },
+  { user_id: 2, email: "member@example.invalid", name: "", role: "member", added_at: "" },
+];
+
+function api() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => {
+      if (url.includes("/answer-link/")) return json(200, { exists: false });
+      if (url.includes("/submissions/")) return json(200, []);
+      if (url.includes("/questions/")) return json(200, [q(1, "open"), q(2, "answered")]);
+      if (url.endsWith("/members/")) return json(200, members);
+      return /^\/api\/projects\/\d+\/$/.test(url) ? json(200, project) : json(200, page([project]));
+    }),
+  );
+}
+
+afterEach(() => {
+  act(() => setLanguage("en"));
+  localStorage.clear();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
+// The members and the ages of the workspace in both languages (#83), with the
+// words looked up from the dictionary.
+for (const lang of ["en", "az"] as Language[]) {
+  const t = (key: Key, values?: Record<string, string | number>) => translate(lang, key, values);
+
+  describe(`the workspace's members and ages in ${lang}`, () => {
+    it("names the member list and each role in the language", async () => {
+      act(() => setLanguage(lang));
+      api();
+      render(<Workspace />);
+
+      const list = await screen.findByRole("list", { name: t("members.label") });
+      expect(within(list).getByText(`Olga Owner · ${t("role.owner")}`)).toBeInTheDocument();
+      expect(within(list).getByText(`member@example.invalid · ${t("role.member")}`)).toBeInTheDocument();
+    });
+
+    it("words the age of an open question in the language", async () => {
+      act(() => setLanguage(lang));
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-01-04T12:00:00Z"));
+      api();
+      render(<Workspace />);
+
+      const row = (await screen.findByText("Invented question 1")).closest("li")!;
+      expect(within(row).getByText(t("age.many", { n: 3 }))).toBeInTheDocument();
+    });
+
+    it("words the age for under a day, exactly one day and many days", async () => {
+      act(() => setLanguage(lang));
+      for (const [now, expected] of [
+        ["2026-01-01T10:00:00Z", t("age.zero")],
+        ["2026-01-02T00:00:00Z", t("age.one")],
+        ["2026-01-05T00:00:00Z", t("age.many", { n: 4 })],
+      ] as const) {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date(now));
+        api();
+        const { unmount } = render(<Workspace />);
+        const row = (await screen.findByText("Invented question 1")).closest("li")!;
+        expect(within(row).getByText(expected)).toBeInTheDocument();
+        unmount();
+        vi.useRealTimers();
+      }
+    });
+
+    it("tells a signed-out person to sign in, in the language, with the button where the sentence puts it (#91)", async () => {
+      act(() => setLanguage(lang));
+      vi.stubGlobal("fetch", vi.fn(async () => json(403, {})));
+      render(<Workspace />);
+
+      const expected = t("workspace.signInLine").replace("{link}", t("session.signIn"));
+      // the header offers a Sign in link too; the one in the page body is inside the sentence
+      const sentence = await waitFor(() => {
+        const found = screen.getAllByRole("link", { name: t("session.signIn") }).map((l) => l.parentElement!).find((p) => p.tagName === "P");
+        expect(found).toBeDefined();
+        return found!;
+      });
+      expect(sentence.textContent).toBe(expected);
+    });
+  });
+}

@@ -12,17 +12,826 @@ Sual-Cavab ("question-answer" in Azerbaijani) keeps them in one place:
 - **Questions per project**, numbered Q1, Q2…, each with why it matters and
   which task it blocks.
 - **A clear status:** open, asked, answered or dropped. Every answer records
-  who gave it, when, and where.
+  who gave it and when (an answer typed in the app is saved as given by the signed-in person, today; answers
+  recorded before #121 also say where they came from).
 - **What's still open**, at a glance.
-- **A drafted message** for the client or a teammate: pick the open questions
-  and get a short message in Azerbaijani, with technical terms kept in English.
-  You review it and send it yourself.
 
 > Status: early. The first version is being built in the open, issue by issue.
 
 ## Stack
 
 Django + Django REST Framework (backend), Next.js (frontend), PostgreSQL.
+
+### What was tested, and what was not
+
+This says only what has been run (#43). "Not run" is not "does not work": it is "nobody has looked".
+
+| | Run | Not run |
+| --- | --- | --- |
+| **Python** | 3.14 (CI, and the author's machine) | 3.12 and 3.13. Django 6.1 itself supports 3.12 and newer, so the code is written for that, but nothing here has run on it. The Python Render uses was never read from the service (`render.yaml` sets none; Render's default was assumed to be 3.14.x). |
+| **Node.js** | A current Node 22 chosen by the CI runner (`node-version: "22"`, no exact pin); 22.20.0 on the author's machine (lint, typecheck, the tests and the build: PRs #14, #62, #74, #76, #82); 22.22.2 on Render, where `npm ci`, `next build` and `next start` ran and the site served the sign-in page and proxied the API (the smoke test of #10) | Lint, typecheck and the tests on 22.22.2 itself, and Node 24 and 26. |
+| **PostgreSQL** | 17: the Compose file, CI, and Render's managed database (`postgresMajorVersion: "17"`), which the smoke test of #10 ran against | Any other major version. |
+| **Operating system** | Ubuntu (CI: the backend and frontend checks, with PostgreSQL as a service container, not Compose; and Render's Linux) and Windows (the author's machine: everything, including Compose on Docker Desktop) | macOS, and Linux on a desktop. |
+| **Docker Compose file** | Windows with Docker Desktop | Linux, macOS, and a Docker without IPv6 (the file binds `[::1]` as well as `127.0.0.1`; see the note under [Local setup](#local-setup)). |
+| **Browsers** | Some screens, in English only, in a headless Edge against the production build with a mock API and invented data: the landing, sign-in, projects and 404 pages and the workspace as first built (#74, #76, #79). And, by hand on the real staging site, as the owner said in conversation on 2026-11-15 (see #32): the new features and the screens | Which browsers and devices the owner used was not recorded; a phone, long words and keyboard-only use were not specifically reported. Nothing has been checked by a script in a browser since the headless Edge runs above. |
+
+The version numbers below are what the tools and packages declare or what CI uses, not a promise that every version in the range has been tried.
+
+## Local setup
+
+The backend needs a PostgreSQL. The repo ships a `docker-compose.yml` with one
+(PostgreSQL 17), so you do not have to install anything but Docker.
+
+```bash
+cp backend/.env.example backend/.env     # then set POSTGRES_PORT, see below
+docker compose --env-file backend/.env up -d --wait db
+```
+
+Then run the backend and the frontend as described below, and the checks:
+
+```bash
+cd backend && python manage.py check && python manage.py makemigrations --check --dry-run && python manage.py test
+cd ../frontend && npm run lint && npm run typecheck && npm test && npm run build
+```
+
+Things to know:
+
+- **Every compose command needs `--env-file backend/.env`** (also `ps`, `logs`,
+  `down`), or `export COMPOSE_ENV_FILES=backend/.env` once in your shell.
+- **The port comes from `backend/.env`** (`POSTGRES_PORT`), and the backend
+  reads the same file. The example uses 5433. It must not clash with a
+  PostgreSQL already on your machine: a native install usually holds 5432, and
+  talking to the wrong server shows up as password errors rather than "wrong
+  port". Pick another, for example 5433. A `POSTGRES_PORT` exported in your
+  shell wins over the file, for compose and for the backend alike.
+- **Compose and the backend read `backend/.env` a little differently**: compose
+  expands a `$` and drops a trailing `# comment`, the backend does neither. A
+  password such as `pa$word1`, or `POSTGRES_PORT=5433  # mine`, gives compose
+  one value and Django another, and the sign-in fails. Keep `$` and inline
+  comments out of the `POSTGRES_*` lines (or use single quotes).
+- **The database listens on this machine only** (127.0.0.1 and ::1), and is for
+  local work. Staging and production are a separate matter. Both addresses are
+  bound on purpose: with only IPv4, `POSTGRES_HOST=localhost` made every
+  connection wait 10 seconds on Windows with Docker Desktop (it tries `::1`
+  first). If your Docker has no IPv6 and `up` fails on the `[::1]` line, create
+  a `docker-compose.override.yml` (git ignores it) next to `docker-compose.yml`
+  instead of editing the tracked file, and set `POSTGRES_HOST=127.0.0.1` in
+  `backend/.env`:
+
+  ```yaml
+  services:
+    db:
+      ports: !override
+        - "127.0.0.1:${POSTGRES_PORT}:5432"
+  ```
+- **The data lives in a named volume.** It survives `docker compose down` and a
+  reboot. `docker compose --env-file backend/.env down -v` deletes it: that is
+  the reset (then `up` again and `migrate`).
+- **Database name, user and password are applied only when the volume is first
+  created.** Changing them in `backend/.env` later does not change an existing
+  database; reset it as above.
+- If a value is missing from `backend/.env`, compose stops and says which one.
+- The compose project is named `sual-cavab`, so two clones of the repository on
+  one machine share one container and one volume.
+- Prefer your own PostgreSQL? Skip the compose step and point the `POSTGRES_*`
+  values in `backend/.env` at it.
+
+## Run the backend
+
+Written for Python 3.12 or newer (Django 6.1's own minimum) and a PostgreSQL you can
+create databases on (see [Local setup](#local-setup)). **Only Python 3.14 has been run**
+(see [What was tested](#what-was-tested-and-what-was-not)).
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate     # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+cp .env.example .env          # then set the POSTGRES_* values for your database
+python manage.py migrate
+python manage.py createcachetable  # sign-in attempt counters live in PostgreSQL (`python manage.py check --database default` warns if the table is missing)
+python manage.py createsuperuser   # accounts are created by an admin; there is no sign-up
+python manage.py runserver
+```
+
+`GET http://localhost:8000/api/health/` returns `{"status": "ok"}`. Add more
+users at `http://localhost:8000/admin/`. People sign in with their email.
+
+After pulling changes, run `python manage.py migrate` **before** starting the
+new code: it selects columns that migrations add (for example
+`next_question_number`), so new code on an un-migrated database fails with 500s.
+
+If you ran `migrate` before accounts existed (#4), that database still has
+Django's default user table and `migrate` now stops with
+`InconsistentMigrationHistory`. It holds no project data yet: drop and recreate
+the database, then migrate again.
+
+Run the tests with `python manage.py test`. Environment variables already set
+in your shell win over `backend/.env`.
+
+Each test run creates its own database, named `test_<POSTGRES_DB>_<process id>`
+(a long `POSTGRES_DB` is cut so the name fits PostgreSQL's 63 bytes), so two
+runs at the same time do not delete each other's data. With `--keepdb` (it has
+no short form; `-k` selects tests by name) the one shared name
+`test_<POSTGRES_DB>` is used, so the database can be found again; do not run two
+`--keepdb` runs at once (that shared name is not cut, so a very long
+`POSTGRES_DB` is refused by Django under `--keepdb`). A run that is killed leaves its database behind. List
+them with
+`psql -h 127.0.0.1 -p <POSTGRES_PORT> -U <POSTGRES_USER> -d postgres -c "\l test_*"`
+and drop the old ones with `DROP DATABASE <name>;`.
+
+## Run the frontend
+
+jsdom, which runs the frontend tests, declares Node `^22.22.2 || ^24.15.0 || >=26`. CI uses a
+current Node 22 (chosen by the runner) and Render is pinned to 22.22.2; the author's machine has 22.20.0, below that
+declared minimum: npm warns, and lint, typecheck, the tests and the build passed there (PRs #14, #62, #74, #76, #82). So the
+declared minimum is not a hard floor in practice, but only these have been run (see
+[What was tested](#what-was-tested-and-what-was-not)).
+
+```bash
+cd frontend
+npm ci
+cp .env.example .env.local    # BACKEND_URL: where /api/* is forwarded
+npm run dev
+```
+
+Open `http://localhost:3000` and sign in at `/login`. The browser only talks to
+the frontend: Next.js forwards `/api/*` to the backend, so the session cookie
+stays on one origin. Checks: `npm run lint`, `npm run typecheck`,
+`npm test`, `npm run build`.
+
+### Design system
+
+The look is the owner's design example (an Azerbaijani ledger: deep navy,
+pomegranate red as the one action colour, saffron as the accent, carpet-diamond
+strips as seams; the repo's `DESIGN.md` has the full spec). Styling is Tailwind CSS 4 (build-time CSS, no runtime code). The
+colours are tokens in `frontend/app/globals.css`, in oklch and with the
+example's names (`bg-card`, `text-muted-foreground`, `bg-navy`, `text-saffron`,
+`bg-status-open`, ...); a component never writes a colour. The three fonts are
+Fraunces (headings), Manrope (text) and JetBrains Mono (ids, counts), through
+`next/font`, self-hosted at build time (the build needs network access once to
+fetch them). Shared pieces are in `frontend/components/ui/`: `Button` (the
+example's `btn-primary`, `btn-ghost`, and `btn-danger` for dropping a question),
+`Field` with `Input`, `Textarea` and `Select`, `StatusChip` (a dot and the word),
+`Card`, `Alert` and `PageShell`. The four statuses have ONE table of words and
+dot colours, `frontend/lib/status.ts`. A new screen uses these instead of inline
+`style={{ }}`.
+
+- Text colours are at 4.5:1 contrast or more, borders of controls and focus
+  rings at 3:1 or more; `app/design-tokens.test.ts` converts the oklch values and
+  checks that again from `globals.css`, and refuses a hardcoded colour or an
+  inline style in a component.
+- Where this differs from the example, on purpose: an extra token,
+  `control-border`, because the hairline `border` is 1.47:1 against a card and too
+  faint for an input; the focus ring is saffron on the navy surfaces (red is 2.7:1
+  there); errors use the pomegranate red as emphasis and `--destructive` is kept
+  for dropping a question; the amber "asked" dot is 2.6:1 on a card, so the word
+  always sits beside it; status words are plain small text as in the screenshots
+  (the example's rule file says monospace, its screenshots do not).
+- **There is no dark theme**: the example has none, so the app no longer follows
+  the system's dark setting (`color-scheme` is light).
+- **Manrope has no capital Ə (U+018F)**, checked in the built font files; Fraunces
+  and JetBrains Mono have every Azerbaijani letter tested. A capital Ə in body
+  text falls back to the next font in the stack.
+- Tailwind's reset ("preflight") is deliberately not imported: it changes every
+  element that has no class (headings, lists, form controls), and nobody has checked
+  every screen in a browser one by one (the owner tried the screens by hand on 2026-11-15, without a list). The components set their own font, border
+  and `list-none` instead. Add the reset only after a screen-by-screen check (#32).
+- Keep your own base CSS inside `@layer base`; unlayered CSS beats every
+  utility class.
+
+#### What was invented where the example shows nothing (#72)
+
+The example has a landing page and a workspace. For the rest I designed in the
+same language, inside its rules; each item is a choice the owner can reject:
+
+- **Sign-in** (`/login`): a navy lattice page with the wordmark, and the form on a
+  cream card topped by a carpet strip, with the eyebrow "Access".
+  The "Sign in" button on the projects and project screens opens `/login?next=<that page>`, and after a
+  successful sign-in the person goes back to it (#96). `next` is used only if it is a path inside the app
+  (`frontend/lib/safeNext.ts`: no `https://...`, `//host`, backslash or control character, and never `/login`
+  itself); anything else, or no `next`, goes to `/` as before. The landing page's own Sign in button is unchanged.
+  Tested with the component tests; not tried in a browser by the author against the real backend; whether the owner used `next` on staging was not recorded.
+- **Header band** (`components/ui/AppHeader.tsx`): the landing header made
+  reusable (wordmark, session actions, eyebrow, title, a sentence, carpet seam);
+  the projects page uses it.
+- **Projects** (`/projects`): numbered ledger lines (`01`, `02`, in red monospace),
+  the name in the serif, the client and "N still open" under it, and a saffron
+  count chip for a project that is still waiting (the example's rail does the
+  same). The names are level-2 headings. The new-project form is a card with a
+  saffron rule on top (the page already has its one carpet strip, the header's).
+- **Empty and missing things** (no projects, no questions, nothing open, project
+  not found, signed out): a card under a carpet strip with one sentence that says
+  what to do next (`EmptyState`). The example allows one carpet strip per screen,
+  so a page that has a header seam (the projects page) leaves the strip out.
+- **Loading**: the words that say what is loading, and three ledger rows that
+  pulse (`motion-safe:`: still when the person asks for less motion), instead of
+  a spinner (`LedgerLoading`).
+- **404**: "This page is not in the ledger." and the missing page as question
+  `Q404`.
+
+### Cleaning the sign-in counters (`purge_expired_cache`)
+
+The sign-in and member-add counters live in a database table (`throttle_cache`). Django only
+removes expired rows once that table passes a million, so until then they pile up and every write counts
+the table (#40). `python manage.py purge_expired_cache` removes the expired ones:
+
+```bash
+python manage.py purge_expired_cache --dry-run   # count them; delete nothing
+python manage.py purge_expired_cache             # delete them, in batches of 1000, at most 100 batches
+```
+
+It prints, for each database cache, how many rows it removed, in how many batches and how long it took (a
+run that removed 0 is normal), and says when it stopped at `--max-batches` with rows left: run it again.
+
+**How it runs (the owner's choice on #40):** Render's free tier has no cron, so the start command in
+`render.yaml` runs it at every start, after `createcachetable` and before the server: a free service
+restarts when it wakes (Render's documentation says an idle free service spins down and starts again on the
+next request; that was not tested here), so that is each deploy and, if so, each wake-up. It is wrapped in `( ... || echo ...)`, like
+the demo loader: a failed purge never keeps the site down.
+- **Overlap:** two starts at once are harmless: it deletes only rows that are expired, picked by key, and a
+  counter renewed while it runs is kept (it looks at the row again once the lock is free; tested with a real lock).
+- **Missed runs:** nothing is lost; it looks for what is expired now, so any gap is caught up on the next run.
+- **Not running at all:** nothing alerts on that (no scheduler or monitor on the free tier). The consequence
+  is the table growing slowly, as it did before this command; `--dry-run` shows how many rows are waiting.
+- A service that never sleeps (a paid plan) restarts rarely, so it would need a real schedule: a Render cron
+  job running this command daily.
+
+### A known `npm audit` finding (accepted, 2026-11-10: #50)
+
+`npm audit` in `frontend/` reports **7 moderate** findings: one advisory,
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) (a denial of service in
+`minimatch` `>=7.0.0 <11.0.1`, from a glob pattern an attacker controls), reported for `minimatch` itself (10.2.6
+here) and for the six packages that depend on it: `typescript-eslint` and its `typescript-estree`, `parser`,
+`utils`, `type-utils` and `eslint-plugin`. `eslint-config-next` 16.4.3 pulls them in (it is the root and is not
+itself reported). **It is accepted, not fixed**, for these reasons (checked on 2026-11-10, by hand and by an
+independent review that also read the code and tried the alternatives):
+
+- **Development tooling only.** `npm audit --omit=dev` reports 0 and `minimatch` is not in npm's production
+  dependency tree. (Next.js bundles its own copies of some libraries inside `next/dist/compiled`, including a
+  `minimatch` in `@vercel/nft`, which `npm audit` cannot see; it traces files during `next build` from our own
+  code and config, and it was not found in the built output.)
+- **The vulnerable code cannot be reached here, for three independent reasons.** (1) `typescript-estree` calls
+  `minimatch` in one place, to match `allowDefaultProject` patterns, and neither `frontend/eslint.config.mjs` nor
+  the `eslint-config-next` presets set `allowDefaultProject` or `projectService`. (2) The advisory is in
+  `firstPhasePreProcess()` "when `optimizationLevel >= 2`"; `minimatch` defaults to 1 and `typescript-estree`
+  passes only `{ dot: true }`. (3) The amplification needs a `**/../` pattern, and `typescript-eslint` refuses an
+  `allowDefaultProject` glob that contains `**`.
+- **The fix exists upstream; only its age is in the way.** `typescript-eslint` 8.72.3-alpha.1 to alpha.7 (canary,
+  published 2026-11-10) depend on `minimatch ^11.0.1`. The newest stable, 8.72.2 (2026-11-09), still depends on
+  `^10.2.2`, and nothing is two weeks old yet.
+- **`npm audit fix` does not help**, although `npm audit` prints "fix available": a dry run still reported 7.
+- **An npm `overrides` entry would work** (scoped: `"@typescript-eslint/typescript-estree": { "minimatch":
+  "11.0.1" }`; the review's trial cleared the audit and ESLint ran, with the code path forced both to match and not
+  to match), and it is the lever for a clean `npm audit` before the stable release. It was not done: for a
+  finding that cannot be triggered here it adds an entry that must be removed later, and the stable fix is
+  expected within days to weeks. The owner can ask for it. (`minimatch` 11.0.1 was published 2026-10-27, so it
+  passes the two-week rule from the evening of 2026-11-10.)
+
+**Revisit when** `npm view @typescript-eslint/typescript-estree dependencies.minimatch` prints `^11.0.1` or
+newer for the `latest` release: then, once that release is at least two weeks old (check it with the
+`review-a-dependency` skill), run `npm update typescript-eslint` in `frontend/` (it is not a direct dependency:
+the lockfile re-resolves it under `eslint-config-next`, which allows `typescript-eslint ^8.56.0` and needs no
+update), and delete this section. Anything `npm audit --omit=dev` reports would be a different matter: it would be
+in the built app.
+
+## Who can see or change a project
+
+Decided by the owner (#5). Access is checked in the query itself, so a project
+you are not on is a 404, the same as one that does not exist.
+
+| Action                              | Owner | Member | Not a member |
+|-------------------------------------|-------|--------|--------------|
+| See the project and its questions   | yes   | yes    | no (404)     |
+| Edit name, client, description      | yes   | yes    | no (404)     |
+| Add or remove members               | yes   | no     | no (404)     |
+| Add, edit and answer questions (#6) | yes   | yes    | no (404)     |
+| Delete the project                  | nobody in v1 (there is no delete endpoint) |
+
+A third role, **client** (#121), is for the person the questions are for: it sees only that project's open questions
+and can send answers (see "Client accounts"). To every team route and screen a client is the same as someone who is
+not a member (404).
+
+- Any signed-in user can create a project and becomes its first owner.
+- **Adding and removing members from the screen (#33).** On the project page an owner sees a **Manage members**
+  section: the members with a Remove button (asks "Remove ... from this project?" first), and a form with an
+  email and a role (member or owner). An owner who wants to hand a project over adds the new owner here before
+  leaving. A member does not see the section, and the API still refuses them (403). Messages from the server
+  (unknown email, already a member, "a project needs at least one active owner", the 30-an-hour limit) show next
+  to the field or above the form in the server's words, which stay English. After a change the list is read again
+  from the server; an owner who removes themselves is asked a different question ("Remove yourself... an owner will have to add you again") and is then taken to the projects list. Changing a member's role in
+  place, and showing who is deactivated, are not built (the API has neither). Tested with the API mocked
+  (`MembersPanel.test.tsx`) and against the server's real rules in the backend tests; not tried in a browser by the author (the owner said they tried the screens on staging, 2026-11-15).
+- **The project list comes in pages of 25** (#49), by name then id. `GET /api/projects/?page=2` answers
+  `{count, page, page_size, results}`; the page size cannot be chosen, and a page number that does not exist is a 404 (DRF also accepts `?page=last`).
+  The projects screen shows "Showing 25 of 30" and a **Show more** button. The project screen asks for its own
+  project (`/api/projects/<id>/`, a 404 means not found; `/projects/05` is project 5) and its side rail shows the first page, plus the open
+  project if it is further down, with an "All projects" link. "Show more" uses page numbers, so if projects are removed or renamed while the list is open, one can be missed until the page is reloaded. Who sees what is unchanged. Tested with 30
+  projects in the backend and with the screens' mocks; not tried with hundreds of real projects, or in a browser by the author.
+- The last active owner of a project cannot be removed (a deactivated owner
+  does not count, because they cannot manage the project).
+- Superusers have no special access through the API; they use `/admin/`.
+- Owners can only add people who already have an account (an admin creates
+  accounts). Because anyone can create a project and so become an owner, a
+  signed-in user can tell whether an email has an account by trying to add it.
+  Accepted for v1 (small, admin-created user base); attempts are limited to
+  30 an hour per user, failures included. The count is exact even when requests
+  arrive at the same moment (#41: each account's or user's check takes a PostgreSQL
+  advisory lock for a few milliseconds, so parallel requests take turns; tested with
+  real threads, and the same for sign-in).
+
+### When someone leaves: deactivate, do not delete (#39)
+
+The supported way to offboard a person is to untick **Active** on their account in `/admin/` (Accounts, Users, the
+person, Save). The owner's decision on #39: nothing else is built, and the access rules above do not change.
+
+- They are signed out on their next request (an open session gets a 403) and cannot sign back in (the same
+  "Email or password is incorrect" as a wrong password). The project is gone from their view. In the app they may
+  be told to sign in, which they cannot do: that is the end of access, not a fault. It also ends their `/admin/`
+  access if they were staff.
+- **Nothing they wrote is lost**: the projects they created, the questions they wrote and the answers they
+  recorded stay as they were, and the other members still see all of it. In the app only an answer shows who
+  recorded it (their email); who created a project or a question is kept in the database and `/admin/`.
+- **Deleting the account is refused**, on purpose: any one of a project they created (`Project.created_by`), a
+  question they wrote (`Question.created_by`) or an answer they recorded (`Answer.recorded_by`) is enough, and
+  each is `PROTECT`. There is no tool to reassign the creator (not built: deactivation is enough).
+  Deleting someone who wrote none of these does work, but prefer deactivating anyway: it deletes their
+  memberships (which can leave a project with no owner at all) and, for a staff user, their `/admin/` history.
+- **A project's only owner: hand it over before deactivating.** A deactivated owner cannot manage the project,
+  and the app has no way to change a member's role or to see who is deactivated (the members list still shows
+  them as owner). So before you deactivate the only owner, either have them make someone else an owner (remove
+  the person, add them again with the owner role: the add-member API takes a role; whether the screens offer it was not checked), or change the role yourself in `/admin/` (Projects, the project,
+  Memberships). The second route has not been tried by hand.
+- **Ticking Active again gives everything back, including old sessions**: deactivating does not delete a
+  person's open sessions, so a browser they were signed in on works again at once. If the account goes to
+  someone else, or after a dispute, change the password first (Django ends old sessions when it changes; this
+  was not run here).
+
+Tested in `backend/projects/test_offboarding.py` (a signed-in user loses access, cannot sign back in, nothing is
+lost and the recorder is still named, deletion is refused for each kind of record on its own, reactivation
+restores access). Not tried in `/admin/` by hand.
+
+## Questions, statuses and answers
+
+Questions belong to a project and are numbered Q1, Q2... per project. A number
+is never reused, even if the question is dropped. Any member of the project
+(owner or member) can add, edit, change the status of and answer questions;
+everyone else gets a 404. API: `/api/projects/<id>/questions/`
+(`?status=open,asked` filters), `…/<number>/` to read or edit the text fields,
+and `POST …/<number>/transition/` with `{"to": "<status>"}` to change status.
+
+Decided by the owner (#6). Anything not listed is refused with a 400 that names
+what is allowed:
+
+| From       | Can become                                   |
+|------------|----------------------------------------------|
+| `open`     | `asked`, `answered` (with an answer), `dropped` |
+| `asked`    | `open` (un-ask), `answered` (with an answer), `dropped` |
+| `answered` | `open` (re-open)                              |
+| `dropped`  | `open` (restore)                              |
+
+- Marking a question `answered` needs an answer, and an answer is **only its text** (#121): who answered (the
+  signed-in person's name, or their email), the date (today) and where (`app`, "In the app") are set by the server,
+  and anything else in the request is ignored, so who gave an answer and where it came from cannot be forged by
+  hand. An answer a member accepted from a client's answer link has the channel `link` and the name the client typed; one accepted from a client
+  account has the channel `client` and the account's name.
+  Answers recorded before #121 keep the channel they were given (chat, meeting, email or other, with a note) and
+  the name that was typed.
+- Answers are never edited or deleted. Re-opening a question keeps its answer
+  as history (`previous_answers`); answering again adds a new one. To correct
+  an answer, re-open and answer again.
+- **Restore the earlier answer** (#121): on a re-opened (or asked) question that had an answer, **Restore the earlier
+  answer** (`POST .../questions/<n>/restore-answer/`) makes the most recently replaced answer the current one again and
+  answers the question again, so a re-open can be undone without typing the answer a second time. No answer is copied or
+  deleted, but the restored answer's "replaced" time is cleared (the time of the earlier re-open is not kept); it is refused (400) on an answered or dropped question or one that never had an answer. Two members pressing
+  it together: one wins, the other is told the question already has an answer.
+- Nothing is deleted by the app: there is no delete endpoint ("dropped" is a
+  status). In the admin, questions can't be added or deleted, only their three
+  text fields can be edited (status moves only through the rules above), and a
+  project or user with questions or answers depending on it can't be deleted.
+- Edits write only the fields that were sent, so an edit racing an answer or a
+  re-open can't write back an old status.
+- Editing a question's text overwrites the previous text (there is no edit
+  history in v1).
+
+### Still open
+
+The workspace (`/projects/<id>`) shows what the project is waiting on: the
+counts of questions in each status, and every question with its number, status
+and text; a question in status **open** or **asked** also says how long it has
+been open (what it blocks is shown when the question is opened: pressing a question opens it below its own row). The age counts from when
+the question was created; re-opening a question does not reset it. The project
+list shows the same count of open questions (`open_question_count`, computed in
+the database from the same two statuses).
+
+### Question screens
+
+In the workspace (`/projects/<id>`; the older `/questions` address redirects to
+it) the list shows every question (any status, with a filter by status), and the
+panel on the right is where people add a question, edit its three text fields,
+change its status and record an answer (text, who answered, date,
+chat/meeting/email/other, optional note).
+Only the status buttons the transition table allows are offered; the server
+still decides, and its message is shown if it refuses. Validation errors from
+the API appear next to the field. If the server refuses an answer because the
+question moved while the form was open (a teammate answered or dropped it), the
+form stays open with what was typed, the question behind it is reloaded, and the
+save button is offered again only if the question, as far as the page knows
+(it could not be reloaded, say), can still be answered (if not, the text stays so
+it can be copied; the hint says the answer was not saved). Re-opening an answered question keeps the old
+answer, shown as "Earlier answer".
+
+## Answering through a private link (#114)
+
+A team member makes a private link for a project and sends it to the client. The client opens it with no account,
+sees the project's open questions (status open or asked) and can send an answer. **Nothing a client sends is an
+answer yet:** it waits as a *submission*, and a team member accepts it (it then becomes the question's answer, marked
+"Answer link") or dismisses it. The team's side is in the workspace: **the answers waiting for a question are inside that
+question** (a "N waiting" mark on its row; open it to accept or dismiss them), an "Answers from the link" card
+summarises them (which questions have some, "dismiss all" for spam, the dismissed ones with restore) and an "Answer
+link" card (make a link, copy it once, revoke it), in both languages. The full link is shown once and held only in memory: it is dropped
+when the person revokes or replaces it, signs out, leaves the page, or after five minutes. Replacing a live link asks
+first, because the one the client already has stops working. An answer a member accepted from a client is marked on
+the question card as sent through the answer link, with the name as typed ("name not verified") and who accepted it;
+direction-control characters are removed from typed names before they are shown. The client's page is `/answer#<token>` (PR C of three, the last).
+
+- **The link:** `https://<app>/answer#<token>`. The token is 256 bits and sits in the URL *fragment*, which browsers
+  never send to the server, so it stays out of server and proxy logs and out of `Referer`. It is shown **once**, when
+  the link is made; only its SHA-256 hash is stored, so it cannot be shown again (make a new link instead).
+- **Who:** any member of the project can make, see the state of and revoke the link. A project has one unrevoked link:
+  making a new one revokes the old one. It lasts 1 to 30 days (default 14) and cannot be extended.
+- **It stops working at once** (checked on every request, never cached) when it expires, is revoked, its creator
+  leaves the project (by any route: the members API, the Django admin or a script) or its creator is deactivated. In
+  the last two cases the link is **revoked for good**, so reactivating or re-adding that person does not bring it back.
+  Unknown, malformed, expired and revoked links all give the same
+  `404 {"detail": "This link is not available."}`.
+- **What the client sees:** the project's name and, for each open or asked question, its number, text, *why it matters*
+  and *what it blocks* (the owner's decision: those two fields are shown to anyone with the link, so write them
+  knowing that). Never other projects, members, e-mail addresses, who made the link, any answer (current or earlier),
+  answered or dropped questions, internal ids, or other clients' submissions.
+- **The client's page** (`/answer#<token>`, in both languages): the project's name, a short explanation, a field for
+  the client's name (required, never checked, not stored in the browser) and, for each open question, the question,
+  why it matters and what it blocks (as plain text) and a box for an answer. A client can send several answers to
+  one question. It has **no sign-in, no session and no link to the rest of the app**; a dead link of any kind shows
+  one message ("This link is not available"), and a throttled request (429) says to wait, without claiming the link
+  works. Every request is sent without cookies and without a Referer. The token, the name and the answers are kept in
+  memory only, but **the token stays in the address bar and so in the browser's history** (that is what lets a reload
+  or a bookmark work, and browsers may sync history across a person's devices): a client on a shared computer should
+  close the tab and clear it. Typed answers survive "Check again" on another question; a new link pasted into the
+  same tab is picked up. The expiry is shown in the client's own time zone. The page is configured to be served with
+  `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow` and is marked `noindex` (set in
+  `next.config.ts` and tested there; **not looked at on the deployed site**).
+- **What the client can do:** exactly two routes, `GET /api/answer-link/questions/` and
+  `POST /api/answer-link/questions/<number>/answers/` with `{"text", "name"}` (text up to 4000 characters, name up to
+  100; the name is typed by the client and **never verified**). The token goes in the `X-Answer-Token` header; cookies
+  and sessions are ignored on these routes. A test calls every route of the project (all methods) with and without a link token,
+  signed out and signed in as a member, and fails if the token changes the status of any answer outside those two
+  (and the body of any JSON answer when signed out). The router's `.json`-style suffix routes are not walked.
+- **The team** (the cards above use these routes): `GET`, `POST` (`{"days": 1-30}`, returns the token once) and `DELETE` on
+  `/api/projects/<id>/answer-link/`; `GET /api/projects/<id>/submissions/?state=pending|accepted|dismissed` (who, as
+  typed, and when); `POST .../submissions/<id>/accept/` (optionally `{"text"}` to edit the answer first; the client's
+  original stays on the submission), `.../dismiss/` and `.../restore/` (undo a dismissal);
+  `POST .../submissions/dismiss-pending/` for spam dismisses everything waiting in the **project**, from every link
+  it has had, so `restore` is how a real answer is brought back. Accepting
+  uses the same status change as every other answer, so a question that is already answered must be re-opened first.
+  Nothing is e-mailed or sent anywhere.
+- **Limits** (per link, never per address: behind the Next.js proxy every request has the same address): page loads
+  `DJANGO_ANSWER_LINK_READ_RATE` (300/hour), answers `DJANGO_ANSWER_LINK_SUBMIT_RATE` (60/hour), and at most 5 waiting
+  submissions per question and 200 per link. Requests with a bad token share one bucket,
+  `DJANGO_ANSWER_LINK_INVALID_RATE` (120/min), which never counts a valid link. These counters use the same
+  `throttle_cache` table as sign-in (see "Cleaning the sign-in counters"). No CAPTCHA in v1; revoking the link is the
+  way to stop a leak.
+- **Known and accepted:** when a question already has 5 answers waiting, the next one gets a `429`, which tells whoever
+  holds the link that others have sent answers to that question (one bit, and only to people who hold the same
+  link). And a flood of bad tokens fills the shared bucket, so a client with a dead link then sees `429` instead of
+  the usual `404`: the client page must not read a `429` as "this link works, try later" for a link it never loaded.
+- **Stored about the client:** the typed name and answer only. No address, no browser details.
+- **Not checked:** nothing here has been run against Render or Supabase, and **the author has not looked at any screen of this feature
+  in a browser** (layout, focus order, a phone, long words): only the DOM tests have. The owner said on 2026-11-15 that
+  they tried the new features by hand on staging; whether that included the answer-link page was not recorded. See issue #32.
+
+## Client accounts (#121)
+
+A client can also have an **account** with the role **client** on a project (an owner adds them in **Manage members**,
+choosing "client"; they need an account first, like any member). The private link stays for people with no account.
+
+- **What a client can reach:** exactly three routes, with their own door and serializers (`answerlinks/client_views.py`):
+  `GET /api/client/projects/` (id and name), `GET /api/client/projects/<id>/questions/` (the open and asked questions,
+  what this person already sent for each, and `earlier`: their own answers on questions that have since closed, with the
+  state, never the team's answer) and `POST /api/client/projects/<id>/questions/<n>/answers/` (the text only: the name
+  is the account's). The screen is `/answering/<id>`; the projects list shows a client's projects in a section of
+  their own. Nobody else's answer, no member, no other project, no client name.
+- **The team door is closed to them:** `Project.objects.visible_to` admits owners and members only, so every team route
+  (projects, questions, members, answer links, submissions) answers a client exactly as it answers a stranger; a test
+  walks every `/api/projects/` route to prove the two are the same. A client cannot start a project (a person who is only a client gets 403 on
+  `POST /api/projects/`).
+- **What a client sends is not an answer.** It waits (marked "client account", with the account's name, which is
+  verified, unlike a name typed on the link) until a team member accepts it (the answer then has the channel `client`)
+  or dismisses it. Removing a client from the project, or deactivating the account, stops both reading and sending at once.
+- **Limits:** per person, `DJANGO_CLIENT_READ_RATE` (300/hour) and `DJANGO_CLIENT_SUBMIT_RATE` (60/hour), and at most 5
+  waiting answers per question and 200 per project for one person, counted under a lock.
+- **Going back:** reversing `projects/0003` is refused while any client membership exists (the previous release would treat
+  clients as team members); remove them first. `answerlinks/0002` cannot be reversed once an account submission exists.
+- **"Dismiss all waiting"** also dismisses answers from client accounts (each can be restored).
+- **Not checked:** the author did not run it against Render or Supabase or look at any screen in a browser (the owner tried the features on staging, 2026-11-15; both services showed Deployed, so the migrations very likely ran); the migrations
+  (`projects/0003`, `questions/0004`, `answerlinks/0002`) run against Supabase when the staging service starts.
+  An already-open tab of an older version may still send a name or an old field; the server ignores them.
+
+## Language (English, Azerbaijani)
+
+The interface is English by default, with Azerbaijani as a second language (#71). An `EN | AZ` switch sits in the headers of the landing, sign-in, projects and workspace pages and at the top of the older pages; the choice is kept in the browser's local storage. `<html lang>` follows the choice on every page.
+
+- **Where the words live:** `frontend/lib/i18n/en.ts` (the master list of keys) and `az.ts` (same keys; a missing one is a compile error and a test failure). No library. Use `useT()` in a client component, or `<T k="..." />` in a server page. `{name}` in a text is filled in at run time.
+- **First paint is always English**: the server cannot know the choice, and the markup must match. A person who chose Azerbaijani sees it as soon as the page has loaded, after a brief English flash (accepted for v1).
+- **Never translated:** what a person typed (questions, answers).
+- **Status words** come from the dictionaries (`status.open` and so on), one set per language, next to the one table of colours (`lib/status.ts`). They follow the language on every page, including pages whose other words are still English.
+- **The Azerbaijani wording was first written by Claude, not by a native speaker; the owner reviewed and changed it on 2026-11-10** (for example `Ləğv olunub` for a dropped question and `sahib` for an owner). Technical terms stay in English. **Reviewed later, on the owner's word:** `landing.lead` (both languages; reworded by Claude on 2026-11-15 when drafting was removed, #115) and the strings of the answer-link cards, the client pages and the client-account screens (`answerLink.*`, `submissions.*`, `channel.link`, `client.*`, `clientAccount.*`; written by Claude, #114 and #121) were written by Claude in the same way; the owner said on 2026-11-15 that they had reviewed the Azerbaijani wording and found it fine (the owner's statement in conversation, not a line-by-line record).
+- **Translated:** the landing page, the sign-in page and form, the projects page and its list and new-project form, the workspace (`/projects/[id]`: shell, members, how long a question has been open, question card, add and edit forms, answer form), the 404, the session status in every header, the home link's name, the status words and the waking-up note. The landing page's sample questions stay in English (a question is the ledger entry and is never translated, as in the design example). **Still English** (things that cannot follow a browser choice): the page titles and social-card text (they are fixed when the page is built) and any message the server itself sends back (a refused status change, a validation error: shown as the server wrote it).
+
+## Staging on Render
+
+A staging site for looking at the app with **invented demo data**. It is
+described by `render.yaml` (the API and the frontend, on Render's free plan, in Frankfurt) and deploys from the
+`staging` branch. Its database is a **Supabase** PostgreSQL project, set up by hand (see "The database is Supabase's,
+not Render's" below), not a Render one.
+
+**Never put real client questions, names or messages on it.** The free database
+has no backups (Render's free database was also deleted 30 days after creation).
+
+### First deploy (once; needs a Render account, so the owner does it)
+
+1. In Render: **New > Blueprint**, connect this GitHub repository, choose the
+   `staging` branch. Render reads `render.yaml` and asks for four values (create the Supabase project first: see below):
+   - `DJANGO_DATABASE_URL`: the Supabase **session pooler** URL, built as described below. It contains the
+     database password; it is stored only in Render.
+   - `DEMO_PASSWORD`: the shared password of the demo accounts. Choose one with
+     12 or more characters. It is stored only in Render.
+   - `DJANGO_CSRF_TRUSTED_ORIGINS`: the frontend's address, normally
+     `https://sual-cavab-web.onrender.com`.
+   - `BACKEND_URL`: the API's address, normally
+     `https://sual-cavab-api.onrender.com`.
+2. If Render shows different addresses for the two services (a name was taken),
+   correct those two values in each service's **Environment** tab and deploy
+   **both** again. `BACKEND_URL` is read when the frontend is built.
+3. The first request to a sleeping free service takes a minute or two (measured below).
+4. Check it from your machine (needs only Python):
+
+   ```bash
+   SMOKE_PASSWORD=<the DEMO_PASSWORD> python scripts/smoke_test.py https://sual-cavab-web.onrender.com
+   ```
+
+   It looks for the demo projects by their original names ("Demo: Ticketing
+   platform", "Demo: Booking portal"): if a visitor renamed one, that check
+   fails and says so. It signs in with the demo accounts and checks the health endpoint, sign-in,
+   the still-open view and counts, and that someone who is on no project sees
+   none. It creates no questions or projects, but a run does leave traces: two
+   sessions, updated "last login" times, and sign-in attempts counted against
+   the demo owner (one is a deliberate wrong password), so run it a few times
+   at most within a minute or its own sign-ins hit the limit. It exits non-zero
+   if anything fails. Set the password without leaving it in your shell
+   history: `read -rs SMOKE_PASSWORD && export SMOKE_PASSWORD`.
+
+### What is on it
+
+- Sign in with `demo.owner@example.invalid` or `demo.member@example.invalid`
+  (the shared `DEMO_PASSWORD`); `demo.outsider@example.invalid` is on no project.
+- Two demo projects with questions in every status, and one answer that was
+  corrected after a re-open. Restarting the API runs `load_demo_data` again;
+  once the demo owner has a project it changes nothing, so renaming or adding
+  projects on staging is safe. It refuses a database that holds a project not
+  created by a demo account, and a refusal does not stop the API from starting
+  (the start command carries on without demo data). `DEMO_PASSWORD` must be
+  12+ characters and pass Django's password checks (not all digits, not a
+  common password).
+
+### The database is Supabase's, not Render's
+
+Render's free database is deleted after 30 days. Supabase's free PostgreSQL is not deleted, but it **pauses** after about
+a week with little activity and has **no backups** on the free plan. The app only needs plain PostgreSQL, so the only
+thing that changes is `DJANGO_DATABASE_URL`; there is no code change. `render.yaml` no longer has a database: that
+variable is entered by hand (`sync: false`). This is a procedure for the owner (it needs the Supabase and Render
+accounts); the Render and Supabase menu names below are from memory.
+
+**1. Create the Supabase project (once)**
+
+1. In Supabase: **New project**. Region **Frankfurt (eu-central-1)**, the same region as Render. Generate a database
+   password of letters and digits only (anything else must be percent-encoded in the URL). Under **Security**, turn
+   **Enable Data API off** (and leave "automatically expose new tables" and "automatic RLS" off): Django keeps all its
+   tables, including the users table, in the `public` schema, and the Data API would put them behind a public REST
+   endpoint. The app does not use it.
+2. Wait until the project is ready. A new project took about **7 minutes** before the pooler accepted connections (the
+   first attempts answered `tenant/user ... not found`, which is not a password error).
+3. **Connect**, then **Session pooler**: host `aws-N-<region>.pooler.supabase.com`, port **5432**, user
+   `postgres.<project-ref>`. Use this one, not the others:
+   - *Direct connection*: IPv6 only on the free plan; whether Render's free services can reach IPv6 was not checked.
+   - *Transaction pooler* (port 6543): no session-level state and no prepared statements. The app's request limits take a
+     **transaction-level** advisory lock (`core/throttles.py`), which Supabase's documentation implies works there, but
+     this was not tested; the session pooler was.
+4. Build the URL: `postgresql://postgres.<project-ref>:<password>@<pooler host>:5432/postgres?sslmode=require`
+   (`sslmode` is the only option `config/dburl.py` accepts). **Never paste this URL into a chat, an issue or a PR**: it
+   contains the database password.
+
+**2. Switch Render over (in this order)**
+
+1. **Merge the change that made `DJANGO_DATABASE_URL` `sync: false` and removed the database from `render.yaml` first.**
+   Render's documentation says a Blueprint sync ignores `sync: false` variables on an existing service and that a
+   service keeps the variable values the Blueprint does not overwrite. The documentation does not state this exact change
+   (from `fromDatabase` to `sync: false` on the same variable), so look: open the API service's **Environment** tab after the
+   sync and check that `DJANGO_DATABASE_URL` is still set. **Observed on 2026-11-12: it was kept** (the part of the sync's list
+   that was looked at showed the new start command and no change to the variable). If it is ever blank, the API cannot start (it falls back to a local database and `migrate`
+   fails): continue with the next step.
+   Setting the variable *before* the merge would leave a window in which any sync restores the old wiring.
+   **A sync may be late.** On 2026-11-12 a deploy of the API ran a start command without the `purge_expired_cache` step
+   that had been merged into `render.yaml` the day before (#101): the Blueprint's **Syncs** list showed one sync only,
+   from the first deploy four days earlier, although Auto Sync was **Yes** (the cause was not found). A **Manual Sync**
+   then applied it (whether Auto Sync would have, was not seen). So look at the Blueprint's **Syncs** list after a merge that changes `render.yaml`,
+   and press **Manual Sync** if the change is not there; until it is synced, the service keeps the start command it has.
+2. Set `DJANGO_DATABASE_URL` to the Supabase URL in the API service's **Environment** tab and choose **Save, rebuild, and
+   deploy** ("Save only" does not redeploy). Render's free services redeploy only for changes under `backend/`, so a
+   merge on its own may not restart the API.
+3. Watch the deploy log: `migrate`, the cache table, the purge, the demo-data load, then gunicorn. An `OperationalError`
+   about the database means the URL is wrong: fix the value and deploy again.
+4. Run the smoke test (`scripts/smoke_test.py`, usage in its header) against the frontend's address.
+5. **Only then delete Render's old database** (its page in the dashboard, **Settings**, **Delete**). It is no longer in
+   `render.yaml`, so Render will not recreate it (its documentation: removing a definition does not delete the resource,
+   and a resource deleted by hand while still defined is recreated at the next sync, which is why the definition went
+   first). Free Render allows one free database per workspace.
+
+**Rolling back:** until step 5, set `DJANGO_DATABASE_URL` back to the Render database's connection string (on its page
+in the dashboard) and deploy. After step 5 there is nothing to go back to: the data in Supabase is the only copy.
+
+**Things to know**
+
+- **15 connections at once.** On the project this was tried on, the session pooler allowed 15 clients (`EMAXCONNSESSION ...
+  pool_size: 15`). The API (one worker, four threads) needs a few. The burst tests in `core/test_exact_throttles.py` open
+  25 to 45 connections and fail against it for that reason, not because the counting is wrong.
+- **Never put this URL in `backend/.env`.** While `DJANGO_DATABASE_URL` is set there, every local run and every test goes
+  to that database. The tests create and drop their own `test_*` databases there (a teardown error left three behind in
+  one trial; they were dropped by hand), and some assume the local database. Local work and the tests use the Docker database.
+- **Pausing stops the whole API, not only the database calls.** A free project is paused after about a week without enough
+  database activity (a few requests a day usually keep it awake; opening it in the dashboard counts). Supabase emails a
+  warning about a week before. A Render service that sleeps makes no requests, so a quiet week pauses the database. When
+  Render then wakes the API, `migrate` cannot connect, the start command stops there and gunicorn never starts (the health
+  check fails too). Restore the project in the Supabase dashboard (its documentation says up to a year after pausing), then
+  redeploy or wake the API. No keep-alive is built.
+- **The data now stays.** Nothing wipes the database every 30 days any more, so anything typed into staging stays until
+  someone deletes it. The rule is unchanged: invented demo data only, and the free plan has no backups (the dashboard
+  showed "No backups").
+- **Changing the demo password.** `load_demo_data` leaves an existing demo account's password alone, so changing
+  `DEMO_PASSWORD` in Render changes nothing for accounts that already exist (it did not matter while the database was
+  recreated every 30 days). Staging has no shell and the admin is off. To change it: make a hash on your machine (`python
+  manage.py shell -c "from django.contrib.auth.hashers import make_password; print(make_password('<new password>'))"`),
+  then in Supabase's SQL editor `update accounts_user set password = '<the hash>' where email like 'demo.%@example.invalid';`.
+  Not run; check the rows with a `select` first.
+- **Changing the database password.** Reset it in Supabase (the database settings), then put the new one in the URL in
+  Render and deploy.
+- **Limits (free plan).** 500 MB per project; 5 GB of egress for the organization (both as read on Supabase's pages when this was
+  written).
+
+**What was checked** (on the Supabase project itself, from a developer machine, not from Render): the URL is read as
+intended; `migrate` and `createcachetable` ran; `manage.py check --database default` was clean; a 12-way simultaneous burst of
+sign-in checks let exactly 4 through against a limit of 4 (12 without the lock); the backend suite ran against it with 371 of
+380 tests passing. The nine that failed are the five connection-count tests above, three that test how `POSTGRES_*` is read
+while a URL is set (the URL wins, as designed; they pass once the URL is out of `backend/.env`), and one that sends 400
+requests after a one-minute lock and takes about 90 seconds over the internet, so the lock had expired (it passes with an
+hourly window). Only `migrate` and `createcachetable` were run there by hand: the demo data was not loaded from a developer
+machine, so the first start on Render loaded it (`Demo data: 2 project(s) created; 3 demo accounts`, then `already loaded`
+on the next start).
+**On Render, 2026-11-12:** with the Supabase URL set, the API started (`migrate`: nothing to apply; the cache table existed;
+`purge_expired_cache`: `removed 0 expired row(s) from throttle_cache in 1 batch(es)`; gunicorn up; health check 200), the
+Blueprint sync kept the variable, and `scripts/smoke_test.py` against the staging frontend passed all 12 checks (sign-in as
+the demo owner and outsider, the project list and open counts, the still-open view, a misspelt status refused, the 404 rule,
+a wrong password refused). **Not checked:** the transaction pooler, the direct connection, a pause and a restore, behaviour
+under real traffic.
+
+### Backups and restore (#35)
+
+**There is no automatic backup, by decision.** Supabase's documentation says automatic daily backups are for Pro, Team and
+Enterprise projects (7 days of them on Pro) and recommends that Free projects "regularly export their data" and keep copies
+elsewhere.
+
+**Decision (owner, 2026-11-12): when production exists, its database stays on Supabase's Free plan, like staging's.** Nothing
+of production is set up yet (`render.yaml` is the staging site's), and which Render plan its API and frontend would use is not
+decided. It is revisitable: moving to Pro would bring daily backups (not tried, so how the upgrade works is unchecked).
+Until then **the manual routine below is the only backup**, and what the owner accepted is this:
+
+- **Data.** If the production database is lost, everything written since the last dump that someone took *and stored
+  elsewhere* is gone. Nothing runs the routine on a schedule.
+- **Recovery is unproven.** The routine was only ever restored into a local copy, never into Supabase, never off-site, never
+  at real volumes (see "Not covered" below).
+- **Availability.** A free Supabase project pauses after about a week without use, and while it is paused the API does not
+  start (see "The database is Supabase's"). No keep-alive is built.
+- **Real data on a developer machine.** `check` restores into the local Docker database, so a production check puts real
+  client data on that machine and in a dump file; treat both as credentials, and keep dumps outside the repository.
+
+The script and the examples below were written and tested for **staging**. Backing up production means pointing
+`BACKUP_DATABASE_URL` at it, which nothing has done. The staging rule against real client data (it has a public demo password
+and no backups) stands; production's no-backup risk is the one accepted here. Not checked: whether one Supabase organization
+may hold two free projects, and whether the free plan's size and traffic limits are enough for production. The routine is the
+evidence the `review-for-data-loss` skill asks for: a backup that was **restored**, not one that reported success.
+
+**Set up (once).** Create `backend/.env.backup` with one line:
+`BACKUP_DATABASE_URL=postgresql://postgres.<ref>:<your database password>@<pooler host>:5432/postgres?sslmode=require`
+(the Supabase **session pooler** address from the section above), or set the variable in the environment. The file is
+git-ignored (`.env.*`) and **Django never loads it**. Do **not** put the address in `backend/.env`: every line of that file is
+loaded into Django's environment, which a debug error page shows unmasked (Django masks only names that contain words like
+`KEY`, `SECRET` or `PASS`), and never name it `DJANGO_DATABASE_URL`, which would point every local run and test at the
+live database. Needs Docker with the project's database container up.
+
+```bash
+python scripts/backup_database.py backup  C:\backups\staging-YYYY-MM-DD.dump     # the folder must already exist, outside the repository
+python scripts/backup_database.py check   C:\backups\staging-YYYY-MM-DD.dump [copy_name]    # default copy: restore_check
+```
+
+(`python` is the project's virtual environment's; the script needs no packages.) What they do:
+
+- **`backup FILE`** dumps the whole `public` schema, which is all the app's data (users, sessions, projects, memberships,
+  questions, answers, the sign-in counters, migrations), with the container's `pg_dump` 17 (the same major version as
+  Supabase's 17). It refuses a file **inside this repository**, a network or `\\?\` path, a file that **already exists** and
+  a missing folder. The dump is written to `FILE.partial` and renamed only when it is whole; any failure or interruption
+  removes the partial file. It goes through Python, not a shell `>`: Windows PowerShell 5.1's `>` rewrites binary output.
+- **`check FILE [COPY]`** restores the dump into a **new local database** and compares it with the source; it exits 0 only
+  if everything matches. The copy's name must be lower case letters, digits and underscores and not `postgres`,
+  `template0`, `template1` or `sual_cavab`; it must not exist, or be a plain empty database (no tables, sequences, views,
+  functions or other schemas, not a template). Nothing is ever dropped or overwritten. For every table it compares the number
+  of rows and a checksum of their contents; it also compares the columns (exact types such as `varchar(50)`, nullability,
+  defaults, identity, collation, order), indexes, constraints, sequences (definition and position), table options
+  (persistence, row-level security, comments), triggers, views and functions. The checksums are made in the "C" collation and
+  in UTC with the text formats pinned (`DateStyle`, `IntervalStyle`, `bytea_output`, `extra_float_digits`, `search_path`),
+  so two servers with different settings do not report false differences. If the restore fails, the message names the copy
+  that was left behind. Grants and owners are not compared (the dump leaves them out), nor other schemas.
+- The address is split into `PGHOST`, `PGUSER`, `PGPASSWORD` and the rest and handed to the container **by name**, so it is in
+  no argument list (on the host or in the container's process list); the password is replaced in any message the script
+  prints; a malformed address gets a generic message that does not quote it (libpq would echo pieces of it); an unexpected
+  error is reported by its class only.
+
+**A dump is a credential.** It holds every row: password hashes and the **live session keys** in `django_session` (a key is
+the `sessionid` cookie, so whoever holds the dump or a restored copy can sign in as those users until the sessions expire, two
+weeks by default). Keep dumps outside the repository (`*.dump` and `*.backup` are also git-ignored as a second line of defence),
+not on the same machine as the only copy, and delete them when they are no longer needed. A restored copy holds the same: delete
+its `django_session` rows if you keep it.
+
+**Clean up by hand** (nothing here deletes anything for you): `DROP DATABASE <copy_name>` in the container's `psql`, and
+the dump file.
+
+**Things to know.** If the free Supabase project is paused the pooler refuses connections: restore the project in the
+dashboard first. `pg_dump` must be at least the server's major version: if Supabase moves to 18, change the image of the
+database container in `docker-compose.yml`. A path with spaces was not tried. To see Django itself accept a copy, run
+`POSTGRES_DB=<copy> python manage.py showmigrations --plan` and `check` in `backend/` with `DJANGO_DATABASE_URL` set neither in the
+shell nor in `backend/.env`.
+
+**What was run (2026-11-12).** On the **staging database on Supabase** (17.11), with the final script, through the session
+pooler: `backup` wrote a 50 KB dump; `check` restored it into a new local database with no error and reported **0
+differences**: the same 15 tables with the same rows and checksums (3 users, 2 projects, 4 memberships, 8 questions, 3
+answers, 22 migrations, ...), and the same columns (82), indexes (46), constraints (43), sequences (13) and table options (15);
+there are no triggers, views or functions; exit 0. On **local scratch databases** the comparison was exercised with a source
+holding NULLs, duplicate rows, jsonb, timestamptz, numeric, float, bytea, arrays, a `varchar(50)` column, a dropped column, a
+foreign key, an index, a view, a function, a trigger, a table comment and a table named with quotes: it caught **all 31
+deliberate changes** made to the copy one at a time (a changed, deleted, added or swapped value; NULL changed to empty text; a
+duplicate row removed; a different instant; the last digit of a number, a float, a byte, an array element or a jsonb value; a
+sequence reset or increment; a dropped primary key, foreign key, default, index or trigger; a changed column type,
+`varchar(50)` to `varchar(200)`, or collation; an added column; a changed function or view body; a changed table comment;
+row-level security switched on; a table made unlogged; an extra or missing table), went back to "same" after each undo, did
+not report a source with a dropped column or a different `DateStyle`, `IntervalStyle`, `bytea_output`, `extra_float_digits`,
+`search_path` or time zone as a difference, and refused `postgres`, `template1`, `sual_cavab`, an upper-case name and a copy that
+already holds data. `core/test_backup_script.py` has 48 unit tests (address parsing, secret handling, the refusals, the partial
+file, the copy rules, the exit status, the comparison with fakes), and 45 mutations of the script all fail a test.
+
+**Not covered:** a schedule (nothing runs this); a restore **into Supabase** after a loss (only into a local copy); off-site
+storage of the dumps; how long it takes with real volumes (the data here is a few dozen rows); the Supabase CLI's `db dump`,
+which its documentation recommends (not tried); Supabase's `auth`, `storage` and other schemas (the app does not use them); a
+source that is not 17.x; a path with spaces; Ctrl+C during a dump (the partial file is removed by a `finally`, covered by a
+unit test, not tried by hand). A check is about what the app wrote: it does not prove the dump holds data nobody wrote.
+
+### Things to know (Render's free plan, from its documentation)
+
+- **Services sleep** after 15 minutes without traffic and restart at will.
+  **Measured** on 2026-11-09, three samples each after 20 idle minutes: the first
+  request took 82.6, 92.3 and 92.5 s on the API and 33.2, 33.1 and 33.3 s on the
+  web service; a warm request 0.1 s. The services wake one after the other, so a
+  visitor to a fully asleep site may wait about two minutes (not measured end to
+  end). The app says so after five seconds of waiting (`WakingNote`).
+  Everything the API needs is done in its start command (`migrate`,
+  `createcachetable`, `purge_expired_cache`, `load_demo_data`), because free instances have no shell.
+- **Render's own free database expires 30 days after creation** (14 days to upgrade, then it and its data are deleted).
+  Staging does not use one any more (see "The database is Supabase's" above); if you go back to one, it needs a
+  `databases:` entry in `render.yaml` and a `fromDatabase` wiring, which were removed.
+- The API's own address is public (free services cannot receive private
+  traffic); it answers only what the app's rules allow. Django's admin is
+  **switched off** on it (`DJANGO_ADMIN_ENABLED=0`): a public host has no need of it. Its sign-in page is
+  limited all the same (#45): it shares the app's attempt counter, ten a minute per account, so guessing at
+  `/admin/` is not a second budget; a sixth guess there after five at the app's sign-in counts as the sixth.
+  The demo account names are public, so anyone can keep one of them locked out
+  by failing to sign in to it about ten times a minute (the limit counts every
+  attempt); that is the accepted per-account design from #4, and it would make
+  the smoke test fail.
+- Anyone with the demo password can create projects. Choose a
+  password you do not use anywhere else. If it leaks, changing `DEMO_PASSWORD` in Render is not enough
+  now that the database persists: see "Changing the demo password" above.
+- Not known: which Host header Render's health check sends. If the first
+  deploy fails its health check with a 400, add that host to
+  `DJANGO_ALLOWED_HOSTS`. The health endpoint does not touch the database.
+- Python is Render's default (3.14.x); Node is pinned to 22.22.2 (CI has no exact pin: it asks for Node 22 and takes what the runner provides).
 
 ## Built with claude-harness
 

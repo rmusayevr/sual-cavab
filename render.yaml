@@ -1,0 +1,95 @@
+# Render Blueprint for the STAGING site (#10).
+#
+# Staging holds INVENTED demo data only (backend/core/management/commands/load_demo_data.py).
+# Never put real client questions, names or messages on it: the free database has
+# no backups (Render's free database was also deleted 30 days after creation, which is
+# why the database is Supabase's now). The README ("Staging on Render") says what to
+# click and what to enter.
+#
+# Free plan facts this file is built around (Render's docs, not tested here):
+# free web services sleep after 15 minutes idle, have no shell and no one-off
+# jobs, and cannot receive private-network traffic. So the frontend reaches the
+# API at its PUBLIC address (BACKEND_URL), migrations and the demo data run in the
+# API's start command, and nothing depends on a private network.
+#
+# Region is fixed at creation and must be the same for both services (and the Supabase project is in Frankfurt too).
+
+services:
+  # ---- the Django API --------------------------------------------------------
+  - type: web
+    name: sual-cavab-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: staging
+    rootDir: backend
+    autoDeployTrigger: commit
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    # Free instances have no shell and no pre-deploy command, so the start command
+    # prepares the database: migrate, the sign-in counter table, removal of its
+    # expired rows (purge_expired_cache, #40: no cron on the free tier, so it runs
+    # at every start), then the demo data (a no-op unless DJANGO_DEMO_DATA=1; it refuses a database with
+    # projects made by anyone but demo accounts). The purge and the loader are allowed to fail:
+    # a refusal must never keep the site down, and a free instance has no shell
+    # to fix it with. One worker with threads. The 180 s timeout was sized for a
+    # drafting request (removed in #115) and is left as it was: lowering it is a deploy change.
+    startCommand: >-
+      python manage.py migrate --noinput
+      && python manage.py createcachetable
+      && (python manage.py purge_expired_cache || echo "purge_expired_cache did not run (see above); starting without it")
+      && (python manage.py load_demo_data || echo "load_demo_data did not run (see above); starting without it")
+      && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+      --worker-class gthread --workers 1 --threads 4 --timeout 180
+    healthCheckPath: /api/health/
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      # Any onrender.com host: the browser never talks to the API directly, the
+      # frontend's server does, by this service's public address.
+      - key: DJANGO_ALLOWED_HOSTS
+        value: .onrender.com
+      - key: DJANGO_BEHIND_HTTPS
+        value: "1"
+      # The API's address is public, and Django's admin sign-in has no rate limit
+      # (only the app's own sign-in has). Staging does not need the admin: the
+      # demo accounts come from load_demo_data.
+      - key: DJANGO_ADMIN_ENABLED
+        value: "0"
+      # The database address: a Supabase session-pooler URL, entered by hand (README: "The database is
+      # Supabase's, not Render's"). sync: false, so Render asks for it when the Blueprint is created and a later
+      # sync leaves a hand-entered value alone. It holds the database password: never commit it. Without it
+      # the API falls back to a local database and its start command stops at `migrate`.
+      - key: DJANGO_DATABASE_URL
+        sync: false
+      # The frontend's public origin, e.g. https://sual-cavab-web.onrender.com
+      # (asked for when the Blueprint is created; never committed).
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: DJANGO_DEMO_DATA
+        value: "1"
+      # The shared password of the invented demo accounts (12+ characters).
+      - key: DEMO_PASSWORD
+        sync: false
+
+  # ---- the Next.js frontend --------------------------------------------------
+  - type: web
+    name: sual-cavab-web
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: staging
+    rootDir: frontend
+    autoDeployTrigger: commit
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.2
+      # The API's public address, e.g. https://sual-cavab-api.onrender.com
+      # (asked for when the Blueprint is created). Read when Next.js builds AND
+      # starts: after changing it, deploy this service again.
+      - key: BACKEND_URL
+        sync: false

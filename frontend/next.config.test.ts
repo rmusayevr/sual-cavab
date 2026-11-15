@@ -1,0 +1,118 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import nextConfig from "./next.config";
+
+// Every Django URL ends in "/", and `:path*` drops it: without the slash in the
+// destination, POSTs through the proxy hit Django's APPEND_SLASH and fail with
+// a 500. Found running #4 end to end; unit tests of the components can't see it.
+describe("the /api proxy", () => {
+  it("waits longer than a sleeping free-tier API takes to wake (82 to 93 s measured on 2026-11-09; Next.js's default is 30 s)", () => {
+    expect(nextConfig.experimental?.proxyTimeout).toBeGreaterThan(120_000);
+  });
+
+  it("forwards to the backend with the trailing slash Django requires", async () => {
+    const rewrites = await nextConfig.rewrites!();
+    const list = Array.isArray(rewrites)
+      ? rewrites
+      : [...(rewrites.beforeFiles ?? []), ...(rewrites.afterFiles ?? []), ...(rewrites.fallback ?? [])];
+    const api = list.find((r) => r.source === "/api/:path*");
+
+    expect(api?.destination).toMatch(/\/api\/:path\*\/$/);
+  });
+});
+
+// The address the rewrite forwards to, for a given environment. The config reads
+// it when it loads, so each case loads it afresh.
+async function destinationWith(env: Record<string, string | undefined>) {
+  vi.resetModules();
+  for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value as string);
+  const { default: config } = await import("./next.config");
+  const rewrites = await config.rewrites!();
+  const list = Array.isArray(rewrites) ? rewrites : (rewrites.afterFiles ?? []);
+  return list.find((r) => r.source === "/api/:path*")?.destination;
+}
+
+describe("where /api is forwarded", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("goes to localhost:8000 when nothing is set", async () => {
+    expect(await destinationWith({ BACKEND_URL: "" })).toBe("http://localhost:8000/api/:path*/");
+  });
+
+  it("goes to BACKEND_URL, without a trailing slash doubling up", async () => {
+    expect(await destinationWith({ BACKEND_URL: "https://api.example.invalid/" })).toBe(
+      "https://api.example.invalid/api/:path*/",
+    );
+  });
+
+});
+
+// #83: the project page is the workspace. The older pages (the questions and the
+// overview) are gone, and anyone with a bookmark or an old link lands on the workspace instead of a 404.
+describe("the older project pages", () => {
+  const redirects = async () => nextConfig.redirects!();
+
+  it("send /projects/<id>/questions and /overview to the workspace, with or without a trailing slash", async () => {
+    const list = await redirects();
+    for (const page of ["questions", "overview"]) {
+      for (const slash of ["", "/"]) {
+        const rule = list.find((r) => r.source === `/projects/:id/${page}${slash}`);
+        expect(rule, `${page}${slash}`).toBeDefined();
+        expect(rule?.destination).toBe("/projects/:id");
+      }
+    }
+  });
+
+  it("are a temporary redirect (307), not a permanent one a browser would remember", async () => {
+    for (const rule of await redirects()) expect(rule.permanent).toBe(false);
+  });
+
+  it("are exactly these four rules, so an over-broad one (a wildcard that would also catch /projects/5 or /projects/5/questions/3, or loop) cannot slip in", async () => {
+    const sources = (await redirects()).map((r) => r.source).sort();
+    expect(sources).toEqual(
+      ["overview", "questions"].flatMap((page) => [`/projects/:id/${page}`, `/projects/:id/${page}/`]).sort(),
+    );
+    for (const rule of await redirects()) {
+      expect(Object.keys(rule).sort(), rule.source).toEqual(["destination", "permanent", "source"]); // no statusCode next to permanent
+      expect(rule.source.match(/:\w+/g), rule.source).toEqual([":id"]); // the one parameter, no wildcard
+    }
+  });
+
+  // What the rules match, worked out from their sources (the only parameter is :id, one path segment).
+  // The real behaviour on `next start` is in the PR text: 307 with and without a trailing slash.
+  it("match the old addresses, and not the workspace, a sub-path, a longer word or the /api proxy", async () => {
+    const patterns = (await redirects()).map((r) => new RegExp(`^${r.source.replace(":id", "[^/]+")}$`));
+    const matches = (path: string) => patterns.some((p) => p.test(path));
+    for (const path of ["/projects/5/questions", "/projects/5/questions/", "/projects/5/overview", "/projects/5/overview/"])
+      expect(matches(path), path).toBe(true);
+    for (const path of ["/projects/5", "/projects/5/", "/projects/5/questions/3", "/projects/5/overviewXYZ", "/projects/x/y/questions", "/projects/5/draft", "/projects/5/draft/", "/api/projects/5/questions/", "/projects"])
+      expect(matches(path), path).toBe(false);
+  });
+});
+
+// #114: the page a client opens with a private link. Its address carries the token in the fragment, which a
+// browser never sends; these headers keep the page out of search results and stop it sending a Referer.
+describe("the answer page's headers", () => {
+  const headers = async () => nextConfig.headers!();
+
+  it("are set for /answer, with or without a trailing slash", async () => {
+    const sources = (await headers()).map((h) => h.source).sort();
+
+    expect(sources).toEqual(["/answer", "/answer/"]);
+  });
+
+  it("say no Referer and no indexing", async () => {
+    for (const rule of await headers()) {
+      const byKey = Object.fromEntries(rule.headers.map((h) => [h.key, h.value]));
+      expect(byKey["Referrer-Policy"], rule.source).toBe("no-referrer");
+      expect(byKey["X-Robots-Tag"], rule.source).toBe("noindex, nofollow");
+    }
+  });
+
+  it("do not touch any other page", async () => {
+    for (const rule of await headers()) expect(rule.source).not.toMatch(/projects|api|login|\*/);
+  });
+});
