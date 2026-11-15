@@ -54,4 +54,4 @@ before the work is done.
 
 ## Incidents
 
-- **sual-cavab, PR #118 (2026-11-15; vault `hand-built-mocks-miss-new-calls`).** Two new cards called two new endpoints; I updated the three fetch mocks I remembered, and sixteen other hand-built mocks answered with the project list, so the cards showed error alerts. One test asserting "no alert" failed only under load and I first called it a flake. Before pushing a component that calls a new endpoint, grep every test that renders it or its parent, and stub it where the test is not about it.
+- **sual-cavab, PR #118 (2026-11-15; vault `hand-built-mocks-miss-new-calls`).** Two new cards called two new endpoints; I updated the three shared mocks I remembered, and 15 other hand-built mocks in `Workspace.test.tsx` did not know the new URLs, so the cards showed error alerts and a test asserting "no alert" failed only under load. The line above ("Check tests, fixtures, and mocks") existed and did not fire for a change that only added a component; before pushing a component that calls a new endpoint, grep every test that renders it or its parent, and stub it where the test is not about it.
