@@ -61,4 +61,4 @@ There should be few of them, and they should not enumerate business rules.
 
 ## Incidents
 
-_None recorded yet. `/promote-lesson` appends real occurrences here._
+- **sual-cavab, issue #114 (2026-11-15; vault `test-must-be-seen-to-fail`, now global).** Four tests that looked right were not: a real-thread test for a cap passed with its row lock removed (the delay sat before the count, not between count and insert); my first repair inverted a comparison, so the mutated run was "killed" for the wrong reason; a mutation run written with a BOM failed 14 of 15 tests that had nothing to do with the guard; and one guard had no test at all. A test guards a rule only when it passes with the rule, fails without it, and fails on the behaviour it names.
