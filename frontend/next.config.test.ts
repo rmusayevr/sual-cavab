@@ -92,3 +92,27 @@ describe("the older project pages", () => {
       expect(matches(path), path).toBe(false);
   });
 });
+
+// #114: the page a client opens with a private link. Its address carries the token in the fragment, which a
+// browser never sends; these headers keep the page out of search results and stop it sending a Referer.
+describe("the answer page's headers", () => {
+  const headers = async () => nextConfig.headers!();
+
+  it("are set for /answer, with or without a trailing slash", async () => {
+    const sources = (await headers()).map((h) => h.source).sort();
+
+    expect(sources).toEqual(["/answer", "/answer/"]);
+  });
+
+  it("say no Referer and no indexing", async () => {
+    for (const rule of await headers()) {
+      const byKey = Object.fromEntries(rule.headers.map((h) => [h.key, h.value]));
+      expect(byKey["Referrer-Policy"], rule.source).toBe("no-referrer");
+      expect(byKey["X-Robots-Tag"], rule.source).toBe("noindex, nofollow");
+    }
+  });
+
+  it("do not touch any other page", async () => {
+    for (const rule of await headers()) expect(rule.source).not.toMatch(/projects|api|login|\*/);
+  });
+});

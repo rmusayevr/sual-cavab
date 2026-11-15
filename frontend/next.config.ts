@@ -27,6 +27,18 @@ const nextConfig: NextConfig = {
       ["", "/"].map((slash) => ({ source: `/projects/:id/${page}${slash}`, destination: "/projects/:id", permanent: false })),
     );
   },
+  // The page a client opens with a private link (/answer#<token>, #114). The token is in the fragment, which a browser
+  // never sends, so it cannot reach a Referer or a log; these headers keep the page itself out of search results and
+  // stop it handing any address to a site it links to (it links to none). Both spellings, as for the redirects.
+  async headers() {
+    return ["/answer", "/answer/"].map((source) => ({
+      source,
+      headers: [
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "X-Robots-Tag", value: "noindex, nofollow" },
+      ],
+    }));
+  },
   async rewrites() {
     // Same origin for the browser: session and CSRF cookies stay first-party
     // and no CORS setup is needed (#4). `:path*` drops the trailing slash, and
