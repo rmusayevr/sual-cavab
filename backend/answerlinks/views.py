@@ -105,6 +105,11 @@ class ProjectMemberView(APIView):
 class AnswerLinkView(ProjectMemberView):
     """/api/projects/<id>/answer-link/: see the link's state, make a new one, revoke it."""
 
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "no-store"  # the one reply that carries the token
+        return response
+
     def get(self, request, project_id):
         link = AnswerLink.objects.filter(project=self.project).select_related("created_by").first()
         return Response(describe_link(link) if link else {"exists": False})
@@ -142,7 +147,7 @@ class SubmissionsView(ProjectMemberView):
 
 
 class DismissPendingView(ProjectMemberView):
-    """For spam: dismiss everything still waiting in this project."""
+    """For spam: dismiss everything still waiting in this project (every link of it). Each can be restored."""
 
     def post(self, request, project_id):
         with transaction.atomic():
@@ -196,6 +201,25 @@ class AcceptSubmissionView(SubmissionDecisionView):
             submission.state = AnswerSubmission.State.ACCEPTED
             submission.decided_by = request.user
             submission.decided_at = timezone.now()
+            submission.save()
+        return Response(SubmissionSerializer(submission).data)
+
+
+class RestoreSubmissionView(ProjectMemberView):
+    """Undo a dismissal, so "dismiss all pending" (for spam) can never lose a real answer for good."""
+
+    def post(self, request, project_id, submission_id):
+        with transaction.atomic():
+            lock_caller_membership(self.project, request.user)
+            submission = get_object_or_404(
+                AnswerSubmission.objects.select_for_update(of=("self",)).filter(link__project=self.project),
+                pk=submission_id,
+            )
+            if submission.state != AnswerSubmission.State.DISMISSED:
+                raise ValidationError({"detail": ["Only a dismissed answer can be restored."]})
+            submission.state = AnswerSubmission.State.PENDING
+            submission.decided_by = None
+            submission.decided_at = None
             submission.save()
         return Response(SubmissionSerializer(submission).data)
 

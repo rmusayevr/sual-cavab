@@ -13,7 +13,7 @@ from rest_framework.test import APIClient
 
 from .support import LINK_QUESTIONS, LinkTestCase, with_token
 
-METHODS = ["get", "post", "put", "patch", "delete"]
+METHODS = ["get", "post", "put", "patch", "delete", "head", "options"]
 LINK_PATHS = {LINK_QUESTIONS, "/api/answer-link/questions/1/answers/"}
 
 
@@ -79,3 +79,22 @@ class DefaultDenyTests(LinkTestCase):
                 self.assertIn(response.status_code, (404, 405), (method, path))
         # reading the list is allowed; writing to it is not
         self.assertIn(client.post(LINK_QUESTIONS, {}, format="json", **with_token(self.token)).status_code, (404, 405))
+
+
+class TokenAddsNothingToASessionEitherTests(LinkTestCase):
+    def test_a_signed_in_member_gets_the_same_answers_with_or_without_a_token_on_team_routes(self):
+        with_link = APIClient(raise_request_exception=False)
+        without = APIClient(raise_request_exception=False)
+        for client in (with_link, without):
+            client.force_authenticate(self.member)
+        differences = []
+        for path in every_route():
+            if path in LINK_PATHS or path.startswith(("/admin", "/api/auth/logout")):
+                continue
+            for method in ("get", "head", "options", "post", "delete"):
+                a = getattr(with_link, method)(path, {}, format="json", **with_token(self.token))
+                b = getattr(without, method)(path, {}, format="json")
+                if a.status_code != b.status_code:
+                    differences.append((method.upper(), path, a.status_code, b.status_code))
+
+        self.assertEqual(differences, [])

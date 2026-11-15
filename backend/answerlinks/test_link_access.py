@@ -12,6 +12,8 @@ from rest_framework.test import APIClient
 
 from questions.models import Answer, Question
 
+from projects.models import Membership
+
 from .models import AnswerLink, AnswerSubmission
 from .services import create_link
 from .support import (
@@ -321,3 +323,61 @@ class SubmittingTests(LinkTestCase):
         second = self.public().get(LINK_QUESTIONS, **with_token(other_token)).json()
 
         self.assertNotEqual(first["questions"], second["questions"])
+
+
+class ARevokedLinkStaysRevokedTests(LinkTestCase):
+    """Review of #117: stopping because the creator is gone must be permanent, not undone by coming back."""
+
+    def test_reactivating_the_creator_does_not_bring_the_link_back(self):
+        self.owner.is_active = False
+        self.owner.save()
+        self.owner.is_active = True
+        self.owner.save()
+
+        self.assertEqual(self.public().get(LINK_QUESTIONS, **with_token(self.token)).status_code, 404)
+        self.assertIsNotNone(AnswerLink.objects.get(pk=self.link.pk).revoked_at)
+
+    def test_adding_the_creator_back_to_the_project_does_not_bring_the_link_back(self):
+        # Removed outside the members API (the Django admin deletes the row like this).
+        self.project.memberships.filter(user=self.owner).delete()
+        Membership.objects.create(project=self.project, user=self.owner, role=Membership.Role.OWNER)
+
+        self.assertEqual(self.public().get(LINK_QUESTIONS, **with_token(self.token)).status_code, 404)
+        self.assertIsNotNone(AnswerLink.objects.get(pk=self.link.pk).revoked_at)
+
+    def test_a_removal_only_ends_the_links_that_person_made_in_that_project(self):
+        _, other_token = create_link(self.other, self.outsider, days=7)
+        Membership.objects.create(project=self.other, user=self.owner, role=Membership.Role.MEMBER)
+
+        Membership.objects.filter(project=self.other, user=self.owner).delete()  # the owner never made B's link
+
+        self.assertEqual(self.public().get(LINK_QUESTIONS, **with_token(self.token)).status_code, 200)
+        self.assertEqual(self.public().get(LINK_QUESTIONS, **with_token(other_token)).status_code, 200)
+
+    def test_deactivating_someone_ends_only_their_links(self):
+        _, other_token = create_link(self.other, self.outsider, days=7)
+        self.owner.is_active = False
+        self.owner.save()
+
+        self.assertEqual(self.public().get(LINK_QUESTIONS, **with_token(self.token)).status_code, 404)
+        self.assertEqual(self.public().get(LINK_QUESTIONS, **with_token(other_token)).status_code, 200)
+
+
+class StaleAuthenticationTests(LinkTestCase):
+    def test_a_revoke_that_lands_after_authentication_still_stops_the_submission(self):
+        """The view re-checks the link under its lock: a link revoked between authentication and the write
+        must not take a submission (authentication here hands over a link that was valid a moment ago)."""
+        from unittest import mock
+
+        from django.contrib.auth.models import AnonymousUser
+
+        from .authentication import AnswerLinkAuthentication
+
+        stale = AnswerLink.objects.get(pk=self.link.pk)
+        AnswerLink.objects.filter(pk=self.link.pk).update(revoked_at=timezone.now())
+
+        with mock.patch.object(AnswerLinkAuthentication, "authenticate", return_value=(AnonymousUser(), stale)):
+            response = self.public().post(link_answers(1), {"text": "x", "name": "n"}, format="json")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(AnswerSubmission.objects.count(), 0)

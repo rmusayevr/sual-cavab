@@ -29,8 +29,9 @@ class AnswerLinkAuthentication(BaseAuthentication):
     def authenticate(self, request):
         link = find_usable_link(request.headers.get(HEADER))
         if link is None:
-            if not InvalidTokenThrottle().allow_request(request, None):
-                raise Throttled()
+            throttle = InvalidTokenThrottle()
+            if not throttle.allow_request(request, None):
+                raise Throttled(wait=throttle.wait())
             raise not_available()
         return AnonymousUser(), link
 

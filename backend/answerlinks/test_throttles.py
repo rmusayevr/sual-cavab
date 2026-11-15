@@ -85,3 +85,21 @@ class InvalidTokenBucketTests(LinkTestCase):
 
         self.assertEqual(response.status_code, 429)
         self.assertEqual(response["Cache-Control"], "no-store")
+
+
+class RetryAfterTests(LinkTestCase):
+    def test_a_limited_client_is_told_when_to_try_again(self):
+        with rates(answer_link_read="1/hour"):
+            self.public().get(LINK_QUESTIONS, **with_token(self.token))
+            response = self.public().get(LINK_QUESTIONS, **with_token(self.token))
+
+        self.assertEqual(response.status_code, 429)
+        self.assertGreater(int(response["Retry-After"]), 0)
+
+    def test_the_bad_token_bucket_says_when_to_try_again_too(self):
+        with rates(answer_link_invalid="1/min"):
+            self.public().get(LINK_QUESTIONS, **with_token("Y" * 43))
+            response = self.public().get(LINK_QUESTIONS, **with_token("Z" * 43))
+
+        self.assertEqual(response.status_code, 429)
+        self.assertGreater(int(response["Retry-After"]), 0)

@@ -12,4 +12,5 @@ urlpatterns = [
     path("projects/<int:project_id>/submissions/dismiss-pending/", views.DismissPendingView.as_view()),
     path("projects/<int:project_id>/submissions/<int:submission_id>/accept/", views.AcceptSubmissionView.as_view()),
     path("projects/<int:project_id>/submissions/<int:submission_id>/dismiss/", views.DismissSubmissionView.as_view()),
+    path("projects/<int:project_id>/submissions/<int:submission_id>/restore/", views.RestoreSubmissionView.as_view()),
 ]

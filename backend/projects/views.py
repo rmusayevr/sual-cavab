@@ -119,7 +119,8 @@ class ProjectViewSet(
             active_owners = [m for m in rows if m.role == Membership.Role.OWNER and m.user.is_active]
             if target in active_owners and len(active_owners) == 1:
                 raise ValidationError({"detail": "A project needs at least one active owner."})
-            target.delete()
-            # Access that this person granted ends when they leave the project (#114).
+            # Access that this person granted ends when they leave the project (#114). Before the delete, so
+            # the revoke records who removed them (the signal in answerlinks covers removals made elsewhere).
             revoke_links(project, revoked_by=request.user, created_by=target.user)
+            target.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

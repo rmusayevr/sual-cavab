@@ -390,3 +390,52 @@ class SimultaneousAcceptTests(TransactionTestCase):
         self.assertEqual(sorted(results), [200, 400], results)
         self.assertEqual(Answer.objects.filter(question=question).count(), 1)
         self.assertEqual(AnswerSubmission.objects.filter(state="accepted").count(), 1)
+
+
+class TokenReplyIsNeverCachedTests(LinkTestCase):
+    def test_the_reply_that_carries_the_token_is_no_store(self):
+        response = self.as_user(self.member).post(self.team_url("answer-link/"), {}, format="json")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response["Cache-Control"], "no-store")
+
+
+class RestoreTests(LinkTestCase):
+    def setUp(self):
+        super().setUp()
+        self.s1 = AnswerSubmission.objects.create(
+            link=self.link, question=self.q1, text="Real answer", submitter_name="Leyla"
+        )
+
+    def restore_url(self, submission=None, project=None):
+        return self.team_url(f"submissions/{(submission or self.s1).pk}/restore/", project)
+
+    def test_a_dismissed_answer_can_be_restored_and_then_accepted(self):
+        self.as_user(self.member).post(self.team_url("submissions/dismiss-pending/"), {}, format="json")
+        self.s1.refresh_from_db()
+        self.assertEqual(self.s1.state, AnswerSubmission.State.DISMISSED)
+
+        response = self.as_user(self.owner).post(self.restore_url(), {}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.s1.refresh_from_db()
+        self.assertEqual(
+            (self.s1.state, self.s1.decided_by, self.s1.decided_at), (AnswerSubmission.State.PENDING, None, None)
+        )
+        accepted = self.as_user(self.owner).post(self.team_url(f"submissions/{self.s1.pk}/accept/"), {}, format="json")
+        self.assertEqual(accepted.status_code, 200)
+
+    def test_only_a_dismissed_answer_can_be_restored(self):
+        self.assertEqual(self.as_user(self.member).post(self.restore_url(), {}, format="json").status_code, 400)
+        self.as_user(self.member).post(self.team_url(f"submissions/{self.s1.pk}/accept/"), {}, format="json")
+        self.assertEqual(self.as_user(self.member).post(self.restore_url(), {}, format="json").status_code, 400)
+
+    def test_only_members_of_the_submissions_project_can_restore(self):
+        AnswerSubmission.objects.filter(pk=self.s1.pk).update(state=AnswerSubmission.State.DISMISSED)
+
+        self.assertEqual(self.public().post(self.restore_url(), {}, format="json").status_code, 403)
+        self.assertEqual(self.as_user(self.outsider).post(self.restore_url(), {}, format="json").status_code, 404)
+        by_b = self.as_user(self.outsider).post(self.restore_url(self.s1, self.other), {}, format="json")
+        self.assertEqual(by_b.status_code, 404)
+        self.s1.refresh_from_db()
+        self.assertEqual(self.s1.state, AnswerSubmission.State.DISMISSED)
