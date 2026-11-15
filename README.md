@@ -439,8 +439,7 @@ link, copy it once, revoke it), in both languages. The full link is shown once a
 when the person revokes or replaces it, signs out, leaves the page, or after five minutes. Replacing a live link asks
 first, because the one the client already has stops working. An answer a member accepted from a client is marked on
 the question card as sent through the answer link, with the name as typed ("name not verified") and who accepted it;
-direction-control characters are removed from typed names before they are shown. The client's page (`/answer#<token>`) is the next PR, so until
-then a link made here does not open anything.
+direction-control characters are removed from typed names before they are shown. The client's page is `/answer#<token>` (PR C of three, the last).
 
 - **The link:** `https://<app>/answer#<token>`. The token is 256 bits and sits in the URL *fragment*, which browsers
   never send to the server, so it stays out of server and proxy logs and out of `Referer`. It is shown **once**, when
@@ -456,6 +455,18 @@ then a link made here does not open anything.
   and *what it blocks* (the owner's decision: those two fields are shown to anyone with the link, so write them
   knowing that). Never other projects, members, e-mail addresses, who made the link, any answer (current or earlier),
   answered or dropped questions, internal ids, or other clients' submissions.
+- **The client's page** (`/answer#<token>`, in both languages): the project's name, a short explanation, a field for
+  the client's name (required, never checked, not stored in the browser) and, for each open question, the question,
+  why it matters and what it blocks (as plain text) and a box for an answer. A client can send several answers to
+  one question. It has **no sign-in, no session and no link to the rest of the app**; a dead link of any kind shows
+  one message ("This link is not available"), and a throttled request (429) says to wait, without claiming the link
+  works. Every request is sent without cookies and without a Referer. The token, the name and the answers are kept in
+  memory only, but **the token stays in the address bar and so in the browser's history** (that is what lets a reload
+  or a bookmark work, and browsers may sync history across a person's devices): a client on a shared computer should
+  close the tab and clear it. Typed answers survive "Check again" on another question; a new link pasted into the
+  same tab is picked up. The expiry is shown in the client's own time zone. The page is configured to be served with
+  `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow` and is marked `noindex` (set in
+  `next.config.ts` and tested there; **not looked at on the deployed site**).
 - **What the client can do:** exactly two routes, `GET /api/answer-link/questions/` and
   `POST /api/answer-link/questions/<number>/answers/` with `{"text", "name"}` (text up to 4000 characters, name up to
   100; the name is typed by the client and **never verified**). The token goes in the `X-Answer-Token` header; cookies
@@ -481,7 +492,9 @@ then a link made here does not open anything.
   link). And a flood of bad tokens fills the shared bucket, so a client with a dead link then sees `429` instead of
   the usual `404`: the client page must not read a `429` as "this link works, try later" for a link it never loaded.
 - **Stored about the client:** the typed name and answer only. No address, no browser details.
-- **Not checked:** nothing here has been run against Render or Supabase, and the client page does not exist yet.
+- **Not checked:** nothing here has been run against Render or Supabase, and **no screen of this feature has been
+  looked at in a real browser** (layout, focus order, a phone, long words, the Azerbaijani wording): only the DOM tests
+  have seen it. See issue #32.
 
 ## Language (English, Azerbaijani)
 
@@ -491,7 +504,7 @@ The interface is English by default, with Azerbaijani as a second language (#71)
 - **First paint is always English**: the server cannot know the choice, and the markup must match. A person who chose Azerbaijani sees it as soon as the page has loaded, after a brief English flash (accepted for v1).
 - **Never translated:** what a person typed (questions, answers).
 - **Status words** come from the dictionaries (`status.open` and so on), one set per language, next to the one table of colours (`lib/status.ts`). They follow the language on every page, including pages whose other words are still English.
-- **The Azerbaijani wording was first written by Claude, not by a native speaker; the owner reviewed and changed it on 2026-11-10** (for example `Ləğv olunub` for a dropped question and `sahib` for an owner). Technical terms stay in English. **Exception, not yet reviewed by the owner:** `landing.lead` (both languages) was reworded on 2026-11-15 by Claude when drafting was removed (#115), and the strings of the two answer-link cards (`answerLink.*`, `submissions.*`, `channel.link`) were written by Claude in the same way (#114).
+- **The Azerbaijani wording was first written by Claude, not by a native speaker; the owner reviewed and changed it on 2026-11-10** (for example `Ləğv olunub` for a dropped question and `sahib` for an owner). Technical terms stay in English. **Exception, not yet reviewed by the owner:** `landing.lead` (both languages) was reworded on 2026-11-15 by Claude when drafting was removed (#115), and the strings of the answer-link cards and the client's page (`answerLink.*`, `submissions.*`, `channel.link`, `client.*`) were written by Claude in the same way (#114).
 - **Translated:** the landing page, the sign-in page and form, the projects page and its list and new-project form, the workspace (`/projects/[id]`: shell, members, how long a question has been open, question card, add and edit forms, answer form), the 404, the session status in every header, the home link's name, the status words and the waking-up note. The landing page's sample questions stay in English (a question is the ledger entry and is never translated, as in the design example). **Still English** (things that cannot follow a browser choice): the page titles and social-card text (they are fixed when the page is built) and any message the server itself sends back (a refused status change, a validation error: shown as the server wrote it).
 
 ## Staging on Render
