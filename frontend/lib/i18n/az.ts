@@ -65,6 +65,7 @@ export const az: Record<Key, string> = {
   "transition.drop": "Ləğv et",
   "transition.unask": "Soruşulmayıb kimi qeyd et",
   "transition.reopen": "Yenidən aç",
+  "transition.restoreAnswer": "Əvvəlki cavabı qaytar",
   "transition.restore": "Bərpa et",
 
   "form.question": "Sual",

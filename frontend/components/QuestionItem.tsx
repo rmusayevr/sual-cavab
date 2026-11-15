@@ -119,6 +119,27 @@ export function QuestionItem({
     }
   }
 
+  // A re-opened question that had an answer can get it back (#121): the server puts the most recently replaced
+  // answer back and answers the question again. Offered only where that can work; the server decides.
+  const canRestore = (question.status === "open" || question.status === "asked") && question.previous_answers.length > 0;
+
+  async function restore() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const response = await apiFetch(`${url}restore-answer/`, { method: "POST", body: {} });
+      if (response.ok) {
+        onChanged((await response.json()) as FullQuestion);
+      } else {
+        setMessage(Object.values(await failure(response, t("error.changeStatus"), [])).join(" "));
+      }
+    } catch {
+      setMessage(t("error.server"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function save(values: QuestionFields): Promise<SubmitResult> {
     // Send only the fields this person changed: one they did not touch may have
     // been changed by a teammate since this page loaded, and sending the old
@@ -206,6 +227,11 @@ export function QuestionItem({
                 {t(transitionKey(question.status, to))}
               </Button>
             ))}
+            {canRestore && (
+              <Button variant="secondary" disabled={busy} onClick={() => void restore()}>
+                {t("transition.restoreAnswer")}
+              </Button>
+            )}
             <Button
               variant="secondary"
               disabled={busy}

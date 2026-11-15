@@ -63,6 +63,7 @@ export const en = {
   "transition.drop": "Drop",
   "transition.unask": "Un-ask",
   "transition.reopen": "Re-open",
+  "transition.restoreAnswer": "Restore the earlier answer",
   "transition.restore": "Restore",
 
   "form.question": "Question",
