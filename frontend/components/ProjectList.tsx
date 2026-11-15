@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import { apiFetch } from "@/lib/api";
+import { SIGNED_OUT_EVENT, apiFetch } from "@/lib/api";
 import { useT, type Key } from "@/lib/i18n";
 import { addProjects, hasMoreProjects, type Project, type ProjectPage } from "@/lib/projects";
 
@@ -25,6 +25,13 @@ export default function ProjectList() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const statusLine = useRef<HTMLParagraphElement>(null);
   const fetchingMore = useRef(false); // a ref: two presses in one tick both see the same state
+
+  // The person signed out in the header (SessionStatus): show the signed-out page now, not after a refresh (#121).
+  useEffect(() => {
+    const signedOut = () => setState({ kind: "signed-out" });
+    window.addEventListener(SIGNED_OUT_EVENT, signedOut);
+    return () => window.removeEventListener(SIGNED_OUT_EVENT, signedOut);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

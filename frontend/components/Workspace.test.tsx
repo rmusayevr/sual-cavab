@@ -666,3 +666,46 @@ describe("Workspace (#70)", () => {
     });
   });
 });
+
+// #121: the page the person is looking at must follow a sign-out, not wait for a refresh.
+describe("Workspace: signing out (#121)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const signedInAs = (logout: () => Response) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+        if (url === "/api/auth/me/") return json(200, { id: 1, email: "owner@example.invalid", name: "Olga Owner" });
+        if (url === "/api/auth/logout/" && init?.method === "POST") return logout();
+        if (url.includes("/questions/")) return json(200, served);
+        if (url.endsWith("/members/")) return json(200, members);
+        return projectsReply(url);
+      }),
+    );
+
+  it("shows the signed-out page at once when the person signs out in the header, and no longer shows the project", async () => {
+    signedInAs(() => new Response(null, { status: 204 }));
+    render(<Workspace />);
+    await screen.findByRole("heading", { level: 1, name: "Ticketing" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByText(/to see this project/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Ticketing" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Which payment providers are allowed?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Olga Owner · owner")).not.toBeInTheDocument();
+  });
+
+  it("keeps the project on screen when the sign-out was refused and the person is still signed in", async () => {
+    signedInAs(() => json(403, { detail: "CSRF Failed" }));
+    render(<Workspace />);
+    await screen.findByRole("heading", { level: 1, name: "Ticketing" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByText(/Sign-out failed/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Ticketing" })).toBeInTheDocument();
+    expect(screen.queryByText(/to see this project/)).not.toBeInTheDocument();
+  });
+});

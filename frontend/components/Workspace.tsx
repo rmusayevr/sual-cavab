@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
-import { apiFetch } from "@/lib/api";
+import { SIGNED_OUT_EVENT, apiFetch } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { ageKey, daysOpen, type Member, type Project, type ProjectPage, type QuestionStatus } from "@/lib/projects";
 import type { FullQuestion } from "@/lib/questions";
@@ -47,6 +47,13 @@ export default function Workspace() {
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<number | null>(null);
   const base = `/api/projects/${id}/questions/`;
+
+  // The person signed out in the header (SessionStatus): show the signed-out page now, not after a refresh (#121).
+  useEffect(() => {
+    const signedOut = () => setState({ kind: "signed-out" });
+    window.addEventListener(SIGNED_OUT_EVENT, signedOut);
+    return () => window.removeEventListener(SIGNED_OUT_EVENT, signedOut);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
