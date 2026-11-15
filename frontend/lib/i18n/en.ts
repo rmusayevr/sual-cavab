@@ -214,7 +214,7 @@ export const en = {
   "clientAccount.waiting": "Waiting for the team",
   "clientAccount.accepted": "The team accepted this answer",
   "clientAccount.earlier": "Your earlier answers",
-  "clientAccount.earlierHint": "Questions that have been answered since. You see only what you sent.",
+  "clientAccount.earlierHint": "Questions that are no longer open. You see only what you sent.",
   "clientAccount.projects": "Projects where you answer questions",
   "client.eyebrow": "Questions for you",
   "client.lead": "The project team is waiting for answers to these questions. Answer what you can. You may send more than one answer to a question.",

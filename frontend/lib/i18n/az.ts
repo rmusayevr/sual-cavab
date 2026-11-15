@@ -216,7 +216,7 @@ export const az: Record<Key, string> = {
   "clientAccount.waiting": "Komandanın cavabını gözləyir",
   "clientAccount.accepted": "Komanda bu cavabı qəbul etdi",
   "clientAccount.earlier": "Əvvəlki cavablarınız",
-  "clientAccount.earlierHint": "Bundan sonra cavablandırılmış suallar. Yalnız özünüzün göndərdiyini görürsünüz.",
+  "clientAccount.earlierHint": "Artıq açıq olmayan suallar. Yalnız özünüzün göndərdiyini görürsünüz.",
   "clientAccount.projects": "Suallara cavab verdiyiniz layihələr",
   "client.eyebrow": "Sizin üçün suallar",
   "client.lead": "Layihə komandası bu sualların cavabını gözləyir. Bildiyiniz suallara cavab verin. Bir suala bir neçə cavab göndərə bilərsiniz.",

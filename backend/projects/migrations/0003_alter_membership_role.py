@@ -3,6 +3,16 @@
 from django.db import migrations, models
 
 
+def refuse_while_clients_exist(apps, schema_editor):
+    """Reversing this changes nothing in the database, so a client row would stay. The release before client
+    accounts does not know the role and treats every membership as a team member: it would give each client the
+    whole project. So going back is refused until the clients are removed on purpose (review of #123)."""
+    if apps.get_model("projects", "Membership").objects.filter(role="client").exists():
+        raise migrations.exceptions.IrreversibleError(
+            "Client memberships exist. Remove them first: the previous release would treat them as team members."
+        )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,6 +20,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(migrations.RunPython.noop, reverse_code=refuse_while_clients_exist),
         migrations.AlterField(
             model_name="membership",
             name="role",

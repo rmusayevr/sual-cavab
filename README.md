@@ -402,8 +402,8 @@ what is allowed:
   an answer, re-open and answer again.
 - **Restore the earlier answer** (#121): on a re-opened (or asked) question that had an answer, **Restore the earlier
   answer** (`POST .../questions/<n>/restore-answer/`) makes the most recently replaced answer the current one again and
-  answers the question again, so a re-open can be undone without typing the answer a second time. Nothing is copied or
-  deleted; it is refused (400) on an answered or dropped question or one that never had an answer. Two members pressing
+  answers the question again, so a re-open can be undone without typing the answer a second time. No answer is copied or
+  deleted, but the restored answer's "replaced" time is cleared (the time of the earlier re-open is not kept); it is refused (400) on an answered or dropped question or one that never had an answer. Two members pressing
   it together: one wins, the other is told the question already has an answer.
 - Nothing is deleted by the app: there is no delete endpoint ("dropped" is a
   status). In the admin, questions can't be added or deleted, only their three
@@ -530,6 +530,9 @@ choosing "client"; they need an account first, like any member). The private lin
   or dismisses it. Removing a client from the project, or deactivating the account, stops both reading and sending at once.
 - **Limits:** per person, `DJANGO_CLIENT_READ_RATE` (300/hour) and `DJANGO_CLIENT_SUBMIT_RATE` (60/hour), and at most 5
   waiting answers per question and 200 per project for one person, counted under a lock.
+- **Going back:** reversing `projects/0003` is refused while any client membership exists (the previous release would treat
+  clients as team members); remove them first. `answerlinks/0002` cannot be reversed once an account submission exists.
+- **"Dismiss all waiting"** also dismisses answers from client accounts (each can be restored).
 - **Not checked:** not run against Render or Supabase, and no screen has been looked at in a real browser; the migrations
   (`projects/0003`, `questions/0004`, `answerlinks/0002`) run against Supabase when the staging service starts.
   An already-open tab of an older version may still send a name or an old field; the server ignores them.

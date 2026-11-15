@@ -11,7 +11,7 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
-from projects.models import Membership
+from projects.models import TEAM_ROLES, Membership
 
 from .models import AnswerLink
 from .services import revoke_links
@@ -20,6 +20,13 @@ from .services import revoke_links
 @receiver(post_delete, sender=Membership, dispatch_uid="answerlinks_revoke_on_membership_delete")
 def revoke_links_of_a_departed_member(sender, instance, **kwargs):
     revoke_links(instance.project_id, revoked_by=None, created_by=instance.user_id)
+
+
+@receiver(post_save, sender=Membership, dispatch_uid="answerlinks_revoke_on_leaving_the_team")
+def revoke_links_of_a_member_who_became_a_client(sender, instance, created, **kwargs):
+    """A client is not on the team (#121): when a role leaves owner/member (the admin can do it), the links end."""
+    if instance.role not in TEAM_ROLES:
+        revoke_links(instance.project_id, revoked_by=None, created_by=instance.user_id)
 
 
 @receiver(post_save, sender=get_user_model(), dispatch_uid="answerlinks_revoke_on_deactivation")

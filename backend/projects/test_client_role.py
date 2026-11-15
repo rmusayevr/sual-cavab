@@ -158,3 +158,23 @@ class OwnersAddClientsTests(TestCase):
 
         self.assertEqual(removed.status_code, 204)
         self.assertEqual(list(Project.objects.visible_to_client(self.account)), [])
+
+
+class RollbackGuardTests(TestCase):
+    """Going back to a release that does not know clients would turn every client into a team member (review of #123)."""
+
+    def test_reversing_the_role_migration_is_refused_while_a_client_exists_and_allowed_when_none_does(self):
+        import importlib
+
+        from django.apps import apps
+        from django.db import migrations
+
+        module = importlib.import_module("projects.migrations.0003_alter_membership_role")
+        owner = get_user_model().objects.create_user(email="o@example.invalid", password=invented_password())
+        project = Project.objects.create(name="P", client_name="C", created_by=owner)
+        module.refuse_while_clients_exist(apps, None)  # no client: fine
+
+        Membership.objects.create(project=project, user=owner, role=Membership.Role.CLIENT)
+
+        with self.assertRaises(migrations.exceptions.IrreversibleError):
+            module.refuse_while_clients_exist(apps, None)
