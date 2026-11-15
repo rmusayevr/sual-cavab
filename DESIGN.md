@@ -63,8 +63,8 @@ UI, JetBrains Mono for ids, counts, eyebrows and status words (`font-mono text-x
 ## Layout
 
 Pages are `max-w-6xl` (the workspace `90rem`) with `px-4` on a phone and `px-6` above. The workspace is
-three panes at `lg` (`15rem` navy project rail, questions, `24rem` selected question and draft) and
-stacks on a phone: rail, list, detail, add, draft. **One carpet strip per screen**; `pattern-lattice`
+three panes at `lg` (`15rem` navy project rail, questions, `24rem` selected question and add form) and
+stacks on a phone: rail, list, detail, add. **One carpet strip per screen**; `pattern-lattice`
 is the only full-surface pattern, and only on navy. At 360 px nothing scrolls sideways (long words wrap
 with `overflow-wrap:anywhere`).
 
@@ -88,8 +88,7 @@ EmptyState).
 English by default, Azerbaijani second (`EN | AZ`, `frontend/lib/i18n`); technical terms stay in
 English (`refund`, `admin`, `support`, `checkout`, `endpoint`, `auth`). Question text is the ledger
 entry and is never translated. Errors say what happened and what to do ("Could not reach the server."),
-empty states say what to do next ("No questions yet. Add the first one."). The app never sends a
-message: the draft is text to review, edit and copy.
+empty states say what to do next ("No questions yet. Add the first one.").
 
 ## Don't
 

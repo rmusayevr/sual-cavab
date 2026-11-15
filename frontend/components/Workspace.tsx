@@ -10,7 +10,6 @@ import { ageKey, daysOpen, type Member, type Project, type ProjectPage, type Que
 import type { FullQuestion } from "@/lib/questions";
 import { STATUSES } from "@/lib/status";
 import { LanguageSwitch, useT } from "@/lib/i18n";
-import { MAX_QUESTIONS, useDraft } from "@/lib/useDraft";
 
 import MembersPanel from "./MembersPanel";
 import QuestionForm, { type QuestionFields, type SubmitResult } from "./QuestionForm";
@@ -19,7 +18,6 @@ import SessionStatus from "./SessionStatus";
 import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
-import { Textarea } from "./ui/Field";
 import { CarpetStrip, EmptyState, Eyebrow, LedgerLoading } from "./ui/Ledger";
 import { SignInPrompt } from "./ui/SignInPrompt";
 import { StatusChip } from "./ui/StatusChip";
@@ -37,8 +35,8 @@ type Filter = "all" | QuestionStatus;
 /**
  * One screen for a project: the person's projects (rail: the first page of the list, plus this project
  * if it is not on it, #49), the project's questions with counts and
- * filters (middle), the selected question and the draft (right). The counts and filters are worked
- * out from the questions already loaded. Drafting never sends anything (#70).
+ * filters (middle), the selected question and the add form (right). The counts and filters are worked
+ * out from the questions already loaded.
  */
 export default function Workspace() {
   const { id } = useParams<{ id: string }>();
@@ -46,15 +44,6 @@ export default function Workspace() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<number | null>(null);
-  const [ticked, setTicked] = useState<number[]>([]);
-  // What counts as picked is worked out from the questions as last loaded, not remembered: a
-  // question that was answered, dropped or removed since it was ticked (here, on another page, by a
-  // teammate, or while this page was kept in the background) drops out by itself instead of staying
-  // ticked and disabled, and in the request (review of #79).
-  const picked = state.kind === "ready"
-    ? ticked.filter((n) => state.questions.some((q) => q.number === n && (q.status === "open" || q.status === "asked")))
-    : [];
-  const draft = useDraft(id, picked);
   const base = `/api/projects/${id}/questions/`;
 
   useEffect(() => {
@@ -182,8 +171,6 @@ export default function Workspace() {
     return await failure(response, t("error.addQuestion"), [...QUESTION_FIELDS]);
   }
 
-  const toggle = (n: number) => setTicked((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p, n]));
-
   return shell(
     <div className="mx-auto grid max-w-[90rem] grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-[15rem_minmax(0,1fr)_24rem]">
       <nav aria-label={t("session.yourProjects")} className="min-w-0 rounded-md bg-navy p-3 text-navy-foreground lg:self-start">
@@ -273,35 +260,10 @@ export default function Workspace() {
         ) : (
           <ul className="grid list-none gap-2">
             {shown.map((q) => {
-              const pickable = q.status === "open" || q.status === "asked";
-              const isPicked = picked.includes(q.number);
-              // Ten are ticked and this one is not: it cannot be added, and the whole row says so.
-              const limitReached = pickable && !isPicked && picked.length >= MAX_QUESTIONS;
+              const waiting = q.status === "open" || q.status === "asked";
               return (
                 <li key={q.id}>
-                  <Card
-                    className={cx(
-                      "flex items-start gap-3 p-3 sm:p-3",
-                      selected === q.number && "border-primary",
-                      limitReached && "opacity-60",
-                    )}
-                  >
-                    {/* the label makes a 44 px tap target around the 20 px box */}
-                    <label
-                      className={cx(
-                        "-m-1 flex min-h-11 min-w-11 shrink-0 items-start justify-center pt-2.5",
-                        limitReached || !pickable ? "cursor-not-allowed" : "cursor-pointer",
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        aria-label={t("workspace.pick", { label: q.label })}
-                        className="h-5 w-5 shrink-0 accent-primary"
-                        checked={isPicked}
-                        disabled={!pickable || limitReached}
-                        onChange={() => toggle(q.number)}
-                      />
-                    </label>
+                  <Card className={cx("flex items-start gap-3 p-3 sm:p-3", selected === q.number && "border-primary")}>
                     <button
                       type="button"
                       onClick={() => setSelected(q.number)}
@@ -313,7 +275,7 @@ export default function Workspace() {
                         <StatusChip status={q.status} />
                       </span>
                       <span>{q.text}</span>
-                      {pickable && (
+                      {waiting && (
                         <span className="text-xs text-muted-foreground">
                           {age(q.created_at)}
                         </span>
@@ -347,54 +309,6 @@ export default function Workspace() {
           <QuestionForm idPrefix="add" submitLabel={t("form.add")} busyLabel={t("form.adding")} clearOnSuccess onSubmit={add} />
         </Card>
 
-        <section aria-labelledby="draft-heading" className="grid gap-3 rounded-md bg-navy p-4 text-navy-foreground">
-          <h2 id="draft-heading" className="text-lg font-semibold">
-            {t("draft.heading")}
-          </h2>
-          <p className="text-sm opacity-80">
-            {picked.length === 0
-              ? t("draft.tickPrompt", { max: MAX_QUESTIONS })
-              : t(picked.length === 1 ? "draft.tickedOne" : "draft.tickedMany", {
-                  n: picked.length,
-                  list: [...picked]
-                    .sort((x, y) => x - y)
-                    .map((n) => `Q${n}`)
-                    .join(", "),
-                })}
-          </p>
-          <p className="text-sm opacity-80">{t("draft.notice")}</p>
-          <div>
-            <Button onClick={() => draft.write()} disabled={draft.writing || picked.length === 0}>
-              {draft.writing ? t("draft.writing") : draft.draft !== null ? t("draft.rewrite") : t("draft.write")}
-            </Button>
-          </div>
-          {draft.error && <Alert tone="error">{draft.error}</Alert>}
-          {draft.draft !== null && (
-            <div className="grid gap-3">
-              <label htmlFor="draft-text" className="text-sm font-medium">
-                {t("draft.label")}
-              </label>
-              {draft.draftIsStale && <Alert>{t("draft.stale")}</Alert>}
-              <Textarea
-                id="draft-text"
-                rows={10}
-                value={draft.draft}
-                onChange={(e) => {
-                  draft.setDraft(e.target.value);
-                  draft.setCopied(null);
-                }}
-              />
-              <div className="flex flex-wrap items-center gap-3">
-                <Button variant="secondary" onClick={draft.copy}>
-                  {t("draft.copy")}
-                </Button>
-                {draft.copied === "yes" && <span role="status">{t("draft.copied")}</span>}
-                {draft.copied === "failed" && <span role="status">{t("draft.copyFailed")}</span>}
-              </div>
-              <p className="text-sm opacity-80">{t("draft.notSent")}</p>
-            </div>
-          )}
-        </section>
       </aside>
     </div>,
   );

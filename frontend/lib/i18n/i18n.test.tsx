@@ -46,19 +46,6 @@ describe("the dictionaries", () => {
   });
 });
 
-describe("the notice about what is sent", () => {
-  // checked as written in each language, so rewording that drops the guarantee fails here
-  it("says in English that the app never sends the message", () => {
-    expect(en["draft.notice"]).toMatch(/never sends the message anywhere/);
-    expect(en["draft.notice"]).toMatch(/Nothing else about the project or the client is sent/);
-  });
-
-  it("says in Azerbaijani that the app does not send the message anywhere", () => {
-    expect(az["draft.notice"]).toMatch(/heç yerə göndərmir/);
-    expect(az["draft.notice"]).toMatch(/başqa heç nə göndərilmir/);
-  });
-});
-
 describe("translate", () => {
   it("fills named values", () => {
     expect(translate("en", "session.signedInAs", { who: "Ada" })).toBe("Signed in as Ada.");
@@ -66,7 +53,7 @@ describe("translate", () => {
   });
 
   it("leaves an unknown {name} visible instead of printing undefined", () => {
-    expect(translate("en", "workspace.pick", {})).toBe("Pick {label}");
+    expect(translate("en", "session.signedInAs", {})).toBe("Signed in as {who}.");
   });
 });
 
@@ -74,7 +61,7 @@ function Probe() {
   const t = useT();
   return (
     <p>
-      {t("session.signOut")} / <T k="draft.copy" />
+      {t("session.signOut")} / <T k="session.signIn" />
     </p>
   );
 }
@@ -83,7 +70,7 @@ describe("the language in use", () => {
   it("is English until a person chooses", () => {
     render(<Probe />);
 
-    expect(screen.getByText("Sign out / Copy")).toBeInTheDocument();
+    expect(screen.getByText("Sign out / Sign in")).toBeInTheDocument();
   });
 
   it("switches to Azerbaijani with the EN | AZ buttons and says which is on", () => {
@@ -97,7 +84,7 @@ describe("the language in use", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "AZ" }));
 
-    expect(screen.getByText("Çıxış / Kopyala")).toBeInTheDocument();
+    expect(screen.getByText("Çıxış / Daxil ol")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AZ" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("group", { name: "Dil" })).toBeInTheDocument();
   });
@@ -137,7 +124,7 @@ describe("the language in use", () => {
 
     render(<Probe />);
 
-    expect(screen.getByText("Çıxış / Kopyala")).toBeInTheDocument();
+    expect(screen.getByText("Çıxış / Daxil ol")).toBeInTheDocument();
   });
 
   it("ignores a stored value it does not know", () => {
@@ -145,7 +132,7 @@ describe("the language in use", () => {
 
     render(<Probe />);
 
-    expect(screen.getByText("Sign out / Copy")).toBeInTheDocument();
+    expect(screen.getByText("Sign out / Sign in")).toBeInTheDocument();
   });
 
   it("changes every part of the page at once, not only the one that was clicked", () => {
@@ -159,7 +146,7 @@ describe("the language in use", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "AZ" }));
 
-    expect(screen.getAllByText("Çıxış / Kopyala")).toHaveLength(2);
+    expect(screen.getAllByText("Çıxış / Daxil ol")).toHaveLength(2);
   });
 
   // The first paint must be English even for a person who chose Azerbaijani: the server cannot know

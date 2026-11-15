@@ -14,9 +14,6 @@ Sual-Cavab ("question-answer" in Azerbaijani) keeps them in one place:
 - **A clear status:** open, asked, answered or dropped. Every answer records
   who gave it, when, and where.
 - **What's still open**, at a glance.
-- **A drafted message** for the client or a teammate: pick the open questions
-  and get a short message in Azerbaijani, with technical terms kept in English.
-  You review it and send it yourself.
 
 > Status: early. The first version is being built in the open, issue by issue.
 
@@ -234,7 +231,7 @@ same language, inside its rules; each item is a choice the owner can reject:
 
 ### Cleaning the sign-in counters (`purge_expired_cache`)
 
-The sign-in, member-add and drafting counters live in a database table (`throttle_cache`). Django only
+The sign-in and member-add counters live in a database table (`throttle_cache`). Django only
 removes expired rows once that table passes a million, so until then they pile up and every write counts
 the table (#40). `python manage.py purge_expired_cache` removes the expired ones:
 
@@ -336,7 +333,7 @@ you are not on is a 404, the same as one that does not exist.
   30 an hour per user, failures included. The count is exact even when requests
   arrive at the same moment (#41: each account's or user's check takes a PostgreSQL
   advisory lock for a few milliseconds, so parallel requests take turns; tested with
-  real threads, and the same for sign-in and drafting).
+  real threads, and the same for sign-in).
 
 ### When someone leaves: deactivate, do not delete (#39)
 
@@ -431,56 +428,16 @@ save button is offered again only if the question, as far as the page knows
 it can be copied; the hint says the answer was not saved). Re-opening an answered question keeps the old
 answer, shown as "Earlier answer".
 
-## Drafting a message (Claude)
-
-In the workspace (`/projects/<id>`; the older `/draft`, `/questions` and `/overview` addresses redirect to it): pick open or asked questions (up to 10) and get a
-**draft** message, in Azerbaijani with technical terms kept in English, as text
-in a box you can edit and copy. **The app never sends anything**: there is no
-email or chat integration, and a test fails if a module of the drafting package
-imports anything that can send (mail, sockets, HTTP clients; the Claude SDK is
-allowed in one file only).
-Nothing is stored: close the page and the draft is gone.
-
-**What goes to the Claude API** (owner's decision on #9): for each selected
-question its number, the question text, "why it matters" and "what it blocks",
-each cut at 1,500 characters. Never the project or client name, anyone's name or
-email, answers, statuses, dates or ids. Question text can still contain names if
-someone typed them there, so keep client details out of it, or ask Anthropic for
-zero data retention for your organization. The screen says what is sent.
-
-Who may use it: any member of the project (same rule as questions). Limits: 20
-drafts per user per hour (`DJANGO_DRAFT_RATE`), 30-second timeout, one retry (only for a timeout, a dropped
-connection, a 408/409/429 or a 5xx, and only if the server asks for a wait of 5 s or less).
-
-Set up (see `backend/.env.example`):
-
-- `ANTHROPIC_API_KEY`: from the environment of the server only, never in code,
-  logs or the browser. **Without it the draft button answers "not set up"
-  (503) and nothing else changes.**
-- `DRAFTING_MODEL`: defaults to `claude-sonnet-5-5`. **The server refuses to
-  start** if it names a Claude Fable or Claude Mythos model: Anthropic keeps
-  prompts and outputs of those for at least 30 days and offers no zero data
-  retention, and the owner decided drafting must not use them.
-- If Claude fails (timeout, rate limit, refusal, empty or cut-off answer) the
-  person sees "The draft could not be written. Try again in a minute." Nothing
-  the API sent back is shown or logged; the `drafting` log lines hold counts and
-  error class names, and `ANTHROPIC_LOG=debug` (which would log request bodies)
-  makes the server refuse to start. The API address is fixed in code, so an
-  `ANTHROPIC_BASE_URL` in the environment is ignored.
-
-Not checked by any test: a real call to the API (tests use a fake client). The
-first real draft has to be made by hand once the key is set.
-
 ## Language (English, Azerbaijani)
 
 The interface is English by default, with Azerbaijani as a second language (#71). An `EN | AZ` switch sits in the headers of the landing, sign-in, projects and workspace pages and at the top of the older pages; the choice is kept in the browser's local storage. `<html lang>` follows the choice on every page.
 
 - **Where the words live:** `frontend/lib/i18n/en.ts` (the master list of keys) and `az.ts` (same keys; a missing one is a compile error and a test failure). No library. Use `useT()` in a client component, or `<T k="..." />` in a server page. `{name}` in a text is filled in at run time.
 - **First paint is always English**: the server cannot know the choice, and the markup must match. A person who chose Azerbaijani sees it as soon as the page has loaded, after a brief English flash (accepted for v1).
-- **Never translated:** what a person typed (questions, answers) and the drafted message. The draft prompt already asks for Azerbaijani.
+- **Never translated:** what a person typed (questions, answers).
 - **Status words** come from the dictionaries (`status.open` and so on), one set per language, next to the one table of colours (`lib/status.ts`). They follow the language on every page, including pages whose other words are still English.
-- **The Azerbaijani wording was first written by Claude, not by a native speaker; the owner reviewed and changed it on 2026-11-10** (for example `Ləğv olunub` for a dropped question and `sahib` for an owner). Technical terms stay in English.
-- **Translated:** the landing page, the sign-in page and form, the projects page and its list and new-project form, the workspace (`/projects/[id]`: shell, members, how long a question has been open, question card, add and edit forms, answer form, draft panel and its error messages), the 404, the session status in every header, the home link's name, the status words and the waking-up note. The landing page's sample questions stay in English (a question is the ledger entry and is never translated, as in the design example) and its sample message is already Azerbaijani (as the drafting feature writes it); both are shown the same in both languages. **Still English** (things that cannot follow a browser choice): the page titles and social-card text (they are fixed when the page is built) and any message the server itself sends back (a refused status change, a validation error: shown as the server wrote it).
+- **The Azerbaijani wording was first written by Claude, not by a native speaker; the owner reviewed and changed it on 2026-11-10** (for example `Ləğv olunub` for a dropped question and `sahib` for an owner). Technical terms stay in English. **Exception, not yet reviewed by the owner:** `landing.lead` (both languages) was reworded on 2026-11-15 by Claude when drafting was removed (#115).
+- **Translated:** the landing page, the sign-in page and form, the projects page and its list and new-project form, the workspace (`/projects/[id]`: shell, members, how long a question has been open, question card, add and edit forms, answer form), the 404, the session status in every header, the home link's name, the status words and the waking-up note. The landing page's sample questions stay in English (a question is the ledger entry and is never translated, as in the design example). **Still English** (things that cannot follow a browser choice): the page titles and social-card text (they are fixed when the page is built) and any message the server itself sends back (a refused status change, a validation error: shown as the server wrote it).
 
 ## Staging on Render
 
@@ -537,9 +494,6 @@ has no backups (Render's free database was also deleted 30 days after creation).
   (the start command carries on without demo data). `DEMO_PASSWORD` must be
   12+ characters and pass Django's password checks (not all digits, not a
   common password).
-- Drafting is **off** until you add `ANTHROPIC_API_KEY` in the API service's
-  Environment tab; without it the draft button says "not set up". A real draft
-  there sends the demo question text to the Claude API, as anywhere else.
 
 ### The database is Supabase's, not Render's
 
@@ -639,7 +593,7 @@ on the next start).
 Blueprint sync kept the variable, and `scripts/smoke_test.py` against the staging frontend passed all 12 checks (sign-in as
 the demo owner and outsider, the project list and open counts, the still-open view, a misspelt status refused, the 404 rule,
 a wrong password refused). **Not checked:** the transaction pooler, the direct connection, a pause and a restore, behaviour
-under real traffic, drafting against this database.
+under real traffic.
 
 ### Backups and restore (#35)
 
@@ -753,9 +707,6 @@ unit test, not tried by hand). A check is about what the app wrote: it does not 
 - **Render's own free database expires 30 days after creation** (14 days to upgrade, then it and its data are deleted).
   Staging does not use one any more (see "The database is Supabase's" above); if you go back to one, it needs a
   `databases:` entry in `render.yaml` and a `fromDatabase` wiring, which were removed.
-- **A drafting reply can take up to about 135 seconds.** Render's documentation
-  states no limit on request duration, so whether a free instance allows it is
-  untested.
 - The API's own address is public (free services cannot receive private
   traffic); it answers only what the app's rules allow. Django's admin is
   **switched off** on it (`DJANGO_ADMIN_ENABLED=0`): a public host has no need of it. Its sign-in page is
@@ -765,8 +716,7 @@ unit test, not tried by hand). A check is about what the app wrote: it does not 
   by failing to sign in to it about ten times a minute (the limit counts every
   attempt); that is the accepted per-account design from #4, and it would make
   the smoke test fail.
-- Anyone with the demo password can create projects and, once a Claude key is
-  set, make paid drafting calls (20 an hour per demo account). Choose a
+- Anyone with the demo password can create projects. Choose a
   password you do not use anywhere else. If it leaks, changing `DEMO_PASSWORD` in Render is not enough
   now that the database persists: see "Changing the demo password" above.
 - Not known: which Host header Render's health check sends. If the first

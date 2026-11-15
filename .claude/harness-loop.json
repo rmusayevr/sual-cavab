@@ -11,10 +11,9 @@
     "cd backend && python manage.py test --noinput",
     "cd frontend && npm run lint && npm run typecheck && npm test && npm run build"
   ],
-  "risky": ["backend/accounts/", "migrations/", "backend/drafting/"],
+  "risky": ["backend/accounts/", "migrations/"],
   "stopFor": [
     "who can see or change a project",
-    "anything that sends a message instead of drafting one",
-    "what client data is sent to the drafting API"
+    "anything that sends a message from the app"
   ]
 }

@@ -44,17 +44,8 @@ for (const lang of ["en", "az"] as Language[]) {
       // question text is the ledger entry: English in both languages, like a typed question
       expect(within(list).getByText("Who can issue a refund — only admins, or support too?")).toBeInTheDocument();
       expect(within(list).getAllByText(t("status.open"), { exact: false })).toHaveLength(3);
-      for (const key of ["landing.eyebrow", "landing.lead", "landing.f1.title", "landing.f1.text", "landing.f2.title", "landing.f2.text", "landing.f3.title", "landing.f3.text", "landing.f4.title", "landing.f4.text", "landing.review.title", "landing.review.text"] as Key[])
+      for (const key of ["landing.eyebrow", "landing.lead", "landing.f1.title", "landing.f1.text", "landing.f2.title", "landing.f2.text", "landing.f3.title", "landing.f3.text"] as Key[])
         expect(screen.getByText(t(key)), key).toBeInTheDocument();
-    });
-
-    it("shows the sample message the same in both languages, as drafted", () => {
-      act(() => setLanguage(lang));
-      pending();
-
-      render(<HomePage />);
-
-      expect(screen.getByText(/Salam, Leyla xanım!/)).toBeInTheDocument();
     });
   });
 

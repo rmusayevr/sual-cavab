@@ -38,7 +38,6 @@ beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
-      if (url.endsWith("/draft/")) return json(200, { draft: "Invented draft text." });
       if (url.includes("/questions/")) return json(200, [q(1, "open"), q(2, "asked"), q(3, "answered"), q(4, "dropped")]);
       if (url.includes("/auth/me")) return json(200, { id: 1, email: "ada@example.invalid", name: "Ada" });
       return /^\/api\/projects\/\d+\/$/.test(url) ? json(200, project) : json(200, page([project]));
@@ -68,25 +67,8 @@ for (const lang of ["en", "az"] as Language[]) {
       for (const label of [t("workspace.all"), t("status.open"), t("status.asked"), t("status.answered"), t("status.dropped")])
         expect(within(filters).getByRole("button", { name: label })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: t("workspace.add") })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: t("draft.heading") })).toBeInTheDocument();
       expect(screen.getByRole("navigation", { name: t("session.yourProjects") })).toBeInTheDocument();
       expect(screen.getByText(t("workspace.selectPrompt"))).toBeInTheDocument();
-      expect(screen.getByRole("checkbox", { name: t("workspace.pick", { label: "Q1" }) })).toBeEnabled();
-    });
-
-    it("writes the draft panel's words, its notice and its buttons in the language", async () => {
-      render(<Workspace />);
-      fireEvent.click(await screen.findByRole("checkbox", { name: t("workspace.pick", { label: "Q1" }) }));
-
-      expect(screen.getByText(t("draft.tickedOne", { list: "Q1" }))).toBeInTheDocument();
-      expect(screen.getByText(t("draft.notice"))).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: t("draft.write") }));
-
-      expect(await screen.findByLabelText(t("draft.label"))).toHaveValue("Invented draft text.");
-      expect(screen.getByRole("button", { name: t("draft.copy") })).toBeInTheDocument();
-      expect(screen.getByText(t("draft.notSent"))).toBeInTheDocument();
-      // what the person (or the model) wrote is never translated
-      expect(screen.getByText("Invented question 1")).toBeInTheDocument();
     });
   });
 

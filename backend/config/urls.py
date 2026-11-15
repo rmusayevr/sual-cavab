@@ -7,7 +7,6 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls")),
     path("api/", include("projects.urls")),
     path("api/", include("questions.urls")),
-    path("api/", include("drafting.urls")),
 ]
 
 # The admin's sign-in shares the app's attempt limit (#45), and a public host can

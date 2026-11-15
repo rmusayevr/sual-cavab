@@ -1,8 +1,7 @@
 # Sual-Cavab
 
-Tracks the open questions a project is waiting on, and drafts short messages
-asking them. Backend: Django + DRF in `backend/`. Frontend: Next.js in
-`frontend/`. Database: PostgreSQL.
+Tracks the open questions a project is waiting on. Backend: Django + DRF in `backend/`.
+Frontend: Next.js in `frontend/`. Database: PostgreSQL.
 
 ## Branches
 
@@ -14,7 +13,6 @@ asking them. Backend: Django + DRF in `backend/`. Frontend: Next.js in
 
 - The repo is public. Demo and test data are invented. Never commit real client
   questions, names or messages.
-- Drafting never sends anything. It returns text for a person to review.
 - Who can see or change a project is a business rule: ask before changing it.
 
 ## Design

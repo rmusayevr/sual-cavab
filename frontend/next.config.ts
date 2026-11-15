@@ -13,17 +13,17 @@ const nextConfig: NextConfig = {
   // /api/x before the rewrite, and a POST would lose its body.
   skipTrailingSlashRedirect: true,
   // The proxy gives up on a backend request after 30 s by default and answers a
-  // plain 500. A draft can take two attempts plus a short wait (#9); the most it
-  // can take is WORST_CASE_SECONDS in backend/drafting/client.py (135 s). Keep
-  // this above it, or the browser sees a 500 while Django finishes a paid call
-  // nobody reads.
+  // plain 500. The first request after a free Render API has slept took 82 to 93 s
+  // while it woke (measured 2026-11-09, scripts/smoke_test.py), so keep this above that.
+  // (It was first sized for a drafting call, 135 s; drafting is gone, #115, the
+  // wake-up is what still needs it.)
   experimental: { proxyTimeout: 150_000 },
-  // The project page is the workspace (#70, #83). The older pages (draft, questions, overview) are
+  // The project page is the workspace (#70, #83). The older pages (questions, overview) are
   // gone: an old link or bookmark lands there. Temporary, not permanent: a browser keeps a permanent
   // redirect for good, and the workspace may still change. Both spellings are listed because
   // skipTrailingSlashRedirect (above) stops Next.js from treating them as one.
   async redirects() {
-    return ["draft", "questions", "overview"].flatMap((page) =>
+    return ["questions", "overview"].flatMap((page) =>
       ["", "/"].map((slash) => ({ source: `/projects/:id/${page}${slash}`, destination: "/projects/:id", permanent: false })),
     );
   },

@@ -64,7 +64,7 @@ export function useT() {
   return (key: Key, values?: Record<string, string | number>) => translate(language, key, values);
 }
 
-/** For a spot in JSX: `<T k="draft.copy" />`. */
+/** For a spot in JSX: `<T k="session.signOut" />`. */
 export function T({ k, values }: { k: Key; values?: Record<string, string | number> }): ReactNode {
   return useT()(k, values);
 }
