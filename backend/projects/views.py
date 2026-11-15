@@ -5,6 +5,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
+from answerlinks.services import revoke_links
+
 from .models import Membership, Project
 from .pagination import ProjectPagination
 from .permissions import lock_caller_membership, role_may_manage_members
@@ -118,4 +120,6 @@ class ProjectViewSet(
             if target in active_owners and len(active_owners) == 1:
                 raise ValidationError({"detail": "A project needs at least one active owner."})
             target.delete()
+            # Access that this person granted ends when they leave the project (#114).
+            revoke_links(project, revoked_by=request.user, created_by=target.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

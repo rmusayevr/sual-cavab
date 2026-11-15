@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "accounts",
     "projects",
     "questions",
+    "answerlinks",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -180,7 +181,7 @@ CACHES = {
     # then expired rows accumulate: `manage.py purge_expired_cache` removes them
     # (run at every start on Render, #40). DRF's read-then-write is made
     # exact for simultaneous requests by core.throttles.ExactCountMixin (#41). Needs
-    # `createcachetable`; without the table, sign-in and member-adds fail closed
+    # `createcachetable`; without the table, sign-in, member-adds and the answer link fail closed
     # with a 500, and `manage.py check --database default` (and `migrate`) warn with the
     # command (#47).
     "throttle": {
@@ -202,6 +203,11 @@ REST_FRAMEWORK = {
         "login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"),
         # 'Add member' attempts per user (projects.throttles.MemberAddThrottle).
         "member_add": os.environ.get("DJANGO_MEMBER_ADD_RATE", "30/hour"),
+        # The public answer link (answerlinks.throttles, #114): per link, not per address.
+        "answer_link_read": os.environ.get("DJANGO_ANSWER_LINK_READ_RATE", "300/hour"),
+        "answer_link_submit": os.environ.get("DJANGO_ANSWER_LINK_SUBMIT_RATE", "60/hour"),
+        # Requests whose token failed, all in one shared bucket (a valid link is never counted in it).
+        "answer_link_invalid": os.environ.get("DJANGO_ANSWER_LINK_INVALID_RATE", "120/min"),
     },
     # For any throttle keyed on the client address: how many proxies in front
     # *append* to X-Forwarded-For. Keep 0 (use the connection address) unless

@@ -56,6 +56,7 @@ class Answer(models.Model):
         MEETING = "meeting", "Meeting"
         EMAIL = "email", "Email"
         OTHER = "other", "Other"
+        LINK = "link", "Answer link"  # sent through a project's answer link, accepted by a member (#114)
 
     question = models.ForeignKey(Question, on_delete=models.PROTECT, related_name="answers")
     text = models.TextField()
