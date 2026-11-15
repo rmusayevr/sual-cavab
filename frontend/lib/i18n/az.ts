@@ -212,6 +212,12 @@ export const az: Record<Key, string> = {
   "submissions.restore": "Bərpa et",
   "submissions.restoreFailed": "Cavabı bərpa etmək alınmadı.",
 
+  "clientAccount.lead": "Layihə komandası bu suallara cavab gözləyir. Cavab verə bildiklərinizi yazın. Komanda göndərdiyiniz cavabın yanında adınızı görür və hansı cavabın saxlanılacağına özü qərar verir.",
+  "clientAccount.waiting": "Komandanın cavabını gözləyir",
+  "clientAccount.accepted": "Komanda bu cavabı qəbul etdi",
+  "clientAccount.earlier": "Əvvəlki cavablarınız",
+  "clientAccount.earlierHint": "Bundan sonra cavablandırılmış suallar. Yalnız özünüzün göndərdiyini görürsünüz.",
+  "clientAccount.projects": "Suallara cavab verdiyiniz layihələr",
   "client.eyebrow": "Sizin üçün suallar",
   "client.lead": "Layihə komandası bu sualların cavabını gözləyir. Bildiyiniz suallara cavab verin. Bir suala bir neçə cavab göndərə bilərsiniz.",
   "client.expires": "Bu link {when} vaxtınadək işləyir.",

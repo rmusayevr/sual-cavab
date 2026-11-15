@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { SIGNED_OUT_EVENT, apiFetch } from "@/lib/api";
 import { useT, type Key } from "@/lib/i18n";
+import type { ClientProject } from "@/lib/clientAccount";
 import { addProjects, hasMoreProjects, type Project, type ProjectPage } from "@/lib/projects";
 
 import { Alert } from "./ui/Alert";
@@ -16,7 +17,7 @@ import { EmptyState, Eyebrow, LedgerLoading } from "./ui/Ledger";
 
 type State =
   | { kind: "loading" }
-  | { kind: "ready"; projects: Project[]; total: number; page: number; pageSize: number; more: "idle" | "loading" | "error" }
+  | { kind: "ready"; projects: Project[]; clientProjects: ClientProject[]; total: number; page: number; pageSize: number; more: "idle" | "loading" | "error" }
   | { kind: "signed-out" }
   | { kind: "error" };
 
@@ -40,12 +41,21 @@ export default function ProjectList() {
   useEffect(() => {
     let cancelled = false;
     signedOutNow.current = false; // a new load: whatever it finds is the truth now
+    // The projects where this person only answers questions (#121). Read beside the team's list; if it cannot be
+    // read the team's projects are still shown, so it never fails the page.
+    const asClient: Promise<ClientProject[]> = apiFetch("/api/client/projects/")
+      .then(async (response) => {
+        const list = response.ok ? await response.json() : [];
+        return Array.isArray(list) ? (list as ClientProject[]) : [];
+      })
+      .catch(() => []);
     apiFetch("/api/projects/")
       .then(async (response) => {
+        const clientProjects = await asClient;
         if (cancelled || signedOutNow.current) return;
         if (response.ok) {
           const body = (await response.json()) as ProjectPage;
-          setState({ kind: "ready", projects: body.results, total: body.count, page: body.page, pageSize: body.page_size, more: "idle" });
+          setState({ kind: "ready", projects: body.results, clientProjects, total: body.count, page: body.page, pageSize: body.page_size, more: "idle" });
         }
         else if (response.status === 401 || response.status === 403) setState({ kind: "signed-out" });
         else setState({ kind: "error" });
@@ -98,9 +108,12 @@ export default function ProjectList() {
     }
   }
 
+  // A person who is only a client has no team project to show and cannot start one (the server refuses it).
+  const onlyClient = state.projects.length === 0 && state.clientProjects.length > 0;
+
   return (
-    <div className="grid gap-10 lg:grid-cols-[1fr_22rem] lg:items-start">
-      {state.projects.length === 0 ? (
+    <div className={onlyClient ? "grid gap-10" : "grid gap-10 lg:grid-cols-[1fr_22rem] lg:items-start"}>
+      {onlyClient ? null : state.projects.length === 0 ? (
         <EmptyState strip={false}>
           <p>{t("projects.empty")}</p>
         </EmptyState>
@@ -147,7 +160,23 @@ export default function ProjectList() {
         {state.more === "error" && <Alert tone="error">{t("projects.moreError")}</Alert>}
         </div>
       )}
-      <NewProjectForm onCreated={added} />
+      {onlyClient ? null : <NewProjectForm onCreated={added} />}
+      {state.clientProjects.length > 0 && (
+        <section aria-label={t("clientAccount.projects")} className="grid min-w-0 gap-3 lg:col-span-full">
+          <h2 className="text-xl font-semibold">{t("clientAccount.projects")}</h2>
+          <ul className="m-0 grid list-none gap-3 p-0">
+            {state.clientProjects.map((p) => (
+              <li key={p.id}>
+                <Card>
+                  <Link href={`/answering/${p.id}`} className="inline-flex min-h-11 items-center text-lg font-semibold hover:underline">
+                    {p.name}
+                  </Link>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

@@ -118,6 +118,15 @@ describe("SubmissionsPanel (#114)", () => {
     expect(within(second).getByText(/not verified/)).toBeInTheDocument();
   });
 
+  it("marks a dismissed answer from a client account as one too", async () => {
+    api({ pending: [], dismissed: [{ ...submission(3, { source: "account", submitter_name: "Ada Client" }), state: "dismissed" }] });
+    open();
+
+    fireEvent.click(await screen.findByRole("button", { name: t("submissions.showDismissed") }));
+
+    expect(await screen.findByText("From Ada Client (client account) · 2026-11-15")).toBeInTheDocument();
+  });
+
   it("shows what the client typed as plain text, never as markup", async () => {
     const script = "<script>window.__pwned = 1</script><b>bold</b>";
     api({ pending: [submission(1, { text: script, submitter_name: "<i>Leyla</i>" })], dismissed: [] });

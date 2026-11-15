@@ -210,6 +210,12 @@ export const en = {
   "submissions.restore": "Restore",
   "submissions.restoreFailed": "Could not restore the answer.",
 
+  "clientAccount.lead": "The project team is waiting for answers to these questions. Answer what you can. The team sees your name next to what you send, and decides which answer is kept.",
+  "clientAccount.waiting": "Waiting for the team",
+  "clientAccount.accepted": "The team accepted this answer",
+  "clientAccount.earlier": "Your earlier answers",
+  "clientAccount.earlierHint": "Questions that have been answered since. You see only what you sent.",
+  "clientAccount.projects": "Projects where you answer questions",
   "client.eyebrow": "Questions for you",
   "client.lead": "The project team is waiting for answers to these questions. Answer what you can. You may send more than one answer to a question.",
   "client.expires": "This link works until {when}.",
