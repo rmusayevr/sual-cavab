@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { plainName } from "@/lib/answerLink";
@@ -53,10 +53,16 @@ export function QuestionItem({
   question,
   base,
   onChanged,
+  inline = false,
+  extra,
 }: {
   question: FullQuestion;
   base: string;
   onChanged: (q: FullQuestion) => void;
+  /** Shown under the question's own row in the list (#121): no card of its own and no repeat of its label, status and text. */
+  inline?: boolean;
+  /** Shown with the answers, not while the question is being edited: the answers waiting for a decision (#121). */
+  extra?: ReactNode;
 }) {
   const t = useT();
   const [mode, setMode] = useState<Mode>("view");
@@ -136,9 +142,8 @@ export function QuestionItem({
   }
 
   const id = `q${question.id}`;
-  return (
-    <li data-testid="question">
-      <Card className="grid gap-3">
+  const content = (
+    <>
         {mode === "edit" ? (
           <QuestionForm
             idPrefix={`edit-${question.id}`}
@@ -150,17 +155,22 @@ export function QuestionItem({
           />
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs text-primary">{question.label}</span>
-              <StatusChip status={question.status} />
-            </div>
-            <p>{question.text}</p>
+            {!inline && (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs text-primary">{question.label}</span>
+                  <StatusChip status={question.status} />
+                </div>
+                <p>{question.text}</p>
+              </>
+            )}
             {question.why_it_matters && <p className="text-sm text-muted-foreground">{t("question.why", { text: question.why_it_matters })}</p>}
             {question.blocks && <p className="text-sm text-muted-foreground">{t("question.blocks", { text: question.blocks })}</p>}
             {question.current_answer && <AnswerView answer={question.current_answer} heading={t("question.answer")} />}
             {question.previous_answers.map((a) => (
               <AnswerView key={a.id} answer={a} heading={t("question.earlier")} />
             ))}
+            {extra}
           </>
         )}
 
@@ -209,7 +219,13 @@ export function QuestionItem({
           </div>
         )}
         {message && <Alert tone="error">{message}</Alert>}
-      </Card>
+    </>
+  );
+
+  if (inline) return <div data-testid="question" className="grid gap-3">{content}</div>;
+  return (
+    <li data-testid="question">
+      <Card className="grid gap-3">{content}</Card>
     </li>
   );
 }

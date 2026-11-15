@@ -146,15 +146,48 @@ describe("Workspace (#70)", () => {
     expect(document.querySelector('a[href^="mailto:"], a[href^="sms:"], a[href*="wa.me"], a[href*="t.me"]')).toBeNull();
   });
 
-  it("shows the selected question on the right, with its reason and what it blocks", async () => {
+  it("opens the question below its own row, with its reason and what it blocks", async () => {
     api();
     render(<Workspace />);
-    fireEvent.click(await screen.findByRole("button", { name: /Q2.*Who approves refunds/ }));
+    const row = await screen.findByRole("button", { name: /Q2.*Who approves refunds/ });
+    expect(screen.queryByRole("region", { name: "Selected question" })).not.toBeInTheDocument();
+
+    fireEvent.click(row);
 
     const detail = screen.getByRole("region", { name: "Selected question" });
-    expect(within(detail).getByText("Who approves refunds?")).toBeInTheDocument();
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(row.closest("li")).toContainElement(detail); // inside the same card, below the question
     expect(within(detail).getByText(/Why 2/)).toBeInTheDocument();
     expect(within(detail).getByText(/Blocks 2/)).toBeInTheDocument();
+    expect(within(detail).queryByText("Who approves refunds?")).not.toBeInTheDocument(); // the row above already says it
+  });
+
+  it("closes the question when its row is pressed again, and opens only one at a time", async () => {
+    api();
+    render(<Workspace />);
+    const q1 = await screen.findByRole("button", { name: /Q1.*Which payment providers/ });
+    const q2 = screen.getByRole("button", { name: /Q2.*Who approves refunds/ });
+
+    fireEvent.click(q1);
+    fireEvent.click(q2);
+    expect(screen.getAllByRole("region", { name: "Selected question" })).toHaveLength(1);
+    expect(q1).toHaveAttribute("aria-expanded", "false");
+    expect(q2.closest("li")).toContainElement(screen.getByRole("region", { name: "Selected question" }));
+
+    fireEvent.click(q2);
+
+    expect(screen.queryByRole("region", { name: "Selected question" })).not.toBeInTheDocument();
+    expect(q2).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("has nothing on the right-hand side for the selected question any more", async () => {
+    api();
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("button", { name: /Q1.*Which payment providers/ }));
+
+    const aside = screen.getByRole("complementary");
+    expect(within(aside).queryByRole("region", { name: "Selected question" })).not.toBeInTheDocument();
+    expect(within(aside).getByRole("heading", { name: "Add a question" })).toBeInTheDocument();
   });
 
   it("has exactly one carpet strip", async () => {
@@ -458,7 +491,7 @@ describe("Workspace (#70)", () => {
     expect(within(detail).getByLabelText("Answer")).toHaveValue("Thirty days, in writing."); // kept through the reload
     expect(within(detail).queryByRole("button", { name: "Save answer" })).not.toBeInTheDocument();
     expect(within(detail).getByText(/kept below so you can copy it/)).toBeInTheDocument();
-    expect(within(detail).getAllByText("Dropped").length).toBeGreaterThan(0); // the card shows the question as it is now
+    expect(within(detail.closest("li")!).getAllByText("Dropped").length).toBeGreaterThan(0); // the row shows the question as it is now
   });
 
   // #91: a 401 or 403 means the session ended (the backend answers 404 for a project the person is not

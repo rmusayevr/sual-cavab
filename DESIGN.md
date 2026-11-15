@@ -63,8 +63,9 @@ UI, JetBrains Mono for ids, counts, eyebrows and status words (`font-mono text-x
 ## Layout
 
 Pages are `max-w-6xl` (the workspace `90rem`) with `px-4` on a phone and `px-6` above. The workspace is
-three panes at `lg` (`15rem` navy project rail, questions, `24rem` selected question and add form) and
-stacks on a phone: rail, list, detail, add. **One carpet strip per screen**; `pattern-lattice`
+three panes at `lg` (`15rem` navy project rail, questions, `24rem` add form and the answer-link cards) and
+stacks on a phone: rail, list, add, cards. A question opens **below its own row** in the list, not in a pane of its
+own (#121); pressing the row again closes it. **One carpet strip per screen**; `pattern-lattice`
 is the only full-surface pattern, and only on navy. At 360 px nothing scrolls sideways (long words wrap
 with `overflow-wrap:anywhere`).
 

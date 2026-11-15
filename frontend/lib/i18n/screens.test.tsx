@@ -70,7 +70,7 @@ for (const lang of ["en", "az"] as Language[]) {
         expect(within(filters).getByRole("button", { name: label })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: t("workspace.add") })).toBeInTheDocument();
       expect(screen.getByRole("navigation", { name: t("session.yourProjects") })).toBeInTheDocument();
-      expect(screen.getByText(t("workspace.selectPrompt"))).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: t("workspace.selected") })).not.toBeInTheDocument(); // nothing is open until a question is pressed
     });
   });
 

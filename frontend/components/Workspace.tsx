@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { SIGNED_OUT_EVENT, apiFetch } from "@/lib/api";
 import { cx } from "@/lib/cx";
@@ -10,6 +10,7 @@ import { ageKey, daysOpen, type Member, type Project, type ProjectPage, type Que
 import type { FullQuestion } from "@/lib/questions";
 import { STATUSES } from "@/lib/status";
 import { LanguageSwitch, useT } from "@/lib/i18n";
+import { useSubmissions } from "@/lib/useSubmissions";
 
 import AnswerLinkPanel from "./AnswerLinkPanel";
 import MembersPanel from "./MembersPanel";
@@ -17,6 +18,7 @@ import QuestionForm, { type QuestionFields, type SubmitResult } from "./Question
 import { QUESTION_FIELDS, QuestionItem, failure } from "./QuestionItem";
 import SessionStatus from "./SessionStatus";
 import SubmissionsPanel from "./SubmissionsPanel";
+import WaitingAnswers from "./WaitingAnswers";
 import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
@@ -37,8 +39,9 @@ type Filter = "all" | QuestionStatus;
 /**
  * One screen for a project: the person's projects (rail: the first page of the list, plus this project
  * if it is not on it, #49), the project's questions with counts and
- * filters (middle), the selected question and the add form (right). The counts and filters are worked
- * out from the questions already loaded.
+ * filters (middle; a question opens below its row, with its answers and the answers clients sent for it, #121),
+ * and the add form and the answer-link cards (right). The counts and filters are worked out from the questions
+ * already loaded.
  */
 export default function Workspace() {
   const { id } = useParams<{ id: string }>();
@@ -107,6 +110,37 @@ export default function Workspace() {
     return t(key, values);
   };
 
+  const replace = (updated: FullQuestion) => {
+    setState((s) =>
+      s.kind === "ready" ? { ...s, questions: s.questions.map((q) => (q.id === updated.id ? updated : q)) } : s,
+    );
+  };
+
+  /** A submission became this question's answer: read the question again so its card shows the answer. */
+  async function reloadQuestion(number: number) {
+    try {
+      const response = await apiFetch(`${base}${number}/`);
+      if (response.ok) replace((await response.json()) as FullQuestion);
+    } catch {
+      // the answer is saved; the card catches up the next time the page loads
+    }
+  }
+
+  // What clients sent through the answer link: one state for the answers inside the questions and the summary card.
+  const submissions = useSubmissions(id, { enabled: state.kind === "ready", onAccepted: reloadQuestion });
+
+  // The open question's own area. After a decision the pressed button is gone, and "Open" in the summary card jumps
+  // here: the keyboard goes to this area, which also scrolls it into view.
+  const detail = useRef<HTMLElement>(null);
+  const [focusDetail, setFocusDetail] = useState(false);
+  useEffect(() => {
+    if (focusDetail) {
+      detail.current?.focus();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFocusDetail(false);
+    }
+  }, [focusDetail, selected]);
+
   const shell = (body: ReactNode) => (
     <div className="min-h-screen bg-background [overflow-wrap:anywhere]">
       <header className="bg-navy pattern-lattice text-navy-foreground">
@@ -162,13 +196,6 @@ export default function Workspace() {
   const project = projects.find((p) => p.id === currentId)!;
   const count = (s: QuestionStatus) => questions.filter((q) => q.status === s).length;
   const shown = filter === "all" ? questions : questions.filter((q) => q.status === filter);
-  const current = questions.find((q) => q.number === selected) ?? null;
-
-  const replace = (updated: FullQuestion) => {
-    setState((s) =>
-      s.kind === "ready" ? { ...s, questions: s.questions.map((q) => (q.id === updated.id ? updated : q)) } : s,
-    );
-  };
 
   async function add(values: QuestionFields): Promise<SubmitResult> {
     const response = await apiFetch(base, { method: "POST", body: values });
@@ -178,16 +205,6 @@ export default function Workspace() {
       return null;
     }
     return await failure(response, t("error.addQuestion"), [...QUESTION_FIELDS]);
-  }
-
-  /** A submission became this question's answer: read the question again so its card shows the answer. */
-  async function reloadQuestion(number: number) {
-    try {
-      const response = await apiFetch(`${base}${number}/`);
-      if (response.ok) replace((await response.json()) as FullQuestion);
-    } catch {
-      // the answer is saved; the card catches up the next time the page loads
-    }
   }
 
   return shell(
@@ -280,18 +297,26 @@ export default function Workspace() {
           <ul className="grid list-none gap-2">
             {shown.map((q) => {
               const waiting = q.status === "open" || q.status === "asked";
+              const isOpen = selected === q.number;
+              const sentHere = submissions.pending.filter((s) => s.question_number === q.number);
               return (
                 <li key={q.id}>
-                  <Card className={cx("flex items-start gap-3 p-3 sm:p-3", selected === q.number && "border-primary")}>
+                  <Card className={cx("grid gap-3 p-3 sm:p-3", isOpen && "border-primary")}>
                     <button
                       type="button"
-                      onClick={() => setSelected(q.number)}
-                      aria-pressed={selected === q.number}
-                      className="m-0 grid min-h-11 min-w-0 flex-1 cursor-pointer gap-1 border-0 bg-transparent p-0 text-left text-inherit [font:inherit]"
+                      onClick={() => setSelected(isOpen ? null : q.number)}
+                      aria-expanded={isOpen}
+                      aria-controls={`question-${q.number}`}
+                      className="m-0 grid min-h-11 min-w-0 cursor-pointer gap-1 border-0 bg-transparent p-0 text-left text-inherit [font:inherit]"
                     >
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs text-primary">{q.label}</span>
                         <StatusChip status={q.status} />
+                        {sentHere.length > 0 && (
+                          <span className="rounded-md bg-saffron px-2 py-0.5 font-mono text-xs text-navy">
+                            {t("submissions.waiting", { n: sentHere.length })}
+                          </span>
+                        )}
                       </span>
                       <span>{q.text}</span>
                       {waiting && (
@@ -300,6 +325,24 @@ export default function Workspace() {
                         </span>
                       )}
                     </button>
+                    {isOpen && (
+                      <section
+                        id={`question-${q.number}`}
+                        ref={detail}
+                        tabIndex={-1}
+                        aria-label={t("workspace.selected")}
+                        className="grid gap-3 border-t pt-3"
+                      >
+                        <QuestionItem
+                          key={q.id}
+                          inline
+                          question={q}
+                          base={base}
+                          onChanged={replace}
+                          extra={<WaitingAnswers items={sentHere} submissions={submissions} onSettled={() => setFocusDetail(true)} />}
+                        />
+                      </section>
+                    )}
                   </Card>
                 </li>
               );
@@ -309,26 +352,19 @@ export default function Workspace() {
       </main>
 
       <aside className="grid min-w-0 content-start gap-4">
-        <section aria-label={t("workspace.selected")} className="grid gap-3">
-          {current ? (
-            <ul className="grid list-none">
-              <QuestionItem key={current.id} question={current} base={base} onChanged={replace} />
-            </ul>
-          ) : (
-            <Card>
-              <p className="text-muted-foreground">
-                {t("workspace.selectPrompt")}
-              </p>
-            </Card>
-          )}
-        </section>
-
         <Card className="grid gap-4">
           <h2 className="text-lg font-semibold">{t("workspace.add")}</h2>
           <QuestionForm idPrefix="add" submitLabel={t("form.add")} busyLabel={t("form.adding")} clearOnSuccess onSubmit={add} />
         </Card>
 
-        <SubmissionsPanel projectId={project.id} onAccepted={reloadQuestion} />
+        <SubmissionsPanel
+          submissions={submissions}
+          onOpen={(number) => {
+            setFilter("all");
+            setSelected(number);
+            setFocusDetail(true);
+          }}
+        />
         <AnswerLinkPanel projectId={project.id} />
 
       </aside>
