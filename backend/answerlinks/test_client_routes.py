@@ -219,6 +219,23 @@ class ClientSendingTests(ClientTestCase):
         self.assertIn(ada.post(url, {"text": "x"}, format="json").status_code, (401, 403))
         self.assertEqual(AnswerSubmission.objects.count(), 0)
 
+    def test_a_client_whose_role_changes_mid_request_cannot_send(self):
+        from unittest import mock
+
+        from .client_views import ClientAnswersView
+
+        real_initial = ClientAnswersView.initial
+
+        def initial(view, request, *args, **kwargs):
+            real_initial(view, request, *args, **kwargs)
+            Membership.objects.filter(project=self.project, user=self.ada).update(role=Membership.Role.MEMBER)
+
+        with mock.patch.object(ClientAnswersView, "initial", initial):
+            response = self.send(self.ada)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(AnswerSubmission.objects.count(), 0)
+
     def test_the_two_clients_of_a_project_do_not_share_their_caps(self):
         for _ in range(5):
             self.assertEqual(self.send(self.ada).status_code, 201)

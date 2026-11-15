@@ -105,6 +105,12 @@ class UnavailableLinkTests(LinkTestCase):
 
         self.assert_unavailable(**with_token(self.token))
 
+    def test_a_link_stops_working_when_its_creator_becomes_a_client_of_the_project(self):
+        # A client account is not on the team (#121): a link a person made as a member must not outlive that.
+        self.project.memberships.filter(user=self.owner).update(role="client")
+
+        self.assert_unavailable(**with_token(self.token))
+
     def test_a_link_stops_working_when_its_creator_is_deactivated(self):
         self.owner.is_active = False
         self.owner.save()
