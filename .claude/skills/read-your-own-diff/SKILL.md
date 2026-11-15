@@ -59,4 +59,4 @@ old name in a string, a comment, or a doc?
 
 ## Incidents
 
-_None recorded yet. `/promote-lesson` appends real occurrences here._
+- **sual-cavab, PR #116 (2026-11-15; third time, vault `windows-edit-script-escapes`).** Edit scripts on Windows changed files with no error: Python text mode rewrote an LF file as CRLF (a change of about 90 lines showed in `git diff --stat` as a whole-file diff), PowerShell 5.1 `Out-File -Encoding utf8` added a BOM, and an unscoped `sed` touched mocks it should not have. Read `git diff --stat` after every scripted edit, not only before the commit (this skill loads at commit time, and two of that day's slips never reached a diff): a line count far above what you meant to change is line endings or encoding until shown otherwise.
