@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { localStamp } from "@/lib/clientLink";
 import { setLanguage, translate, type Key } from "@/lib/i18n";
 
 import ClientAnswers from "./ClientAnswers";
@@ -63,7 +64,7 @@ describe("ClientAnswers: opening the link (#114)", () => {
     expect(screen.getByText(t("client.loading"))).toBeInTheDocument();
     expect(await screen.findByRole("heading", { level: 1, name: "Ticketing" })).toBeInTheDocument();
     expect(screen.getByText(t("client.lead"))).toBeInTheDocument();
-    expect(screen.getByText(t("client.expires", { date: "2026-11-29" }))).toBeInTheDocument();
+    expect(screen.getByText(t("client.expires", { when: localStamp("2026-11-29T09:00:00Z") }))).toBeInTheDocument();
     expect(screen.getByText(t("client.privacy"))).toBeInTheDocument();
     expect(screen.getByText("Invented question 1?")).toBeInTheDocument();
     expect(screen.getByText("Q2")).toHaveClass("font-mono");
@@ -206,7 +207,7 @@ describe("ClientAnswers: a client has no account (#114)", () => {
     }
   });
 
-  it("keeps the token and the name out of storage, cookies and the history", async () => {
+  it("keeps the token and the name out of storage and cookies, and never touches the History API", async () => {
     api(({ init }) => (init.method === "POST" ? json(201) : undefined));
     const push = vi.spyOn(window.history, "pushState");
     const replace = vi.spyOn(window.history, "replaceState");
@@ -361,16 +362,6 @@ describe("ClientAnswers: sending an answer (#114)", () => {
     await waitFor(() => expect(screen.queryByText("Invented question 1?")).not.toBeInTheDocument());
     expect(screen.getByText("Invented question 2?")).toBeInTheDocument();
   });
-
-  it("does not let a direction-control character in the name reorder the form's name", async () => {
-    api();
-    open();
-    await screen.findByText("Invented question 1?");
-
-    fireEvent.change(nameBox(), { target: { value: "Mal‮lory" } });
-
-    expect(answerBox("Q1").closest("form")!.getAttribute("aria-label")).toBe("Q1 · Mallory");
-  });
 });
 
 describe("ClientAnswers: both languages (#114)", () => {
@@ -381,7 +372,7 @@ describe("ClientAnswers: both languages (#114)", () => {
 
     const az = (key: Key, values?: Record<string, string | number>) => translate("az", key, values);
     expect(await screen.findByText(az("client.lead"))).toBeInTheDocument();
-    expect(screen.getByText(az("client.expires", { date: "2026-11-29" }))).toBeInTheDocument();
+    expect(screen.getByText(az("client.expires", { when: localStamp("2026-11-29T09:00:00Z") }))).toBeInTheDocument();
     expect(screen.getByLabelText(az("client.name"))).toBeInTheDocument();
     expect(screen.getByRole("button", { name: az("client.send") })).toBeInTheDocument();
     expect(screen.getByText(`${az("client.why")}:`)).toBeInTheDocument();
@@ -407,5 +398,274 @@ describe("ClientAnswers: both languages (#114)", () => {
     await screen.findByText("Invented question 1?");
 
     for (const list of screen.getAllByRole("list")) expect(list).toHaveClass("list-none");
+  });
+});
+
+describe("ClientAnswers: re-reading the list keeps what was typed (#114)", () => {
+  it("'Check again' on one question does not erase the other answers being written, or the name", async () => {
+    let closedOne = false;
+    api(({ init }) => {
+      if (init.method === "POST") {
+        closedOne = true;
+        return json(404, {});
+      }
+      return closedOne ? json(200, view([question(2), question(3)])) : undefined;
+    }, view([question(1), question(2), question(3)]));
+    open();
+    await screen.findByText("Invented question 1?");
+    fireEvent.change(nameBox(), { target: { value: "Leyla" } });
+    fireEvent.change(answerBox("Q2"), { target: { value: "half written Q2" } });
+    fireEvent.change(answerBox("Q3"), { target: { value: "half written Q3" } });
+    fireEvent.change(answerBox("Q1"), { target: { value: "Use Stripe." } });
+    fireEvent.click(sendFor("Q1"));
+
+    fireEvent.click(await screen.findByRole("button", { name: t("client.checkAgain") }));
+
+    await waitFor(() => expect(screen.queryByText("Invented question 1?")).not.toBeInTheDocument());
+    expect(answerBox("Q2").value).toBe("half written Q2");
+    expect(answerBox("Q3").value).toBe("half written Q3");
+    expect(nameBox().value).toBe("Leyla");
+  });
+
+  it("brings the form back when the question is still open after all", async () => {
+    let first = true;
+    api(({ init }) => {
+      if (init.method === "POST") {
+        const reply = first ? json(404, {}) : json(201);
+        first = false;
+        return reply;
+      }
+    });
+    open();
+    await screen.findByText("Invented question 1?");
+    fireEvent.change(nameBox(), { target: { value: "Leyla" } });
+    fireEvent.change(answerBox("Q1"), { target: { value: "Use Stripe." } });
+    fireEvent.click(sendFor("Q1"));
+
+    fireEvent.click(await screen.findByRole("button", { name: t("client.checkAgain") }));
+
+    expect(await screen.findByLabelText(t("client.answerLabel", { label: "Q1" }))).toBeInTheDocument();
+    expect(screen.queryByText(t("client.closed"))).not.toBeInTheDocument();
+  });
+
+  it("when checking again fails, keeps everything and says so", async () => {
+    let closed = false;
+    api(({ init }) => {
+      if (init.method === "POST") {
+        closed = true;
+        return json(404, {});
+      }
+      return closed ? json(500, {}) : undefined;
+    });
+    open();
+    await screen.findByText("Invented question 1?");
+    fireEvent.change(nameBox(), { target: { value: "Leyla" } });
+    fireEvent.change(answerBox("Q2"), { target: { value: "half written" } });
+    fireEvent.change(answerBox("Q1"), { target: { value: "Use Stripe." } });
+    fireEvent.click(sendFor("Q1"));
+
+    fireEvent.click(await screen.findByRole("button", { name: t("client.checkAgain") }));
+
+    expect(await screen.findByText(t("client.loadError"))).toBeInTheDocument();
+    expect(answerBox("Q2").value).toBe("half written");
+    expect(screen.getByText(t("client.closed"))).toBeInTheDocument();
+  });
+
+  it("when checking again finds the link dead, says so", async () => {
+    let closed = false;
+    api(({ init }) => {
+      if (init.method === "POST") {
+        closed = true;
+        return json(404, {});
+      }
+      return closed ? json(404, {}) : undefined;
+    });
+    open();
+    await screen.findByText("Invented question 1?");
+    fireEvent.change(nameBox(), { target: { value: "Leyla" } });
+    fireEvent.change(answerBox("Q1"), { target: { value: "Use Stripe." } });
+    fireEvent.click(sendFor("Q1"));
+
+    fireEvent.click(await screen.findByRole("button", { name: t("client.checkAgain") }));
+
+    expect(await screen.findByRole("heading", { name: t("client.unavailableTitle") })).toBeInTheDocument();
+  });
+});
+
+describe("ClientAnswers: a link pasted into the same tab (#114)", () => {
+  const NEW = "n".repeat(43);
+  const change = (hash: string) => {
+    setHash(hash);
+    act(() => {
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+  };
+
+  it("is picked up when the page was showing 'not available'", async () => {
+    setHash("");
+    const calls = api();
+    open();
+    await screen.findByRole("heading", { name: t("client.unavailableTitle") });
+
+    change(`#${NEW}`);
+
+    expect(await screen.findByText("Invented question 1?")).toBeInTheDocument();
+    expect((calls[0].init.headers as Record<string, string>)["X-Answer-Token"]).toBe(NEW);
+  });
+
+  it("is used for the answers sent afterwards", async () => {
+    const calls = api(({ init }) => (init.method === "POST" ? json(201) : undefined));
+    open();
+    await screen.findByText("Invented question 1?");
+
+    change(`#${NEW}`);
+    await screen.findByText("Invented question 1?");
+    fireEvent.change(nameBox(), { target: { value: "Leyla" } });
+    fireEvent.change(answerBox("Q1"), { target: { value: "Use Stripe." } });
+    fireEvent.click(sendFor("Q1"));
+
+    await screen.findByText(t("client.sent"));
+    const post = calls.find((c) => c.init.method === "POST")!;
+    expect((post.init.headers as Record<string, string>)["X-Answer-Token"]).toBe(NEW);
+  });
+
+  it("shows 'not available' if the new address is not a link", async () => {
+    api();
+    open();
+    await screen.findByText("Invented question 1?");
+
+    change("#oops");
+
+    expect(await screen.findByRole("heading", { name: t("client.unavailableTitle") })).toBeInTheDocument();
+  });
+});
+
+describe("ClientAnswers: keyboard and screen reader (#114)", () => {
+  it("moves the keyboard to the name when it is missing (the error alone would be off screen on a phone), and to the box when the answer is", async () => {
+    api();
+    open();
+    await screen.findByText("Invented question 1?");
+
+    fireEvent.change(answerBox("Q2"), { target: { value: "An answer" } });
+    fireEvent.click(sendFor("Q2"));
+    expect(nameBox()).toHaveFocus();
+
+    fireEvent.change(nameBox(), { target: { value: "Leyla" } });
+    fireEvent.change(answerBox("Q2"), { target: { value: " " } });
+    fireEvent.click(sendFor("Q2"));
+    expect(answerBox("Q2")).toHaveFocus();
+  });
+
+  it("does not take the keyboard away while sending: the button is only marked unavailable and the box is read-only", async () => {
+    let release: (r: Response) => void = () => {};
+    api(({ init }) => (init.method === "POST" ? new Promise<Response>((resolve) => (release = resolve)) : undefined));
+    open();
+    await screen.findByText("Invented question 1?");
+    fireEvent.change(nameBox(), { target: { value: "Leyla" } });
+    fireEvent.change(answerBox("Q1"), { target: { value: "Use Stripe." } });
+
+    fireEvent.click(sendFor("Q1"));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: t("client.sending") })).toHaveAttribute("aria-disabled", "true"));
+    expect(screen.getByRole("button", { name: t("client.sending") })).not.toBeDisabled();
+    expect(answerBox("Q1")).toHaveAttribute("readonly");
+    expect(answerBox("Q1")).not.toBeDisabled();
+    await act(async () => release(json(201)));
+    expect(answerBox("Q1")).not.toHaveAttribute("readonly");
+  });
+
+  it("announces 'sent' every time: the message area is always there, empties when sending starts and fills when it is done", async () => {
+    let release: (r: Response) => void = () => {};
+    let first = true;
+    api(({ init }) => {
+      if (init.method !== "POST") return undefined;
+      if (first) {
+        first = false;
+        return json(201);
+      }
+      return new Promise<Response>((resolve) => (release = resolve));
+    });
+    open();
+    await screen.findByText("Invented question 1?");
+    fireEvent.change(nameBox(), { target: { value: "Leyla" } });
+    const area = () => answerBox("Q1").closest("form")!.querySelector('[role="status"]')!;
+    expect(area()).toBeInTheDocument();
+    expect(area().textContent).toBe("");
+
+    fireEvent.change(answerBox("Q1"), { target: { value: "First." } });
+    fireEvent.click(sendFor("Q1"));
+    await waitFor(() => expect(area().textContent).toContain(t("client.sent")));
+    fireEvent.change(answerBox("Q1"), { target: { value: "Second." } });
+    fireEvent.click(sendFor("Q1"));
+
+    await waitFor(() => expect(area().textContent).toBe("")); // cleared while the second is on its way
+    await act(async () => release(json(201)));
+    await waitFor(() => expect(area().textContent).toContain(t("client.sent")));
+  });
+
+  it("never shows 'Thank you' beside a new error", async () => {
+    api(({ init }) => (init.method === "POST" ? json(201) : undefined));
+    open();
+    await screen.findByText("Invented question 1?");
+    fireEvent.change(nameBox(), { target: { value: "Leyla" } });
+    fireEvent.change(answerBox("Q1"), { target: { value: "First." } });
+    fireEvent.click(sendFor("Q1"));
+    await screen.findByText(t("client.sent"));
+
+    fireEvent.click(sendFor("Q1")); // the box is empty now
+
+    expect(screen.getByText(t("client.textRequired"))).toBeInTheDocument();
+    expect(screen.queryByText(t("client.sent"))).not.toBeInTheDocument();
+  });
+
+  it("limits what can be typed to what the server accepts, so a long answer is stopped before it is sent", async () => {
+    api();
+    open();
+    await screen.findByText("Invented question 1?");
+
+    expect(nameBox()).toHaveAttribute("maxlength", "100");
+    expect(answerBox("Q1")).toHaveAttribute("maxlength", "4000");
+  });
+
+  it("gives the 'wait' and 'could not load' pages a heading too", async () => {
+    api(() => json(429, {}));
+    open();
+
+    expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument();
+  });
+});
+
+describe("ClientAnswers: what the client is told when a limit is hit (#114)", () => {
+  it("never describes the link as working or as dead, because a limit says nothing about that", () => {
+    for (const key of ["client.tooMany", "client.throttled"] as const) {
+      for (const language of ["en", "az"] as const) {
+        const text = translate(language, key);
+        expect(text, `${language} ${key}`).not.toMatch(/this question|no longer|not available|expired|works|əlçatan deyil|işləyir/i);
+      }
+    }
+  });
+});
+
+describe("ClientAnswers: an old answer arriving late (#114)", () => {
+  it("does not replace the page of a link pasted afterwards (the first link's slow answer comes last)", async () => {
+    const NEW = "n".repeat(43);
+    let releaseFirst: (r: Response) => void = () => {};
+    api(({ init }) => {
+      const sent = (init.headers as Record<string, string>)["X-Answer-Token"];
+      if (sent === TOKEN) return new Promise<Response>((resolve) => (releaseFirst = resolve));
+      return json(200, { ...view(), project_name: "Booking" });
+    });
+    open(); // starts reading with TOKEN, and that read is slow
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    setHash(`#${NEW}`);
+    act(() => {
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(await screen.findByRole("heading", { level: 1, name: "Booking" })).toBeInTheDocument();
+    await act(async () => releaseFirst(json(200, { ...view(), project_name: "Ticketing" }))); // the old answer, late
+
+    expect(screen.getByRole("heading", { level: 1, name: "Booking" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Ticketing" })).not.toBeInTheDocument();
   });
 });

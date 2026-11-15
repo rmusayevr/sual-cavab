@@ -209,7 +209,7 @@ export const en = {
 
   "client.eyebrow": "Questions for you",
   "client.lead": "The project team is waiting for answers to these questions. Answer what you can. You may send more than one answer to a question.",
-  "client.expires": "This link works until {date}.",
+  "client.expires": "This link works until {when}.",
   "client.privacy": "The team reads your name and your answers. Please do not send passwords or other secrets.",
   "client.name": "Your name",
   "client.nameHint": "The team sees it next to your answers. It is not checked.",
@@ -223,7 +223,7 @@ export const en = {
   "client.sent": "Thank you. Your answer was sent to the team.",
   "client.closed": "This question can no longer take answers, or the link has stopped working. Check again, or ask the team for a new link.",
   "client.checkAgain": "Check again",
-  "client.tooMany": "Too many answers are waiting for this question right now. Please try again later.",
+  "client.tooMany": "Your answer could not be sent just now: too many requests or answers are waiting. Please try again later.",
   "client.failed": "Your answer could not be sent. Try again.",
   "client.loading": "Loading the questions…",
   "client.unavailableTitle": "This link is not available",

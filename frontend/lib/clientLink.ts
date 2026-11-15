@@ -30,6 +30,24 @@ export function tokenFromHash(hash: string): string | null {
   return TOKEN.test(token) ? token : null;
 }
 
+/**
+ * A moment as the person reading it sees it: "2026-11-29 13:00" in their own time zone (or `timeZone`, for tests).
+ * The date part of the server's UTC time can be a day off for a client who is not on UTC.
+ */
+export function localStamp(iso: string, timeZone?: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+}
+
 export function isClientView(value: unknown): value is ClientView {
   if (!value || typeof value !== "object") return false;
   const v = value as Partial<ClientView>;

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { isClientView, loadQuestions, sendAnswer, tokenFromHash } from "./clientLink";
+import { isClientView, loadQuestions, localStamp, sendAnswer, tokenFromHash } from "./clientLink";
 
 const TOKEN = "k".repeat(43);
 const json = (status: number, body?: unknown) =>
@@ -116,5 +116,17 @@ describe("isClientView", () => {
     expect(isClientView({ project_name: "x" })).toBe(false);
     expect(isClientView(null)).toBe(false);
     expect(isClientView([])).toBe(false);
+  });
+});
+
+describe("localStamp", () => {
+  it("shows a moment in the reader's own time zone, so the date is not a day off", () => {
+    expect(localStamp("2026-11-29T09:00:00Z", "Asia/Baku")).toBe("2026-11-29 13:00");
+    expect(localStamp("2026-11-29T09:00:00Z", "America/Los_Angeles")).toBe("2026-11-29 01:00");
+    expect(localStamp("2026-11-29T01:00:00Z", "America/Los_Angeles")).toBe("2026-11-28 17:00"); // the UTC date would say the 29th
+  });
+
+  it("writes midnight as 00:00, never 24:00", () => {
+    expect(localStamp("2026-11-29T00:00:00Z", "UTC")).toBe("2026-11-29 00:00");
   });
 });

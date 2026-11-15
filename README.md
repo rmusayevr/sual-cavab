@@ -460,8 +460,13 @@ direction-control characters are removed from typed names before they are shown.
   why it matters and what it blocks (as plain text) and a box for an answer. A client can send several answers to
   one question. It has **no sign-in, no session and no link to the rest of the app**; a dead link of any kind shows
   one message ("This link is not available"), and a throttled request (429) says to wait, without claiming the link
-  works. Every request is sent without cookies and without a Referer, and the page is served with
-  `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow` and is marked `noindex`.
+  works. Every request is sent without cookies and without a Referer. The token, the name and the answers are kept in
+  memory only, but **the token stays in the address bar and so in the browser's history** (that is what lets a reload
+  or a bookmark work, and browsers may sync history across a person's devices): a client on a shared computer should
+  close the tab and clear it. Typed answers survive "Check again" on another question; a new link pasted into the
+  same tab is picked up. The expiry is shown in the client's own time zone. The page is configured to be served with
+  `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow` and is marked `noindex` (set in
+  `next.config.ts` and tested there; **not looked at on the deployed site**).
 - **What the client can do:** exactly two routes, `GET /api/answer-link/questions/` and
   `POST /api/answer-link/questions/<number>/answers/` with `{"text", "name"}` (text up to 4000 characters, name up to
   100; the name is typed by the client and **never verified**). The token goes in the `X-Answer-Token` header; cookies
