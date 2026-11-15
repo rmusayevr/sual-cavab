@@ -33,7 +33,7 @@ This says only what has been run (#43). "Not run" is not "does not work": it is 
 | **PostgreSQL** | 17: the Compose file, CI, and Render's managed database (`postgresMajorVersion: "17"`), which the smoke test of #10 ran against | Any other major version. |
 | **Operating system** | Ubuntu (CI: the backend and frontend checks, with PostgreSQL as a service container, not Compose; and Render's Linux) and Windows (the author's machine: everything, including Compose on Docker Desktop) | macOS, and Linux on a desktop. |
 | **Docker Compose file** | Windows with Docker Desktop | Linux, macOS, and a Docker without IPv6 (the file binds `[::1]` as well as `127.0.0.1`; see the note under [Local setup](#local-setup)). |
-| **Browsers** | Some screens, in English only, in a headless Edge against the production build with a mock API and invented data: the landing, sign-in, projects and 404 pages and the workspace as first built (#74, #76, #79). And, by hand on the real staging site (reported by the owner on 2026-11-15, #32, #121): the screens, including the client accounts, answering, restoring an earlier answer and the Azerbaijani wording | Which browsers and devices the owner used was not recorded; a phone, long words and keyboard-only use were not specifically reported. Nothing here has been checked by a script in a real browser since the headless runs above. |
+| **Browsers** | Some screens, in English only, in a headless Edge against the production build with a mock API and invented data: the landing, sign-in, projects and 404 pages and the workspace as first built (#74, #76, #79). And, by hand on the real staging site, as the owner said in conversation on 2026-11-15 (see #32): the new features and the screens | Which browsers and devices the owner used was not recorded; a phone, long words and keyboard-only use were not specifically reported. Nothing has been checked by a script in a browser since the headless Edge runs above. |
 
 The version numbers below are what the tools and packages declare or what CI uses, not a promise that every version in the range has been tried.
 
@@ -194,9 +194,9 @@ dot colours, `frontend/lib/status.ts`. A new screen uses these instead of inline
   and JetBrains Mono have every Azerbaijani letter tested. A capital Ə in body
   text falls back to the next font in the stack.
 - Tailwind's reset ("preflight") is deliberately not imported: it changes every
-  element that has no class (headings, lists, form controls), and no one has yet
-  looked at every screen in a browser. The components set their own font, border
-  and `list-none` instead. Add the reset only after a click-through (#32).
+  element that has no class (headings, lists, form controls), and nobody has checked
+  every screen in a browser one by one (the owner tried the screens by hand on 2026-11-15, without a list). The components set their own font, border
+  and `list-none` instead. Add the reset only after a screen-by-screen check (#32).
 - Keep your own base CSS inside `@layer base`; unlayered CSS beats every
   utility class.
 
@@ -211,7 +211,7 @@ same language, inside its rules; each item is a choice the owner can reject:
   successful sign-in the person goes back to it (#96). `next` is used only if it is a path inside the app
   (`frontend/lib/safeNext.ts`: no `https://...`, `//host`, backslash or control character, and never `/login`
   itself); anything else, or no `next`, goes to `/` as before. The landing page's own Sign in button is unchanged.
-  Tested with the component tests; not tried in a browser against the real backend.
+  Tested with the component tests; not tried in a browser by the author against the real backend; whether the owner used `next` on staging was not recorded.
 - **Header band** (`components/ui/AppHeader.tsx`): the landing header made
   reusable (wordmark, session actions, eyebrow, title, a sentence, carpet seam);
   the projects page uses it.
@@ -321,13 +321,13 @@ not a member (404).
   to the field or above the form in the server's words, which stay English. After a change the list is read again
   from the server; an owner who removes themselves is asked a different question ("Remove yourself... an owner will have to add you again") and is then taken to the projects list. Changing a member's role in
   place, and showing who is deactivated, are not built (the API has neither). Tested with the API mocked
-  (`MembersPanel.test.tsx`) and against the server's real rules in the backend tests; not tried in a browser.
+  (`MembersPanel.test.tsx`) and against the server's real rules in the backend tests; not tried in a browser by the author (the owner said they tried the screens on staging, 2026-11-15).
 - **The project list comes in pages of 25** (#49), by name then id. `GET /api/projects/?page=2` answers
   `{count, page, page_size, results}`; the page size cannot be chosen, and a page number that does not exist is a 404 (DRF also accepts `?page=last`).
   The projects screen shows "Showing 25 of 30" and a **Show more** button. The project screen asks for its own
   project (`/api/projects/<id>/`, a 404 means not found; `/projects/05` is project 5) and its side rail shows the first page, plus the open
   project if it is further down, with an "All projects" link. "Show more" uses page numbers, so if projects are removed or renamed while the list is open, one can be missed until the page is reloaded. Who sees what is unchanged. Tested with 30
-  projects in the backend and with the screens' mocks; not tried with hundreds of real projects or in a browser.
+  projects in the backend and with the screens' mocks; not tried with hundreds of real projects, or in a browser by the author.
 - The last active owner of a project cannot be removed (a deactivated owner
   does not count, because they cannot manage the project).
 - Superusers have no special access through the API; they use `/admin/`.
@@ -506,9 +506,9 @@ direction-control characters are removed from typed names before they are shown.
   link). And a flood of bad tokens fills the shared bucket, so a client with a dead link then sees `429` instead of
   the usual `404`: the client page must not read a `429` as "this link works, try later" for a link it never loaded.
 - **Stored about the client:** the typed name and answer only. No address, no browser details.
-- **Not checked:** nothing here has been run against Render or Supabase, and **no screen of this feature has been
-  looked at in a real browser** (layout, focus order, a phone, long words, the Azerbaijani wording): only the DOM tests
-  have seen it. See issue #32.
+- **Not checked:** nothing here has been run against Render or Supabase, and **the author has not looked at any screen of this feature
+  in a browser** (layout, focus order, a phone, long words): only the DOM tests have. The owner said on 2026-11-15 that
+  they tried the new features by hand on staging; whether that included the answer-link page was not recorded. See issue #32.
 
 ## Client accounts (#121)
 
@@ -533,7 +533,7 @@ choosing "client"; they need an account first, like any member). The private lin
 - **Going back:** reversing `projects/0003` is refused while any client membership exists (the previous release would treat
   clients as team members); remove them first. `answerlinks/0002` cannot be reversed once an account submission exists.
 - **"Dismiss all waiting"** also dismisses answers from client accounts (each can be restored).
-- **Not checked:** not run against Render or Supabase, and no screen has been looked at in a real browser; the migrations
+- **Not checked:** the author did not run it against Render or Supabase or look at any screen in a browser (the owner tried the features on staging, 2026-11-15; both services showed Deployed, so the migrations very likely ran); the migrations
   (`projects/0003`, `questions/0004`, `answerlinks/0002`) run against Supabase when the staging service starts.
   An already-open tab of an older version may still send a name or an old field; the server ignores them.
 
@@ -545,7 +545,7 @@ The interface is English by default, with Azerbaijani as a second language (#71)
 - **First paint is always English**: the server cannot know the choice, and the markup must match. A person who chose Azerbaijani sees it as soon as the page has loaded, after a brief English flash (accepted for v1).
 - **Never translated:** what a person typed (questions, answers).
 - **Status words** come from the dictionaries (`status.open` and so on), one set per language, next to the one table of colours (`lib/status.ts`). They follow the language on every page, including pages whose other words are still English.
-- **The Azerbaijani wording was first written by Claude, not by a native speaker; the owner reviewed and changed it on 2026-11-10** (for example `Ləğv olunub` for a dropped question and `sahib` for an owner). Technical terms stay in English. **Exception, not yet reviewed by the owner:** `landing.lead` (both languages) was reworded on 2026-11-15 by Claude when drafting was removed (#115), and the strings of the answer-link cards and the client's page (`answerLink.*`, `submissions.*`, `channel.link`, `client.*`) were written by Claude in the same way (#114).
+- **The Azerbaijani wording was first written by Claude, not by a native speaker; the owner reviewed and changed it on 2026-11-10** (for example `Ləğv olunub` for a dropped question and `sahib` for an owner). Technical terms stay in English. **Reviewed later, on the owner's word:** `landing.lead` (both languages; reworded by Claude on 2026-11-15 when drafting was removed, #115) and the strings of the answer-link cards, the client pages and the client-account screens (`answerLink.*`, `submissions.*`, `channel.link`, `client.*`, `clientAccount.*`; written by Claude, #114 and #121) were written by Claude in the same way; the owner said on 2026-11-15 that they had reviewed the Azerbaijani wording and found it fine (the owner's statement in conversation, not a line-by-line record).
 - **Translated:** the landing page, the sign-in page and form, the projects page and its list and new-project form, the workspace (`/projects/[id]`: shell, members, how long a question has been open, question card, add and edit forms, answer form), the 404, the session status in every header, the home link's name, the status words and the waking-up note. The landing page's sample questions stay in English (a question is the ledger entry and is never translated, as in the design example). **Still English** (things that cannot follow a browser choice): the page titles and social-card text (they are fixed when the page is built) and any message the server itself sends back (a refused status change, a validation error: shown as the server wrote it).
 
 ## Staging on Render
