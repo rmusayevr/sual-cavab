@@ -11,9 +11,7 @@ import { StatusChip } from "./ui/StatusChip";
 import { Wordmark } from "./ui/Wordmark";
 
 // The landing page, from the owner's design example (#69). Everything on it is invented text: the
-// project, the questions and the drafted message are not from any client. The sample message is
-// already Azerbaijani with English technical terms, as the drafting feature writes it, so it is
-// shown the same in both languages.
+// project and the questions are not from any client.
 
 // Question text is the ledger entry: it is written in English and is not translated (DESIGN.md
 // section 7), like the questions a person types in the app. Only the status words follow the language.
@@ -29,7 +27,6 @@ const FEATURES: Array<[string, Key, Key]> = [
   ["01", "landing.f1.title", "landing.f1.text"],
   ["02", "landing.f2.title", "landing.f2.text"],
   ["03", "landing.f3.title", "landing.f3.text"],
-  ["04", "landing.f4.title", "landing.f4.text"],
 ];
 
 export default function Landing() {
@@ -82,7 +79,7 @@ export default function Landing() {
       </header>
 
       <main>
-        <section className="mx-auto grid max-w-6xl gap-x-0 gap-y-10 px-6 py-24 md:grid-cols-4 md:gap-y-0">
+        <section className="mx-auto grid max-w-6xl gap-x-0 gap-y-10 px-6 py-24 md:grid-cols-3 md:gap-y-0">
           {FEATURES.map(([n, title, description]) => (
             <div key={n} className="border-t-2 border-primary pt-5 md:pr-6">
               <span className="font-mono text-xs text-primary">{n}</span>
@@ -90,24 +87,6 @@ export default function Landing() {
               <p className="mt-2 text-sm text-muted-foreground">{t(description)}</p>
             </div>
           ))}
-        </section>
-
-        <section className="mx-auto max-w-6xl px-6 pb-24">
-          <div className="grid gap-10 rounded-lg bg-navy p-10 text-navy-foreground md:grid-cols-2 md:items-center">
-            <div>
-              <h2 className="text-4xl font-semibold">{t("landing.review.title")}</h2>
-              <p className="mt-4 opacity-80">{t("landing.review.text")}</p>
-            </div>
-            <blockquote className="rounded-md border-l-4 border-saffron bg-card p-6 text-sm leading-relaxed text-card-foreground">
-              Salam, Leyla xanım! Bir neçə sualımız var:
-              <br />
-              1. Kim <b>refund</b> edə bilər — yalnız <b>admin</b>, yoxsa <b>support</b> da?
-              <br />
-              2. Bir sifarişdə maksimum neçə bilet ola bilər?
-              <br />
-              Təşəkkürlər!
-            </blockquote>
-          </div>
         </section>
       </main>
 

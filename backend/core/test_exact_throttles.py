@@ -21,7 +21,6 @@ from rest_framework.test import APIClient
 
 from accounts.throttles import AdminLoginThrottle, LoginPerAccountThrottle
 from core.testing import invented_password
-from drafting.throttles import DraftThrottle
 from projects.throttles import MemberAddThrottle
 
 EXTRA = 15  # more simultaneous requests than the limit allows
@@ -94,12 +93,6 @@ class ExactThrottleTests(TransactionTestCase):
 
         self.assertEqual(allowed, limit)
 
-    def test_drafts_per_user_stop_at_exactly_the_limit(self):
-        # Each draft is a paid API call: this is the one where an overshoot costs money.
-        limit, allowed = self.burst_allowed(DraftThrottle, self.signed_in_as(8))
-
-        self.assertEqual(allowed, limit)
-
     def test_a_check_waits_only_for_the_same_account(self):
         # Hold the lock of ada's key the way a check in progress does. Another account's check must go straight
         # through; a second check for ada must wait (so the lock is on the account's own key, not on all of them).
@@ -150,7 +143,7 @@ class ExactThrottleTests(TransactionTestCase):
 
     def test_what_the_exact_count_depends_on_is_still_true(self):
         # The lock is held by the transaction opened around a check, so a request-wide transaction would hold it
-        # for the whole request (a draft runs for minutes); and exactness needs READ COMMITTED, where each
+        # for the whole request (a slow request would hold it); and exactness needs READ COMMITTED, where each
         # statement sees the previous holder's commit (REPEATABLE READ let 35 of 20 through in review of #104).
         self.assertFalse(settings.DATABASES["default"].get("ATOMIC_REQUESTS"))
         with connection.cursor() as cursor:

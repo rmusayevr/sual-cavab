@@ -1,7 +1,7 @@
 /**
  * English: the default language and the master list of keys (#71). Azerbaijani (az.ts) must have
  * exactly the same keys; the type and a test both check it. `{name}` marks a value filled in at
- * run time. What a person typed (questions, answers, drafts) is never put through here.
+ * run time. What a person typed (questions, answers) is never put through here.
  */
 export const en = {
   "lang.label": "Language",
@@ -42,7 +42,6 @@ export const en = {
   "workspace.loadError": "Could not load the project.",
   "workspace.filterGroup": "Filter questions",
   "workspace.all": "All",
-  "workspace.pick": "Pick {label}",
   "workspace.none": "No questions yet. Add the first one.",
   "workspace.noneWithStatus": "No questions with this status.",
   "workspace.selectPrompt": "Select a question to see why it matters, what it blocks and its answer.",
@@ -92,7 +91,7 @@ export const en = {
   "landing.eyebrow": "sual · cavab — question · answer",
   "landing.h1a": "How many questions are ",
   "landing.h1b": "still open?",
-  "landing.lead": "Every client question in one ledger — numbered, tracked, and ready to send in Azerbaijani.",
+  "landing.lead": "Every client question in one ledger — numbered and tracked until it is answered.",
   "landing.start": "Start tracking",
   "landing.sample": "Sample questions",
   "landing.f1.title": "Questions per project",
@@ -101,10 +100,6 @@ export const en = {
   "landing.f2.text": "Open, asked, answered or dropped — with who, when and where.",
   "landing.f3.title": "Open at a glance",
   "landing.f3.text": "One number per project. No more digging through chats.",
-  "landing.f4.title": "Drafted messages",
-  "landing.f4.text": "Short Azerbaijani text, technical terms kept in English.",
-  "landing.review.title": "You review it. You send it.",
-  "landing.review.text": "Pick the open questions — Sual-Cavab writes the message. Nothing leaves without you.",
 
   "projects.eyebrow": "Ledger",
   "projects.title": "Your projects",
@@ -157,28 +152,6 @@ export const en = {
   "age.one": "open for 1 day",
   "age.many": "open for {n} days",
 
-  "draft.err.noSetup": "Drafting is not set up on this server.",
-  "draft.err.rateLimited": "You have asked for a lot of drafts. Try again later.",
-  "draft.err.badGateway": "The draft could not be written. Try again in a minute.",
-  "draft.err.notAvailable": "This project is not available.",
-  "draft.err.signedOut": "This project is not available, or you have been signed out. Sign in again.",
-  "draft.err.failed": "Could not write the draft.",
-
-  "draft.heading": "Draft a message",
-  "draft.tickPrompt": "Tick up to {max} open or asked questions.",
-  "draft.tickedOne": "1 question ticked: {list}.",
-  "draft.tickedMany": "{n} questions ticked: {list}.",
-  "draft.notice":
-    "The text of the selected questions (the question, why it matters and what it blocks) is sent to Claude to write the draft. Nothing else about the project or the client is sent. The app never sends the message anywhere: you copy it and send it yourself.",
-  "draft.write": "Write a draft",
-  "draft.writing": "Writing…",
-  "draft.rewrite": "Write a new draft (replaces the one below)",
-  "draft.label": "Draft (edit it before you send it)",
-  "draft.stale": "The ticked questions have changed since this draft was written.",
-  "draft.copy": "Copy",
-  "draft.copied": "Copied.",
-  "draft.copyFailed": "Could not copy. Select the text and copy it yourself.",
-  "draft.notSent": "Nothing has been sent. This draft is not saved: copy it before you leave the page.",
 } as const;
 
 export type Key = keyof typeof en;

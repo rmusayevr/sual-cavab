@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { Activity } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Workspace from "./Workspace";
@@ -63,17 +62,12 @@ const members = [
   { user_id: 2, email: "member@example.invalid", name: "", role: "member", added_at: "2026-01-02T00:00:00Z" },
 ];
 
-let draftBody: unknown = null;
 let served: typeof questions = questions;
 function api(overrides: Record<string, () => Response> = {}) {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string, init?: RequestInit) => {
+    vi.fn(async (url: string) => {
       for (const [part, make] of Object.entries(overrides)) if (url.includes(part)) return make();
-      if (url.endsWith("/draft/")) {
-        draftBody = JSON.parse(String(init?.body));
-        return json(200, { draft: "Salam, bir neçə sualımız var." });
-      }
       if (url.includes("/questions/")) return json(200, served);
       if (url.endsWith("/members/")) return json(200, members);
       return projectsReply(url);
@@ -84,7 +78,6 @@ function api(overrides: Record<string, () => Response> = {}) {
 describe("Workspace (#70)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    draftBody = null;
     served = questions;
   });
 
@@ -124,15 +117,15 @@ describe("Workspace (#70)", () => {
     expect(screen.getByText("Which currency do we show?")).toBeInTheDocument();
   });
 
-  it("lets only open and asked questions be picked", async () => {
+  it("has no drafting and no ticking left: no draft box, no checkboxes, no write button", async () => {
     api();
     render(<Workspace />);
     await screen.findByText("Which payment providers are allowed?");
 
-    expect(screen.getByRole("checkbox", { name: /Q1/ })).toBeEnabled();
-    expect(screen.getByRole("checkbox", { name: /Q2/ })).toBeEnabled();
-    expect(screen.getByRole("checkbox", { name: /Q3/ })).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: /Q4/ })).toBeDisabled();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /draft/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /draft/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Claude/)).not.toBeInTheDocument();
   });
 
   it("shows the selected question on the right, with its reason and what it blocks", async () => {
@@ -144,41 +137,6 @@ describe("Workspace (#70)", () => {
     expect(within(detail).getByText("Who approves refunds?")).toBeInTheDocument();
     expect(within(detail).getByText(/Why 2/)).toBeInTheDocument();
     expect(within(detail).getByText(/Blocks 2/)).toBeInTheDocument();
-  });
-
-  it("writes a draft for the picked questions, in order, and offers to edit and copy it", async () => {
-    api();
-    render(<Workspace />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: /Q2/ }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Q1/ }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
-
-    const box = await screen.findByLabelText(/Draft \(edit it/);
-    expect(box).toHaveValue("Salam, bir neçə sualımız var.");
-    expect(draftBody).toEqual({ questions: [1, 2] });
-    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
-  });
-
-  it("says what is sent to Claude, and never offers to send the message", async () => {
-    api();
-    render(<Workspace />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: /Q1/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
-    await screen.findByLabelText(/Draft \(edit it/);
-
-    expect(screen.getByText(/is sent to Claude to write the draft/)).toBeInTheDocument();
-    expect(screen.getByText(/Nothing has been sent/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /send|mail|whatsapp/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /send|mail|whatsapp/i })).not.toBeInTheDocument();
-  });
-
-  it("keeps the write button off until a question is picked", async () => {
-    api();
-    render(<Workspace />);
-    await screen.findByText("Which payment providers are allowed?");
-
-    expect(screen.getByRole("button", { name: "Write a draft" })).toBeDisabled();
   });
 
   it("has exactly one carpet strip", async () => {
@@ -201,57 +159,6 @@ describe("Workspace (#70)", () => {
     render(<Workspace />);
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Could not load the project."));
-  });
-
-  // Review of #79: Next keeps a page it was left in the background, with its state, and loads the
-  // questions again when it comes back. A question answered meanwhile must not stay ticked.
-  it("drops a ticked question that was answered while the page was in the background", async () => {
-    api();
-    const view = (mode: "visible" | "hidden") => (
-      <Activity mode={mode}>
-        <Workspace />
-      </Activity>
-    );
-    const { rerender } = render(view("visible"));
-    fireEvent.click(await screen.findByRole("checkbox", { name: /Q1/ }));
-    expect(screen.getByRole("button", { name: "Write a draft" })).toBeEnabled();
-
-    rerender(view("hidden"));
-    served = questions.map((x) => (x.number === 1 ? { ...x, status: "answered" } : x));
-    rerender(view("visible"));
-
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Q1/ })).toBeDisabled());
-    expect(screen.getByRole("checkbox", { name: /Q1/ })).not.toBeChecked();
-    expect(screen.getByRole("button", { name: "Write a draft" })).toBeDisabled();
-  });
-
-  it("unticks a question once it is answered in the detail pane", async () => {
-    api();
-    render(<Workspace />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: /Q1/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Q1.*Which payment providers/ }));
-    // the status change answers with the question as the server now has it
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => json(200, { ...questions[0], status: "dropped" })),
-    );
-
-    const detail = screen.getByRole("region", { name: "Selected question" });
-    fireEvent.click(await within(detail).findByRole("button", { name: /drop/i }));
-
-    await waitFor(() => expect(screen.getByRole("button", { name: "Write a draft" })).toBeDisabled());
-    expect(screen.getByText(/Tick up to 10/)).toBeInTheDocument();
-  });
-
-  it("names the ticked questions, also the ones a filter hides", async () => {
-    api();
-    render(<Workspace />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: /Q2/ }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Q1/ }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Answered" }));
-
-    expect(screen.getByText("2 questions ticked: Q1, Q2.")).toBeInTheDocument();
   });
 
   // #83: what the old overview and Still open pages showed, now in the workspace.
@@ -449,34 +356,6 @@ describe("Workspace (#70)", () => {
     expect(screen.getByLabelText("Question")).toHaveValue("Q?");
   });
 
-  it("allows at most ten questions in one draft, and the other rows then look unavailable", async () => {
-    served = Array.from({ length: 11 }, (_, n) => q(n + 1, "open", `Open question ${n + 1}`));
-    api();
-    render(<Workspace />);
-    await screen.findByText("Open question 1");
-
-    for (let n = 1; n <= 10; n++) fireEvent.click(screen.getByRole("checkbox", { name: `Pick Q${n}` }));
-
-    expect(screen.getByRole("checkbox", { name: "Pick Q11" })).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: "Pick Q10" })).toBeEnabled(); // a ticked one can be unticked
-    fireEvent.click(screen.getByRole("checkbox", { name: "Pick Q10" }));
-    expect(screen.getByRole("checkbox", { name: "Pick Q11" })).toBeEnabled();
-  });
-
-  it("says that writing again replaces the draft, and warns when the ticked questions no longer match it", async () => {
-    api();
-    render(<Workspace />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Pick Q1" }));
-    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
-    await screen.findByLabelText(/Draft \(edit it/);
-    expect(screen.getByRole("button", { name: "Write a new draft (replaces the one below)" })).toBeInTheDocument();
-    expect(screen.queryByText("The ticked questions have changed since this draft was written.")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("checkbox", { name: "Pick Q2" }));
-
-    expect(screen.getByText("The ticked questions have changed since this draft was written.")).toBeInTheDocument();
-  });
-
   it("lets a long question without spaces shrink inside its row", async () => {
     served = [q(1, "open", "https://example.invalid/a/very/long/link/that/has/no/spaces/at/all/ever/and/keeps/going")];
     api();
@@ -484,105 +363,6 @@ describe("Workspace (#70)", () => {
 
     const button = (await screen.findByText(/very\/long\/link/)).closest("button")!;
     expect(button).toHaveClass("min-w-0");
-  });
-
-  // Review of #90: protections the old draft and questions pages' tests gave, which the first move lost.
-  const fetchWithDraft = (draftAnswer: () => Response | Promise<Response>) =>
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string) => {
-        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
-        if (url.endsWith("/draft/")) return draftAnswer();
-        if (url.includes("/questions/")) return json(200, served);
-        if (url.endsWith("/members/")) return json(200, members);
-        return projectsReply(url);
-      }),
-    );
-
-  it("keeps the picked questions and the write button after a failed draft, and shows no draft", async () => {
-    fetchWithDraft(() => json(502, {}));
-    render(<Workspace />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Pick Q1" }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("The draft could not be written. Try again in a minute.");
-    expect(screen.getByRole("checkbox", { name: "Pick Q1" })).toBeChecked();
-    expect(screen.getByRole("button", { name: "Write a draft" })).toBeEnabled(); // not stuck on "Writing…"
-    expect(screen.queryByLabelText("Draft (edit it before you send it)")).not.toBeInTheDocument();
-  });
-
-  it("offers no way to send, mail, share or post anything, with or without a draft, and says the app sends nothing", async () => {
-    fetchWithDraft(() => json(200, { draft: "Invented draft." }));
-    render(<Workspace />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Pick Q1" }));
-    const sendWords = /send|e-?mail|share|post|whatsapp|telegram|sms|mailto/i;
-    const shareLinks = 'a[href^="mailto:"], a[href^="sms:"], a[href^="whatsapp:"], a[href^="tg:"], a[href*="wa.me"], a[href*="t.me"]';
-    const check = () => {
-      for (const b of screen.getAllByRole("button")) expect(b.textContent ?? "", "button").not.toMatch(sendWords);
-      for (const l of screen.queryAllByRole("link")) expect(l.textContent ?? "", "link").not.toMatch(sendWords);
-      expect(document.querySelector(shareLinks)).toBeNull();
-    };
-    check();
-
-    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
-    await screen.findByLabelText("Draft (edit it before you send it)");
-    check();
-
-    // the wording is checked as written (not through the dictionary), so deleting the guarantee fails here
-    expect(screen.getByText(/The app never sends the message anywhere: you copy it and send it yourself\./)).toBeInTheDocument();
-    expect(screen.getByText(/Nothing else about the project or the client is sent\./)).toBeInTheDocument();
-    expect(screen.getByText(/Nothing has been sent\./)).toBeInTheDocument();
-  });
-
-  it("stops saying Copied once the text in the box is edited", async () => {
-    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(async () => {}) } });
-    fetchWithDraft(() => json(200, { draft: "Invented draft." }));
-    render(<Workspace />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Pick Q1" }));
-    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Copy" }));
-    expect(await screen.findByText("Copied.")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Draft (edit it before you send it)"), { target: { value: "Invented draft, edited." } });
-
-    expect(screen.queryByText("Copied.")).not.toBeInTheDocument();
-  });
-
-  it("tells the person to copy by hand when the browser refuses to copy", async () => {
-    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(async () => { throw new Error("denied"); }) } });
-    fetchWithDraft(() => json(200, { draft: "Invented draft." }));
-    render(<Workspace />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Pick Q1" }));
-    fireEvent.click(screen.getByRole("button", { name: "Write a draft" }));
-
-    fireEvent.click(await screen.findByRole("button", { name: "Copy" }));
-
-    expect(await screen.findByText("Could not copy. Select the text and copy it yourself.")).toBeInTheDocument();
-  });
-
-  it("dims the rows that cannot be added once ten are ticked, and lights them up again when one is unticked", async () => {
-    served = Array.from({ length: 11 }, (_, n) => q(n + 1, "open", `Open question ${n + 1}`));
-    api();
-    render(<Workspace />);
-    await screen.findByText("Open question 1");
-    const rowOf = (n: number) => screen.getByRole("checkbox", { name: `Pick Q${n}` }).closest("li")!.firstElementChild!;
-
-    for (let n = 1; n <= 10; n++) fireEvent.click(screen.getByRole("checkbox", { name: `Pick Q${n}` }));
-
-    expect(rowOf(11)).toHaveClass("opacity-60");
-    expect(rowOf(10)).not.toHaveClass("opacity-60"); // a ticked row can still be unticked
-    fireEvent.click(screen.getByRole("checkbox", { name: "Pick Q10" }));
-    expect(rowOf(11)).not.toHaveClass("opacity-60");
-  });
-
-  it("gives the pick checkbox a tap target of 44 px, not only its 20 px box", async () => {
-    api();
-    render(<Workspace />);
-
-    const label = (await screen.findByRole("checkbox", { name: "Pick Q1" })).closest("label")!;
-
-    expect(label).toHaveClass("min-h-11", "min-w-11");
   });
 
   it("shows each question's status word in its row, for all four statuses", async () => {

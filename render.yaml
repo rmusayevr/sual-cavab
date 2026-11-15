@@ -31,8 +31,8 @@ services:
     # at every start), then the demo data (a no-op unless DJANGO_DEMO_DATA=1; it refuses a database with
     # projects made by anyone but demo accounts). The purge and the loader are allowed to fail:
     # a refusal must never keep the site down, and a free instance has no shell
-    # to fix it with. One worker with threads: a drafting request can run for
-    # minutes, and the timeout must outlast it (135 s).
+    # to fix it with. One worker with threads. The 180 s timeout was sized for a
+    # drafting request (removed in #115) and is left as it was: lowering it is a deploy change.
     startCommand: >-
       python manage.py migrate --noinput
       && python manage.py createcachetable
@@ -72,9 +72,6 @@ services:
       # The shared password of the invented demo accounts (12+ characters).
       - key: DEMO_PASSWORD
         sync: false
-      # ANTHROPIC_API_KEY is deliberately NOT here. Add it by hand in the
-      # service's Environment tab to turn drafting on; without it the draft
-      # button answers "not set up" and nothing else changes.
 
   # ---- the Next.js frontend --------------------------------------------------
   - type: web

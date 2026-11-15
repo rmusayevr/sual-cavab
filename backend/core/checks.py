@@ -10,9 +10,9 @@ def cache_tables_exist(app_configs, databases=None, **kwargs):
     """
     Name a missing cache table and the command that creates it (#47).
 
-    The throttles (settings.CACHES["throttle"], a database cache table) count attempts at sign-in, at
-    adding a member and at drafting. Without the table those requests answer a bare 500 (with drafting
-    switched off too: the throttle runs before the handler), and the cause is one setup step,
+    The throttles (settings.CACHES["throttle"], a database cache table) count attempts at sign-in and at
+    adding a member. Without the table those requests answer a bare 500 (the throttle runs before the
+    handler), and the cause is one setup step,
     `createcachetable`, that only the README and the deploy command mention.
 
     A WARNING, not an error, on purpose: `migrate` runs the database checks before `createcachetable`
@@ -46,8 +46,8 @@ def cache_tables_exist(app_configs, databases=None, **kwargs):
         if table not in existing:
             messages.append(
                 Warning(
-                    f"The cache table {table!r} (CACHES[{alias!r}]) does not exist, so signing in, adding "
-                    "members and drafting answer a server error (500).",
+                    f"The cache table {table!r} (CACHES[{alias!r}]) does not exist, so signing in and adding "
+                    "members answer a server error (500).",
                     hint="Run: python manage.py createcachetable (a new database needs it once, after migrate)",
                     id="core.W001",
                 )

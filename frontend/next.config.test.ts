@@ -6,8 +6,8 @@ import nextConfig from "./next.config";
 // destination, POSTs through the proxy hit Django's APPEND_SLASH and fail with
 // a 500. Found running #4 end to end; unit tests of the components can't see it.
 describe("the /api proxy", () => {
-  it("waits longer than a drafting call can take (135 s: WORST_CASE_SECONDS in backend/drafting/client.py)", () => {
-    expect(nextConfig.experimental?.proxyTimeout).toBeGreaterThan(135_000);
+  it("waits longer than a sleeping free-tier API takes to wake (82 to 93 s measured on 2026-11-09; Next.js's default is 30 s)", () => {
+    expect(nextConfig.experimental?.proxyTimeout).toBeGreaterThan(93_000);
   });
 
   it("forwards to the backend with the trailing slash Django requires", async () => {
@@ -50,14 +50,14 @@ describe("where /api is forwarded", () => {
 
 });
 
-// #83: the project page is the workspace. The three older pages (the draft, the questions and the
+// #83: the project page is the workspace. The older pages (the questions and the
 // overview) are gone, and anyone with a bookmark or an old link lands on the workspace instead of a 404.
 describe("the older project pages", () => {
   const redirects = async () => nextConfig.redirects!();
 
-  it("send /projects/<id>/draft, /questions and /overview to the workspace, with or without a trailing slash", async () => {
+  it("send /projects/<id>/questions and /overview to the workspace, with or without a trailing slash", async () => {
     const list = await redirects();
-    for (const page of ["draft", "questions", "overview"]) {
+    for (const page of ["questions", "overview"]) {
       for (const slash of ["", "/"]) {
         const rule = list.find((r) => r.source === `/projects/:id/${page}${slash}`);
         expect(rule, `${page}${slash}`).toBeDefined();
@@ -70,10 +70,10 @@ describe("the older project pages", () => {
     for (const rule of await redirects()) expect(rule.permanent).toBe(false);
   });
 
-  it("are exactly these six rules, so an over-broad one (a wildcard that would also catch /projects/5 or /projects/5/questions/3, or loop) cannot slip in", async () => {
+  it("are exactly these four rules, so an over-broad one (a wildcard that would also catch /projects/5 or /projects/5/questions/3, or loop) cannot slip in", async () => {
     const sources = (await redirects()).map((r) => r.source).sort();
     expect(sources).toEqual(
-      ["draft", "overview", "questions"].flatMap((page) => [`/projects/:id/${page}`, `/projects/:id/${page}/`]).sort(),
+      ["overview", "questions"].flatMap((page) => [`/projects/:id/${page}`, `/projects/:id/${page}/`]).sort(),
     );
     for (const rule of await redirects()) {
       expect(Object.keys(rule).sort(), rule.source).toEqual(["destination", "permanent", "source"]); // no statusCode next to permanent
@@ -86,9 +86,9 @@ describe("the older project pages", () => {
   it("match the old addresses, and not the workspace, a sub-path, a longer word or the /api proxy", async () => {
     const patterns = (await redirects()).map((r) => new RegExp(`^${r.source.replace(":id", "[^/]+")}$`));
     const matches = (path: string) => patterns.some((p) => p.test(path));
-    for (const path of ["/projects/5/draft", "/projects/5/draft/", "/projects/5/questions", "/projects/5/overview/"])
+    for (const path of ["/projects/5/questions", "/projects/5/questions/", "/projects/5/overview", "/projects/5/overview/"])
       expect(matches(path), path).toBe(true);
-    for (const path of ["/projects/5", "/projects/5/", "/projects/5/questions/3", "/projects/5/draftXYZ", "/projects/x/y/draft", "/api/projects/5/draft/", "/projects"])
+    for (const path of ["/projects/5", "/projects/5/", "/projects/5/questions/3", "/projects/5/overviewXYZ", "/projects/x/y/questions", "/projects/5/draft", "/projects/5/draft/", "/api/projects/5/questions/", "/projects"])
       expect(matches(path), path).toBe(false);
   });
 });

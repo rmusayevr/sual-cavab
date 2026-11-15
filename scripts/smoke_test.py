@@ -8,8 +8,6 @@ checks what the owner asked for: the health endpoint, sign-in, and the
 still-open view, plus the rule that a person who is not on a project cannot
 see it. It changes nothing on the site. The password is read from the
 environment and never printed. Exit status 0 only if every check passed.
-
-Drafting calls a paid API, so it is checked only with --draft.
 """
 
 import http.cookiejar
@@ -69,7 +67,7 @@ class Session:
         return self.call("POST", "/api/auth/login/", {"email": email, "password": password})[0]
 
 
-def run(base, password, draft=False, out=print):
+def run(base, password, out=print):
     """Run every check; return the number of failures."""
     results = []
 
@@ -122,11 +120,6 @@ def run(base, password, draft=False, out=print):
     status, _ = Session(base).call("POST", "/api/auth/login/", {"email": OWNER, "password": secrets.token_urlsafe(12)})
     check("a wrong password does not sign in", status in (400, 403), status)
 
-    if draft and ticketing:
-        status, body = owner.call("POST", f"/api/projects/{ticketing['id']}/draft/", {"questions": [1]}, timeout=200)
-        check("drafting answers 200, or 503 if no key is set (never 5xx otherwise)", status in (200, 503), f"{status}")
-        out(f"     drafting: {'a draft was written' if status == 200 else 'not set up on this site' if status == 503 else status}")
-
     failures = results.count(False)
     out(f"\n{len(results) - failures} passed, {failures} failed")
     return failures
@@ -136,9 +129,9 @@ def main(argv):
     args = [a for a in argv[1:] if not a.startswith("--")]
     if len(args) != 1 or not os.environ.get("SMOKE_PASSWORD"):
         print(__doc__)
-        print("Usage: SMOKE_PASSWORD=... python scripts/smoke_test.py <frontend URL> [--draft]")
+        print("Usage: SMOKE_PASSWORD=... python scripts/smoke_test.py <frontend URL>")
         return 2
-    return 1 if run(args[0], os.environ["SMOKE_PASSWORD"], draft="--draft" in argv) else 0
+    return 1 if run(args[0], os.environ["SMOKE_PASSWORD"]) else 0
 
 
 if __name__ == "__main__":

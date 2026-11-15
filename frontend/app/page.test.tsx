@@ -57,28 +57,27 @@ describe("HomePage", () => {
     expect(within(rows[2]).getByText(statusLabel.answered).firstElementChild).toHaveClass(statusDot.answered);
   });
 
-  it("lists the four things it does, numbered", () => {
+  it("lists the three things it does, numbered", () => {
     pending();
 
     render(<HomePage />);
 
     // level 2, right after the page's one h1 (the example's h3 skipped a level; review of #74)
-    for (const title of ["Questions per project", "A clear status", "Open at a glance", "Drafted messages"]) {
+    for (const title of ["Questions per project", "A clear status", "Open at a glance"]) {
       expect(screen.getByRole("heading", { level: 2, name: title })).toBeInTheDocument();
     }
     expect(screen.queryByRole("heading", { level: 3 })).not.toBeInTheDocument();
-    for (const n of ["01", "02", "03", "04"]) expect(screen.getByText(n)).toHaveClass("font-mono");
+    for (const n of ["01", "02", "03"]) expect(screen.getByText(n)).toHaveClass("font-mono");
   });
 
-  it("says the person reviews and sends, shows a sample message, and offers no way to send anything", () => {
+  it("has no drafting left: no sample message, no review-and-send section, nothing that sends", () => {
     pending();
 
     render(<HomePage />);
 
-    expect(screen.getByRole("heading", { level: 2, name: "You review it. You send it." })).toBeInTheDocument();
-    expect(screen.getByText(/Nothing leaves without you/)).toBeInTheDocument();
-    const message = screen.getByText(/Salam, Leyla xanım!/).closest("blockquote")!;
-    for (const term of ["refund", "admin", "support"]) expect(within(message).getByText(term).tagName).toBe("B");
+    expect(screen.queryByText(/Salam, Leyla xanım!/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: /Drafted messages|You review it/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nothing leaves without you/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /send|email|share|post/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /send|email|share|post|mailto/i })).not.toBeInTheDocument();
     expect(document.querySelector('a[href^="mailto:"]')).toBeNull();
@@ -99,14 +98,13 @@ describe("HomePage", () => {
     expect(container.querySelector(".pattern-lattice")).toHaveClass("bg-navy");
   });
 
-  it("has one main landmark that holds the features and the band, with the header and footer outside it", () => {
+  it("has one main landmark that holds the features, with the header and footer outside it", () => {
     pending();
 
     render(<HomePage />);
 
     const main = screen.getByRole("main");
     expect(within(main).getByRole("heading", { name: "Questions per project" })).toBeInTheDocument();
-    expect(within(main).getByRole("heading", { name: "You review it. You send it." })).toBeInTheDocument();
     expect(within(main).queryByRole("navigation")).not.toBeInTheDocument();
     expect(within(main).queryByRole("contentinfo")).not.toBeInTheDocument();
   });

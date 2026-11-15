@@ -11,8 +11,6 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
-from drafting.config import DEFAULT_MODEL, validate_drafting_model, validate_sdk_environment
-
 from .dburl import database_from_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -68,7 +66,6 @@ INSTALLED_APPS = [
     "accounts",
     "projects",
     "questions",
-    "drafting",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -183,7 +180,7 @@ CACHES = {
     # then expired rows accumulate: `manage.py purge_expired_cache` removes them
     # (run at every start on Render, #40). DRF's read-then-write is made
     # exact for simultaneous requests by core.throttles.ExactCountMixin (#41). Needs
-    # `createcachetable`; without the table, sign-in, member-adds and drafting fail closed
+    # `createcachetable`; without the table, sign-in and member-adds fail closed
     # with a 500, and `manage.py check --database default` (and `migrate`) warn with the
     # command (#47).
     "throttle": {
@@ -205,8 +202,6 @@ REST_FRAMEWORK = {
         "login": os.environ.get("DJANGO_LOGIN_RATE", "10/min"),
         # 'Add member' attempts per user (projects.throttles.MemberAddThrottle).
         "member_add": os.environ.get("DJANGO_MEMBER_ADD_RATE", "30/hour"),
-        # Drafts per user (drafting.throttles.DraftThrottle): each is a paid API call.
-        "draft": os.environ.get("DJANGO_DRAFT_RATE", "20/hour"),
     },
     # For any throttle keyed on the client address: how many proxies in front
     # *append* to X-Forwarded-For. Keep 0 (use the connection address) unless
@@ -222,23 +217,10 @@ CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_O
 if DEBUG and not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
-# Drafting (#9). A Fable or Mythos model makes the server refuse to start.
 # Django's admin (on by default). Its sign-in shares the app's attempt limit
 # (accounts.throttles.protect_admin_login, #45); a public staging host turns the
 # admin off anyway (DJANGO_ADMIN_ENABLED=0, #10).
 ADMIN_ENABLED = _env_bool("DJANGO_ADMIN_ENABLED", default=True)
-
-DRAFTING_MODEL = validate_drafting_model(os.environ.get("DRAFTING_MODEL") or DEFAULT_MODEL)
-validate_sdk_environment(os.environ)
-
-# Drafting logs counts and error class names only (never question text or
-# anything the API sent back); this makes those lines reach the server log.
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "loggers": {"drafting": {"handlers": ["console"], "level": "INFO"}},
-}
 
 # Deployed behind a platform that terminates HTTPS (#10). Set DJANGO_BEHIND_HTTPS=1
 # there. It only ever adds protection, so a stray value cannot weaken a server:
