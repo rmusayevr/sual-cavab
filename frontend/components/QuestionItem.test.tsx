@@ -647,3 +647,41 @@ describe("QuestionItem: answers", () => {
     expect(screen.queryByText("The question was changed. Check it and try again.")).not.toBeInTheDocument();
   });
 });
+
+describe("QuestionItem: an answer sent through the answer link (#114)", () => {
+  it("says it came through the link, that the name is not verified, and who accepted it", async () => {
+    backend({
+      [LIST]: () =>
+        json(200, [
+          question(1, {
+            status: "answered",
+            current_answer: answerOf({ channel: "link", answered_by: "Leyla", recorded_by: "olga@example.invalid", answered_on: "2026-11-15" }),
+          }),
+        ]),
+    });
+    render(<Board projectId="5" />);
+
+    expect(
+      await screen.findByText("Sent through the answer link by Leyla (name not verified) · accepted by olga@example.invalid · 2026-11-15"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not let a direction-control character in the typed name reorder the sentence", async () => {
+    backend({
+      [LIST]: () =>
+        json(200, [question(1, { status: "answered", current_answer: answerOf({ channel: "link", answered_by: "Mal\u202Elory" }) })]),
+    });
+    render(<Board projectId="5" />);
+
+    const line = await screen.findByText(/Sent through the answer link by Mallory/);
+    expect(line.textContent).not.toMatch(/[\u202A-\u202E\u2066-\u2069]/);
+  });
+
+  it("keeps the old wording for an answer someone recorded by hand", async () => {
+    backend({ [LIST]: () => json(200, [question(1, { status: "answered", current_answer: answerOf({ channel: "email" }) })]) });
+    render(<Board projectId="5" />);
+
+    expect(await screen.findByText(/by Əli Məmmədov · Email · 2026-03-01/)).toBeInTheDocument();
+    expect(screen.queryByText(/name not verified/)).not.toBeInTheDocument();
+  });
+});

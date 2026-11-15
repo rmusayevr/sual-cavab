@@ -227,3 +227,43 @@ describe("SessionStatus: a slow first answer (#38)", () => {
   });
 
 });
+
+describe("SessionStatus: telling the rest of the page that the person signed out (#114)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("announces a sign-out, so a screen holding a one-time credential can drop it", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
+      url === "/api/auth/me/"
+        ? new Response(JSON.stringify({ id: 1, email: "ada@example.com", name: "" }), { status: 200 })
+        : new Response(null, { status: 204 }),
+    ));
+    const heard = vi.fn();
+    window.addEventListener("sual:signed-out", heard);
+    render(<SessionStatus />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    await screen.findByRole("link", { name: "Sign in" });
+    expect(heard).toHaveBeenCalledTimes(1);
+    window.removeEventListener("sual:signed-out", heard);
+  });
+
+  it("announces nothing when the sign-out was refused and the person is still signed in", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
+      url === "/api/auth/me/"
+        ? new Response(JSON.stringify({ id: 1, email: "ada@example.com", name: "" }), { status: 200 })
+        : new Response(JSON.stringify({ detail: "CSRF Failed" }), { status: 403 }),
+    ));
+    const heard = vi.fn();
+    window.addEventListener("sual:signed-out", heard);
+    render(<SessionStatus />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    await screen.findByText(/Sign-out failed/);
+    expect(heard).not.toHaveBeenCalled();
+    window.removeEventListener("sual:signed-out", heard);
+  });
+});

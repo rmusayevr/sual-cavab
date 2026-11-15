@@ -173,6 +173,18 @@ class TransitionApiTests(QuestionTestCase):
 
         self.assertEqual(self.move(1, "asked", answer=answer_payload()).status_code, 400)
 
+    def test_a_member_cannot_record_an_answer_as_coming_from_the_answer_link(self):
+        # "link" is the mark of an answer a member ACCEPTED from a client's submission (#114). It is not a
+        # place a member can say an answer came from, or anyone could forge that provenance by hand.
+        self.ask()
+
+        response = self.move(1, "answered", answer=answer_payload(channel="link"))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("channel", response.json()["answer"])
+        self.assertEqual(self.db_question(1).status, "open")
+        self.assertEqual(Answer.objects.filter(channel="link").count(), 0)
+
     def test_a_refused_transition_names_the_allowed_ones(self):
         self.ask()
         self.move(1, "answered", answer=answer_payload())

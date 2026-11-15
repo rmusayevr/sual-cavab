@@ -11,6 +11,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
 }));
 
+// The two answer-link cards have their own tests (AnswerLinkPanel.test.tsx, SubmissionsPanel.test.tsx) and are
+// tested together with the workspace in Workspace.answerlink.test.tsx. Here they are stubs: their own requests would
+// otherwise answer from this file's hand-built mocks and show error alerts that have nothing to do with these tests.
+vi.mock("./AnswerLinkPanel", () => ({ default: () => null }));
+vi.mock("./SubmissionsPanel", () => ({ default: () => null }));
+
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
 const project = (id: number, name: string, open: number) => ({

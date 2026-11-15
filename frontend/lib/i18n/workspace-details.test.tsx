@@ -35,6 +35,8 @@ function api() {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
+      if (url.includes("/answer-link/")) return json(200, { exists: false });
+      if (url.includes("/submissions/")) return json(200, []);
       if (url.includes("/questions/")) return json(200, [q(1, "open"), q(2, "answered")]);
       if (url.endsWith("/members/")) return json(200, members);
       return /^\/api\/projects\/\d+\/$/.test(url) ? json(200, project) : json(200, page([project]));

@@ -27,7 +27,9 @@ class AnswerInputSerializer(serializers.Serializer):
     text = serializers.CharField(allow_blank=False)
     answered_by = serializers.CharField(max_length=200, allow_blank=False)
     answered_on = serializers.DateField()
-    channel = serializers.ChoiceField(choices=Answer.Channel.choices)
+    # "link" marks an answer a member accepted from a client's submission (answerlinks, #114); a member cannot
+    # type it in by hand, or anyone could forge where an answer came from.
+    channel = serializers.ChoiceField(choices=[c for c in Answer.Channel.choices if c[0] != Answer.Channel.LINK])
     channel_note = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
 
     def validate_answered_on(self, value):

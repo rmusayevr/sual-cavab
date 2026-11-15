@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { apiFetch, type CurrentUser } from "@/lib/api";
+import { SIGNED_OUT_EVENT, apiFetch, type CurrentUser } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 
 import { Alert } from "./ui/Alert";
@@ -56,11 +56,14 @@ export default function SessionStatus({
       const response = await apiFetch("/api/auth/logout/", { method: "POST" });
       if (response.ok) {
         setState({ kind: "signed-out" });
+        window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
         return;
       }
       const me = await apiFetch("/api/auth/me/");
-      if (me.status === 401 || me.status === 403) setState({ kind: "signed-out" });
-      else setSignOutFailed(true);
+      if (me.status === 401 || me.status === 403) {
+        setState({ kind: "signed-out" });
+        window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
+      } else setSignOutFailed(true);
     } catch {
       setSignOutFailed(true);
     }

@@ -1,9 +1,11 @@
 import { en, type Key } from "./i18n/en";
 import type { Question, QuestionStatus } from "./projects";
 
-export type Channel = "chat" | "meeting" | "email" | "other";
+/** Where an answer came from. "link" is set by the server when a member accepts what a client sent through
+ * the answer link (#114); it is not in CHANNELS because a person cannot pick it (the server refuses it). */
+export type Channel = "chat" | "meeting" | "email" | "other" | "link";
 
-export const CHANNELS: { value: Channel; label: string }[] = [
+export const CHANNELS: { value: Exclude<Channel, "link">; label: string }[] = [
   { value: "chat", label: en["channel.chat"] },
   { value: "meeting", label: en["channel.meeting"] },
   { value: "email", label: en["channel.email"] },
