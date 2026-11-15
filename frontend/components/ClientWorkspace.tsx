@@ -42,7 +42,6 @@ export default function ClientWorkspace() {
   const load = useCallback(
     async (quiet = false): Promise<"ok" | "gone" | "failed"> => {
       const mine = ++latestRead.current;
-      if (!quiet) setState({ kind: "loading" });
       try {
         const response = await apiFetch(base);
         if (mine !== latestRead.current) return "failed";
@@ -70,6 +69,8 @@ export default function ClientWorkspace() {
   );
 
   useEffect(() => {
+    // Read on arrival; the setState calls happen after the request, not during the render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
@@ -122,7 +123,13 @@ export default function ClientWorkspace() {
       <div className="grid gap-3">
         <Alert tone="error">{state.kind === "throttled" ? t("client.throttled") : t("client.loadError")}</Alert>
         <div>
-          <Button variant="secondary" onClick={() => void load()}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setState({ kind: "loading" });
+              void load();
+            }}
+          >
             {t("client.retry")}
           </Button>
         </div>
