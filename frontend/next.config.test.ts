@@ -7,7 +7,7 @@ import nextConfig from "./next.config";
 // a 500. Found running #4 end to end; unit tests of the components can't see it.
 describe("the /api proxy", () => {
   it("waits longer than a sleeping free-tier API takes to wake (82 to 93 s measured on 2026-11-09; Next.js's default is 30 s)", () => {
-    expect(nextConfig.experimental?.proxyTimeout).toBeGreaterThan(93_000);
+    expect(nextConfig.experimental?.proxyTimeout).toBeGreaterThan(120_000);
   });
 
   it("forwards to the backend with the trailing slash Django requires", async () => {

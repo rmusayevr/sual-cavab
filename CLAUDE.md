@@ -1,7 +1,7 @@
 # Sual-Cavab
 
-Tracks the open questions a project is waiting on. Backend: Django + DRF in `backend/`. Frontend: Next.js in
-`frontend/`. Database: PostgreSQL.
+Tracks the open questions a project is waiting on. Backend: Django + DRF in `backend/`.
+Frontend: Next.js in `frontend/`. Database: PostgreSQL.
 
 ## Branches
 

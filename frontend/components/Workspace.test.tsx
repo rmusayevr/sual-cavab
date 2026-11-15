@@ -128,6 +128,18 @@ describe("Workspace (#70)", () => {
     expect(screen.queryByText(/Claude/)).not.toBeInTheDocument();
   });
 
+  // The rule outlived drafting: the app sends nothing (harness-loop.json stopFor; #114 answers happen in the app).
+  it("offers no way to send, mail, share or post anything", async () => {
+    api();
+    render(<Workspace />);
+    await screen.findByText("Which payment providers are allowed?");
+
+    const words = /send|e-?mail|share|post|whatsapp|telegram|sms/i;
+    expect(screen.queryByRole("button", { name: words })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: words })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="mailto:"], a[href^="sms:"], a[href*="wa.me"], a[href*="t.me"]')).toBeNull();
+  });
+
   it("shows the selected question on the right, with its reason and what it blocks", async () => {
     api();
     render(<Workspace />);
