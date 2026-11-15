@@ -46,7 +46,7 @@ class CacheTableCheckTests(TestCase):
     def test_it_says_what_stops_working_without_the_table(self):
         (message,) = cache_tables_exist(None, databases=["default"])
 
-        for words in ("signing in", "adding members"):
+        for words in ("signing in", "adding members", "answer link"):
             self.assertIn(words, message.msg)
 
     def test_a_table_that_exists_is_not_reported(self):

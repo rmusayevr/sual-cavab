@@ -428,6 +428,55 @@ save button is offered again only if the question, as far as the page knows
 it can be copied; the hint says the answer was not saved). Re-opening an answered question keeps the old
 answer, shown as "Earlier answer".
 
+## Answering through a private link (#114)
+
+A team member makes a private link for a project and sends it to the client. The client opens it with no account,
+sees the project's open questions (status open or asked) and can send an answer. **Nothing a client sends is an
+answer yet:** it waits as a *submission*, and a team member accepts it (it then becomes the question's answer, marked
+"Answer link") or dismisses it. This part is the **backend only** (PR A of three): the screens for the team and for
+the client come in the next two PRs, so until then the routes below are used directly.
+
+- **The link:** `https://<app>/answer#<token>`. The token is 256 bits and sits in the URL *fragment*, which browsers
+  never send to the server, so it stays out of server and proxy logs and out of `Referer`. It is shown **once**, when
+  the link is made; only its SHA-256 hash is stored, so it cannot be shown again (make a new link instead).
+- **Who:** any member of the project can make, see the state of and revoke the link. A project has one unrevoked link:
+  making a new one revokes the old one. It lasts 1 to 30 days (default 14) and cannot be extended.
+- **It stops working at once** (checked on every request, never cached) when it expires, is revoked, its creator
+  leaves the project (by any route: the members API, the Django admin or a script) or its creator is deactivated. In
+  the last two cases the link is **revoked for good**, so reactivating or re-adding that person does not bring it back.
+  Unknown, malformed, expired and revoked links all give the same
+  `404 {"detail": "This link is not available."}`.
+- **What the client sees:** the project's name and, for each open or asked question, its number, text, *why it matters*
+  and *what it blocks* (the owner's decision: those two fields are shown to anyone with the link, so write them
+  knowing that). Never other projects, members, e-mail addresses, who made the link, any answer (current or earlier),
+  answered or dropped questions, internal ids, or other clients' submissions.
+- **What the client can do:** exactly two routes, `GET /api/answer-link/questions/` and
+  `POST /api/answer-link/questions/<number>/answers/` with `{"text", "name"}` (text up to 4000 characters, name up to
+  100; the name is typed by the client and **never verified**). The token goes in the `X-Answer-Token` header; cookies
+  and sessions are ignored on these routes. A test calls every route of the project (all methods) with and without a link token,
+  signed out and signed in as a member, and fails if the token changes the status of any answer outside those two
+  (and the body of any JSON answer when signed out). The router's `.json`-style suffix routes are not walked.
+- **The team:** `GET`, `POST` (`{"days": 1-30}`, returns the token once) and `DELETE` on
+  `/api/projects/<id>/answer-link/`; `GET /api/projects/<id>/submissions/?state=pending|accepted|dismissed` (who, as
+  typed, and when); `POST .../submissions/<id>/accept/` (optionally `{"text"}` to edit the answer first; the client's
+  original stays on the submission), `.../dismiss/` and `.../restore/` (undo a dismissal);
+  `POST .../submissions/dismiss-pending/` for spam dismisses everything waiting in the **project**, from every link
+  it has had, so `restore` is how a real answer is brought back. Accepting
+  uses the same status change as every other answer, so a question that is already answered must be re-opened first.
+  Nothing is e-mailed or sent anywhere.
+- **Limits** (per link, never per address: behind the Next.js proxy every request has the same address): page loads
+  `DJANGO_ANSWER_LINK_READ_RATE` (300/hour), answers `DJANGO_ANSWER_LINK_SUBMIT_RATE` (60/hour), and at most 5 waiting
+  submissions per question and 200 per link. Requests with a bad token share one bucket,
+  `DJANGO_ANSWER_LINK_INVALID_RATE` (120/min), which never counts a valid link. These counters use the same
+  `throttle_cache` table as sign-in (see "Cleaning the sign-in counters"). No CAPTCHA in v1; revoking the link is the
+  way to stop a leak.
+- **Known and accepted:** when a question already has 5 answers waiting, the next one gets a `429`, which tells whoever
+  holds the link that others have sent answers to that question (one bit, and only to people who hold the same
+  link). And a flood of bad tokens fills the shared bucket, so a client with a dead link then sees `429` instead of
+  the usual `404`: the client page must not read a `429` as "this link works, try later" for a link it never loaded.
+- **Stored about the client:** the typed name and answer only. No address, no browser details.
+- **Not checked:** nothing here has been run against Render or Supabase, and the client page does not exist yet.
+
 ## Language (English, Azerbaijani)
 
 The interface is English by default, with Azerbaijani as a second language (#71). An `EN | AZ` switch sits in the headers of the landing, sign-in, projects and workspace pages and at the top of the older pages; the choice is kept in the browser's local storage. `<html lang>` follows the choice on every page.

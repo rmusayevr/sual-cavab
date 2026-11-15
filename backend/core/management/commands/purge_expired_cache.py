@@ -10,7 +10,7 @@ DATABASE_CACHE = "django.core.cache.backends.db.DatabaseCache"
 
 class Command(BaseCommand):
     help = (
-        "Delete the expired rows of the database cache tables (the sign-in and member-add throttle "
+        "Delete the expired rows of the database cache tables (the sign-in, member-add and answer-link throttle "
         "counters), in bounded batches (#40). Django only culls expired rows once a table passes a million."
     )
 
