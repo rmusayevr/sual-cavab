@@ -308,6 +308,10 @@ you are not on is a 404, the same as one that does not exist.
 | Add, edit and answer questions (#6) | yes   | yes    | no (404)     |
 | Delete the project                  | nobody in v1 (there is no delete endpoint) |
 
+A third role, **client** (#121), is for the person the questions are for: it sees only that project's open questions
+and can send answers (see "Client accounts"). To every team route and screen a client is the same as someone who is
+not a member (404).
+
 - Any signed-in user can create a project and becomes its first owner.
 - **Adding and removing members from the screen (#33).** On the project page an owner sees a **Manage members**
   section: the members with a Remove button (asks "Remove ... from this project?" first), and a form with an
@@ -389,12 +393,18 @@ what is allowed:
 - Marking a question `answered` needs an answer, and an answer is **only its text** (#121): who answered (the
   signed-in person's name, or their email), the date (today) and where (`app`, "In the app") are set by the server,
   and anything else in the request is ignored, so who gave an answer and where it came from cannot be forged by
-  hand. An answer a member accepted from a client's answer link has the channel `link` and the name the client typed.
+  hand. An answer a member accepted from a client's answer link has the channel `link` and the name the client typed; one accepted from a client
+  account has the channel `client` and the account's name.
   Answers recorded before #121 keep the channel they were given (chat, meeting, email or other, with a note) and
   the name that was typed.
 - Answers are never edited or deleted. Re-opening a question keeps its answer
   as history (`previous_answers`); answering again adds a new one. To correct
   an answer, re-open and answer again.
+- **Restore the earlier answer** (#121): on a re-opened (or asked) question that had an answer, **Restore the earlier
+  answer** (`POST .../questions/<n>/restore-answer/`) makes the most recently replaced answer the current one again and
+  answers the question again, so a re-open can be undone without typing the answer a second time. Nothing is copied or
+  deleted; it is refused (400) on an answered or dropped question or one that never had an answer. Two members pressing
+  it together: one wins, the other is told the question already has an answer.
 - Nothing is deleted by the app: there is no delete endpoint ("dropped" is a
   status). In the admin, questions can't be added or deleted, only their three
   text fields can be edited (status moves only through the rules above), and a
@@ -499,6 +509,30 @@ direction-control characters are removed from typed names before they are shown.
 - **Not checked:** nothing here has been run against Render or Supabase, and **no screen of this feature has been
   looked at in a real browser** (layout, focus order, a phone, long words, the Azerbaijani wording): only the DOM tests
   have seen it. See issue #32.
+
+## Client accounts (#121)
+
+A client can also have an **account** with the role **client** on a project (an owner adds them in **Manage members**,
+choosing "client"; they need an account first, like any member). The private link stays for people with no account.
+
+- **What a client can reach:** exactly three routes, with their own door and serializers (`answerlinks/client_views.py`):
+  `GET /api/client/projects/` (id and name), `GET /api/client/projects/<id>/questions/` (the open and asked questions,
+  what this person already sent for each, and `earlier`: their own answers on questions that have since closed, with the
+  state, never the team's answer) and `POST /api/client/projects/<id>/questions/<n>/answers/` (the text only: the name
+  is the account's). The screen is `/answering/<id>`; the projects list shows a client's projects in a section of
+  their own. Nobody else's answer, no member, no other project, no client name.
+- **The team door is closed to them:** `Project.objects.visible_to` admits owners and members only, so every team route
+  (projects, questions, members, answer links, submissions) answers a client exactly as it answers a stranger; a test
+  walks every `/api/projects/` route to prove the two are the same. A client cannot start a project (a person who is only a client gets 403 on
+  `POST /api/projects/`).
+- **What a client sends is not an answer.** It waits (marked "client account", with the account's name, which is
+  verified, unlike a name typed on the link) until a team member accepts it (the answer then has the channel `client`)
+  or dismisses it. Removing a client from the project, or deactivating the account, stops both reading and sending at once.
+- **Limits:** per person, `DJANGO_CLIENT_READ_RATE` (300/hour) and `DJANGO_CLIENT_SUBMIT_RATE` (60/hour), and at most 5
+  waiting answers per question and 200 per project for one person, counted under a lock.
+- **Not checked:** not run against Render or Supabase, and no screen has been looked at in a real browser; the migrations
+  (`projects/0003`, `questions/0004`, `answerlinks/0002`) run against Supabase when the staging service starts.
+  An already-open tab of an older version may still send a name or an old field; the server ignores them.
 
 ## Language (English, Azerbaijani)
 
