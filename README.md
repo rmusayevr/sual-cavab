@@ -435,7 +435,11 @@ sees the project's open questions (status open or asked) and can send an answer.
 answer yet:** it waits as a *submission*, and a team member accepts it (it then becomes the question's answer, marked
 "Answer link") or dismisses it. The team's side is in the workspace (PR B of three): an
 "Answers from the link" card (what is waiting, with accept, dismiss and restore) and an "Answer link" card (make a
-link, copy it once, revoke it), in both languages. The client's page (`/answer#<token>`) is the next PR, so until
+link, copy it once, revoke it), in both languages. The full link is shown once and held only in memory: it is dropped
+when the person revokes or replaces it, signs out, leaves the page, or after five minutes. Replacing a live link asks
+first, because the one the client already has stops working. An answer a member accepted from a client is marked on
+the question card as sent through the answer link, with the name as typed ("name not verified") and who accepted it;
+direction-control characters are removed from typed names before they are shown. The client's page (`/answer#<token>`) is the next PR, so until
 then a link made here does not open anything.
 
 - **The link:** `https://<app>/answer#<token>`. The token is 256 bits and sits in the URL *fragment*, which browsers

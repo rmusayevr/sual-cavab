@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Activity } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LINK_VISIBLE_MS } from "@/lib/answerLink";
 import { setLanguage, translate, type Key } from "@/lib/i18n";
 
 import AnswerLinkPanel from "./AnswerLinkPanel";
@@ -276,5 +278,211 @@ describe("AnswerLinkPanel (#114)", () => {
 
     for (const button of screen.getAllByRole("button")) expect(button.className).toMatch(/min-h-11/);
     await waitFor(() => expect(screen.queryByText(t("answerLink.loading"))).not.toBeInTheDocument());
+  });
+});
+
+/** Make a link in a panel that starts with none, and wait for the link to be shown. */
+async function makeALink() {
+  await screen.findByText(t("answerLink.none"));
+  fireEvent.click(screen.getByRole("button", { name: t("answerLink.create") }));
+  await screen.findByLabelText(t("answerLink.urlLabel"));
+}
+
+describe("AnswerLinkPanel: the link is shown once (#114)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  const madeThenRevocable = () => {
+    const current = { value: { exists: false } as unknown };
+    const calls = api(current, ({ method }) => {
+      if (method === "POST") {
+        current.value = active;
+        return json(201, { ...active, token: TOKEN });
+      }
+      if (method === "DELETE") {
+        current.value = { ...active, state: "revoked" };
+        return new Response(null, { status: 204 });
+      }
+      return undefined;
+    });
+    return calls;
+  };
+
+  it("drops the link when the person revokes it", async () => {
+    madeThenRevocable();
+    open();
+    await makeALink();
+
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.revoke") }));
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.revokeYes") }));
+
+    await screen.findByText(t("answerLink.revoked"));
+    expect(screen.queryByLabelText(t("answerLink.urlLabel"))).not.toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain(TOKEN);
+  });
+
+  it("drops the link when the person signs out", async () => {
+    madeThenRevocable();
+    open();
+    await makeALink();
+
+    act(() => {
+      window.dispatchEvent(new Event("sual:signed-out"));
+    });
+
+    expect(screen.queryByLabelText(t("answerLink.urlLabel"))).not.toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain(TOKEN);
+  });
+
+  it("drops the link after a few minutes of nobody touching the screen", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    madeThenRevocable();
+    open();
+    await makeALink();
+
+    // The timer is started by an effect that React runs a moment after the link appears: let that happen first.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LINK_VISIBLE_MS / 2);
+    });
+    expect(screen.getByLabelText(t("answerLink.urlLabel"))).toBeInTheDocument(); // still there at half the time
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(LINK_VISIBLE_MS); // one and a half times the limit in all
+    });
+
+    expect(screen.queryByLabelText(t("answerLink.urlLabel"))).not.toBeInTheDocument();
+  });
+
+  it("drops the link when the page is left and comes back (Next keeps a page you leave alive but hidden)", async () => {
+    madeThenRevocable();
+    const view = (mode: "visible" | "hidden") => (
+      <Activity mode={mode}>
+        <AnswerLinkPanel projectId={5} />
+      </Activity>
+    );
+    const { rerender } = render(view("visible"));
+    await makeALink();
+
+    rerender(view("hidden"));
+    rerender(view("visible"));
+
+    await screen.findByText(/Active\. Made by/);
+    expect(screen.queryByLabelText(t("answerLink.urlLabel"))).not.toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain(TOKEN);
+  });
+});
+
+describe("AnswerLinkPanel: replacing a live link asks first (#114)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("asks before making a new link, because the client's current one stops working", async () => {
+    const calls = api({ value: active });
+    open();
+    await screen.findByText(/Active\. Made by/);
+
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.createNew") }));
+
+    expect(screen.getByText(t("answerLink.replaceAsk"))).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("asks also when the form is submitted with Enter", async () => {
+    const calls = api({ value: active });
+    open();
+    await screen.findByText(/Active\. Made by/);
+
+    fireEvent.submit(screen.getByRole("form", { name: t("answerLink.create") }));
+
+    expect(screen.getByText(t("answerLink.replaceAsk"))).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("makes the new link only after 'Yes', and Cancel leaves everything as it was", async () => {
+    const calls = api({ value: active }, ({ method }) => (method === "POST" ? json(201, { ...active, token: TOKEN }) : undefined));
+    open();
+    await screen.findByText(/Active\. Made by/);
+
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.createNew") }));
+    fireEvent.click(screen.getByRole("button", { name: t("question.cancel") }));
+    expect(screen.queryByText(t("answerLink.replaceAsk"))).not.toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.createNew") }));
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.replaceYes") }));
+
+    await screen.findByLabelText(t("answerLink.urlLabel"));
+    expect(calls.filter((c) => c.method === "POST")).toHaveLength(1);
+  });
+
+  it("does not ask when there is no live link to lose", async () => {
+    const calls = api({ value: { ...active, state: "revoked" } }, ({ method }) => (method === "POST" ? json(201, { ...active, token: TOKEN }) : undefined));
+    open();
+    await screen.findByText(t("answerLink.revoked"));
+
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.create") }));
+
+    await screen.findByLabelText(t("answerLink.urlLabel"));
+    expect(screen.queryByText(t("answerLink.replaceAsk"))).not.toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(true);
+  });
+});
+
+describe("AnswerLinkPanel: keyboard and screen reader (#114)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("puts the keyboard on the new link, selected for copying, and has the 'copied' message region ready before it is used", async () => {
+    api({ value: { exists: false } }, ({ method }) => (method === "POST" ? json(201, { ...active, token: TOKEN }) : undefined));
+    open();
+    await makeALink();
+
+    expect(screen.getByLabelText(t("answerLink.urlLabel"))).toHaveFocus();
+    const regions = screen.getAllByRole("status");
+    expect(regions.some((r) => r.textContent === "")).toBe(true); // empty until something is copied: it can be announced
+  });
+
+  it("returns the keyboard to the Revoke button after Cancel", async () => {
+    api({ value: active });
+    open();
+    await screen.findByText(/Active\. Made by/);
+
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.revoke") }));
+    expect(screen.getByRole("button", { name: t("question.cancel") })).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: t("question.cancel") }));
+
+    expect(screen.getByRole("button", { name: t("answerLink.revoke") })).toHaveFocus();
+  });
+
+  it("keeps the keyboard on the card after a confirmed revoke removed the button it was on", async () => {
+    const current = { value: active as unknown };
+    api(current, ({ method }) => {
+      if (method === "DELETE") {
+        current.value = { ...active, state: "revoked" };
+        return new Response(null, { status: 204 });
+      }
+    });
+    open();
+    await screen.findByText(/Active\. Made by/);
+
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.revoke") }));
+    fireEvent.click(screen.getByRole("button", { name: t("answerLink.revokeYes") }));
+
+    await screen.findByText(t("answerLink.revoked"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: t("answerLink.title") })).toHaveFocus());
+  });
+});
+
+describe("AnswerLinkPanel: the hint tells the team what the client sees", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("names the two internal notes that go with each question", async () => {
+    api({ value: { exists: false } });
+    open();
+
+    await screen.findByText(t("answerLink.none"));
+    expect(screen.getByText(/why each matters and what it blocks/)).toBeInTheDocument();
   });
 });

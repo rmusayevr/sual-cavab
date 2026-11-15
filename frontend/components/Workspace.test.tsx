@@ -11,6 +11,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
 }));
 
+// The two answer-link cards have their own tests (AnswerLinkPanel.test.tsx, SubmissionsPanel.test.tsx) and are
+// tested together with the workspace in Workspace.answerlink.test.tsx. Here they are stubs: their own requests would
+// otherwise answer from this file's hand-built mocks and show error alerts that have nothing to do with these tests.
+vi.mock("./AnswerLinkPanel", () => ({ default: () => null }));
+vi.mock("./SubmissionsPanel", () => ({ default: () => null }));
+
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 
 const project = (id: number, name: string, open: number) => ({
@@ -68,8 +74,6 @@ function api(overrides: Record<string, () => Response> = {}) {
     "fetch",
     vi.fn(async (url: string) => {
       for (const [part, make] of Object.entries(overrides)) if (url.includes(part)) return make();
-      if (url.includes("/answer-link/")) return json(200, { exists: false });
-      if (url.includes("/submissions/")) return json(200, []);
       if (url.includes("/questions/")) return json(200, served);
       if (url.endsWith("/members/")) return json(200, members);
       return projectsReply(url);
@@ -660,76 +664,5 @@ describe("Workspace (#70)", () => {
       expect(screen.queryByText("Manage members")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add member" })).not.toBeInTheDocument();
     });
-  });
-});
-
-describe("Workspace: answers sent through the answer link (#114)", () => {
-  afterEach(() => vi.unstubAllGlobals());
-
-  const waiting = {
-    id: 9,
-    question_number: 1,
-    question_label: "Q1",
-    question_text: "Which payment providers are allowed?",
-    text: "Stripe and PayPal",
-    submitter_name: "Leyla",
-    submitted_at: "2026-11-15T09:30:00Z",
-    state: "pending",
-    decided_by: null,
-    decided_at: null,
-  };
-
-  it("shows the answers panel and the link panel beside the add form", async () => {
-    api();
-    render(<Workspace />);
-
-    expect(await screen.findByRole("heading", { name: "Answers from the link" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Answer link" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Add a question" })).toBeInTheDocument();
-  });
-
-  it("accepting an answer reloads that question, which then shows as answered through the answer link", async () => {
-    let accepted = false;
-    const answeredQ1 = {
-      ...q(1, "answered", "Which payment providers are allowed?"),
-      current_answer: {
-        id: 1,
-        text: "Stripe and PayPal",
-        answered_by: "Leyla",
-        answered_on: "2026-11-15",
-        channel: "link",
-        channel_note: "",
-        recorded_by: "owner@example.invalid",
-        recorded_at: "2026-11-15T10:00:00Z",
-        superseded_at: null,
-      },
-    };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string, init?: RequestInit) => {
-        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
-        if (url.includes("/submissions/9/accept/") && init?.method === "POST") {
-          accepted = true;
-          return json(200, { ...waiting, state: "accepted" });
-        }
-        if (url.includes("/submissions/")) return json(200, accepted ? [] : [waiting]);
-        if (url.includes("/answer-link/")) return json(200, { exists: false });
-        if (url.endsWith("/questions/1/")) return json(200, answeredQ1);
-        if (url.includes("/questions/")) return json(200, questions);
-        if (url.endsWith("/members/")) return json(200, members);
-        return projectsReply(url);
-      }),
-    );
-    render(<Workspace />);
-    expect(within(await screen.findByTestId("stat-answered")).getByText("1")).toBeInTheDocument();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Accept Q1 · Leyla" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save as the answer" }));
-
-    await waitFor(() => expect(within(screen.getByTestId("stat-answered")).getByText("2")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: /Q1.*Which payment providers/ }));
-    const detail = screen.getByRole("region", { name: "Selected question" });
-    expect(within(detail).getByText("Stripe and PayPal")).toBeInTheDocument();
-    expect(within(detail).getByText(/by Leyla · Answer link/)).toBeInTheDocument();
   });
 });

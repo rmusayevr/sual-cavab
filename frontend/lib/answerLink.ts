@@ -38,6 +38,19 @@ export const MIN_DAYS = 1;
 export const MAX_DAYS = 30;
 export const DEFAULT_DAYS = 14;
 
+/** How long the link stays on screen after it is made. It is a credential that needs no account; a screen that
+ * someone walked away from must not keep showing it. */
+export const LINK_VISIBLE_MS = 5 * 60 * 1000;
+
+/** Unicode direction controls (embeddings, overrides, isolates, marks). A name typed by an anonymous person can
+ * carry one, and an unclosed right-to-left override reverses the words that follow it in the same line. */
+const DIRECTION_CONTROLS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+
+/** A name typed by an anonymous client, made safe to put inside a sentence. */
+export function plainName(name: string): string {
+  return name.replace(DIRECTION_CONTROLS, "");
+}
+
 /** The link the client opens. The token goes after "#": a browser never sends that part to a server, so it
  * stays out of server logs and out of Referer (the design on #114). */
 export function answerUrl(origin: string, token: string): string {

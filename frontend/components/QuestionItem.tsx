@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { plainName } from "@/lib/answerLink";
 import { useT } from "@/lib/i18n";
 import type { QuestionStatus } from "@/lib/projects";
 import { TRANSITIONS, fieldErrors, transitionKey, type Answer, type FullQuestion } from "@/lib/questions";
@@ -219,10 +220,16 @@ function AnswerView({ answer, heading }: { answer: Answer; heading: string }) {
     <div className="grid gap-1 border-l-4 border-status-answered bg-muted p-3">
       <p className="text-sm font-medium text-muted-foreground">{heading}</p>
       <p>{answer.text}</p>
-      <p className="text-sm text-muted-foreground">
-        {t("question.by", { who: answer.answered_by })} · {t(`channel.${answer.channel}`)}
-        {answer.channel_note ? ` (${answer.channel_note})` : ""} · {answer.answered_on}
-      </p>
+      {answer.channel === "link" ? (
+        <p className="text-sm text-muted-foreground">
+          {t("question.viaLink", { who: plainName(answer.answered_by), by: answer.recorded_by, date: answer.answered_on })}
+        </p>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {t("question.by", { who: answer.answered_by })} · {t(`channel.${answer.channel}`)}
+          {answer.channel_note ? ` (${answer.channel_note})` : ""} · {answer.answered_on}
+        </p>
+      )}
     </div>
   );
 }

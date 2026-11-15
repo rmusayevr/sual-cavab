@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
-import { isSubmissionList, shortDate, type Submission } from "@/lib/answerLink";
+import { isSubmissionList, plainName, shortDate, type Submission } from "@/lib/answerLink";
 import { useT } from "@/lib/i18n";
 
 import { failure } from "./QuestionItem";
@@ -18,8 +18,9 @@ type State = { kind: "loading" } | { kind: "error" } | { kind: "ready"; pending:
 /**
  * What clients sent through the answer link, waiting for a member to decide (#114). Nothing a client sends is an
  * answer until a member accepts it here; accepting uses the same status change as every other answer. The text
- * and the name are typed by an anonymous person: they are shown as plain text, never as markup, and the name is
- * marked as not verified. After each change the list is read again from the server.
+ * and the name are typed by an anonymous person: they are shown as plain text, never as markup, the name has
+ * its direction-control characters removed (one could reverse the words around it), and the name is marked as
+ * not verified. After each change the list is read again from the server.
  */
 export default function SubmissionsPanel({
   projectId,
@@ -31,6 +32,10 @@ export default function SubmissionsPanel({
 }) {
   const t = useT();
   const base = `/api/projects/${projectId}/submissions/`;
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const inFlight = useRef(false);
+  const latestLoad = useRef(0); // only the newest read may change what is shown
+  const returnFocusTo = useRef<number | null>(null);
   const [state, setState] = useState<State>({ kind: "loading" });
   const [dismissed, setDismissed] = useState<Submission[] | null>(null);
   const [showDismissed, setShowDismissed] = useState(false);
@@ -55,9 +60,12 @@ export default function SubmissionsPanel({
 
   const load = useCallback(
     async (alsoDismissed: boolean) => {
-      const pending = await read("pending");
+      const mine = ++latestLoad.current;
+      const [pending, other] = await Promise.all([read("pending"), alsoDismissed ? read("dismissed") : Promise.resolve(undefined)]);
+      if (mine !== latestLoad.current) return; // a newer read has started: its answer is the one to show
       setState(pending ? { kind: "ready", pending } : { kind: "error" });
-      if (alsoDismissed) setDismissed(await read("dismissed"));
+      if (pending && pending.length <= 1) setAskAll(false); // "dismiss all" is not offered for one, and must not come back unasked
+      if (other !== undefined) setDismissed(other);
     },
     [read],
   );
@@ -68,8 +76,18 @@ export default function SubmissionsPanel({
     void load(false);
   }, [load]);
 
-  /** Do one change, then read the lists again. `fields` are the field names whose errors may be shown. */
+  // After Cancel the editor goes away and the Accept button it replaced comes back: put the keyboard on it.
+  useEffect(() => {
+    if (accepting === null && returnFocusTo.current !== null) {
+      document.getElementById(`accept-${returnFocusTo.current}`)?.focus();
+      returnFocusTo.current = null;
+    }
+  }, [accepting]);
+
+  /** Do one change, then read the lists again (also after a refusal: the refusal usually means the list is out of date). */
   async function change(path: string, body: unknown, fallback: string, fields: string[], then?: () => void) {
+    if (inFlight.current) return; // a second click while the first is still on its way
+    inFlight.current = true;
     setBusy(true);
     setProblem(null);
     try {
@@ -77,13 +95,16 @@ export default function SubmissionsPanel({
       if (response.ok) {
         then?.();
         await load(showDismissed);
+        headingRef.current?.focus(); // the button that was pressed is gone: keep the keyboard on this card
       } else {
         const errors = await failure(response, fallback, fields);
         setProblem(errors.form ?? Object.values(errors)[0] ?? fallback);
+        await load(showDismissed);
       }
     } catch {
       setProblem(t("error.server"));
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
@@ -99,7 +120,10 @@ export default function SubmissionsPanel({
   function toggleDismissed() {
     const next = !showDismissed;
     setShowDismissed(next);
-    if (next) void read("dismissed").then(setDismissed);
+    if (next) {
+      setDismissed(null); // not the list from the last time it was open
+      void load(true);
+    }
   }
 
   const pending = state.kind === "ready" ? state.pending : [];
@@ -107,7 +131,7 @@ export default function SubmissionsPanel({
   return (
     <Card className="grid gap-3" aria-labelledby={`submissions-heading-${projectId}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id={`submissions-heading-${projectId}`} className="text-lg font-semibold">
+        <h2 ref={headingRef} tabIndex={-1} id={`submissions-heading-${projectId}`} className="text-lg font-semibold">
           {t("submissions.title")}
         </h2>
         {state.kind === "ready" && pending.length > 0 && (
@@ -126,7 +150,8 @@ export default function SubmissionsPanel({
       {pending.length > 0 && (
         <ul className="m-0 grid list-none gap-4 p-0">
           {pending.map((s) => {
-            const name = `${s.question_label} · ${s.submitter_name}`;
+            const who = plainName(s.submitter_name);
+            const name = `${s.question_label} · ${who}`;
             return (
               <li key={s.id} className="grid gap-2 border-t pt-3 first:border-t-0 first:pt-0">
                 <p className="text-sm">
@@ -134,7 +159,7 @@ export default function SubmissionsPanel({
                 </p>
                 <p className="whitespace-pre-wrap">{s.text}</p>
                 <p className="text-sm text-muted-foreground">
-                  {t("submissions.from", { who: s.submitter_name, when: shortDate(s.submitted_at) })}
+                  {t("submissions.from", { who, when: shortDate(s.submitted_at) })}
                 </p>
                 {accepting === s.id ? (
                   <form onSubmit={(e) => onAccept(e, s)} className="grid gap-2" aria-label={name}>
@@ -143,6 +168,7 @@ export default function SubmissionsPanel({
                         <Textarea
                           rows={5}
                           required
+                          autoFocus
                           disabled={busy}
                           value={draft}
                           onChange={(e) => setDraft(e.target.value)}
@@ -154,7 +180,14 @@ export default function SubmissionsPanel({
                       <Button type="submit" disabled={busy}>
                         {busy ? t("submissions.accepting") : t("submissions.acceptSave")}
                       </Button>
-                      <Button variant="secondary" disabled={busy} onClick={() => setAccepting(null)}>
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => {
+                          returnFocusTo.current = s.id;
+                          setAccepting(null);
+                        }}
+                      >
                         {t("question.cancel")}
                       </Button>
                     </div>
@@ -162,6 +195,7 @@ export default function SubmissionsPanel({
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     <Button
+                      id={`accept-${s.id}`}
                       disabled={busy}
                       aria-label={`${t("submissions.accept")} ${name}`}
                       onClick={() => {
@@ -196,8 +230,8 @@ export default function SubmissionsPanel({
         </Button>
         {pending.length > 1 &&
           (askAll ? (
-            <span role="group" aria-label={t("submissions.dismissAllAsk", { n: pending.length })} className="flex flex-wrap items-center gap-2">
-              <span>{t("submissions.dismissAllAsk", { n: pending.length })}</span>
+            <span role="group" aria-label={t("submissions.dismissAllAsk")} className="flex flex-wrap items-center gap-2">
+              <span>{t("submissions.dismissAllAsk")}</span>
               <Button
                 variant="danger"
                 disabled={busy}
@@ -227,27 +261,30 @@ export default function SubmissionsPanel({
             <p className="text-sm text-muted-foreground">{t("submissions.dismissedNone")}</p>
           ) : (
             <ul className="m-0 grid list-none gap-3 p-0">
-              {dismissed.map((s) => (
-                <li key={s.id} className="grid gap-1">
-                  <p className="text-sm">
-                    <span className="font-mono text-xs text-primary">{s.question_label}</span> {s.question_text}
-                  </p>
-                  <p className="whitespace-pre-wrap text-muted-foreground">{s.text}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {t("submissions.from", { who: s.submitter_name, when: shortDate(s.submitted_at) })}
-                  </p>
-                  <div>
-                    <Button
-                      variant="secondary"
-                      disabled={busy}
-                      aria-label={`${t("submissions.restore")} ${s.question_label} · ${s.submitter_name}`}
-                      onClick={() => void change(`${s.id}/restore/`, {}, t("submissions.restoreFailed"), [])}
-                    >
-                      {t("submissions.restore")}
-                    </Button>
-                  </div>
-                </li>
-              ))}
+              {dismissed.map((s) => {
+                const who = plainName(s.submitter_name);
+                return (
+                  <li key={s.id} className="grid gap-1">
+                    <p className="text-sm">
+                      <span className="font-mono text-xs text-primary">{s.question_label}</span> {s.question_text}
+                    </p>
+                    <p className="whitespace-pre-wrap text-muted-foreground">{s.text}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("submissions.from", { who, when: shortDate(s.submitted_at) })}
+                    </p>
+                    <div>
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        aria-label={`${t("submissions.restore")} ${s.question_label} · ${who}`}
+                        onClick={() => void change(`${s.id}/restore/`, {}, t("submissions.restoreFailed"), [])}
+                      >
+                        {t("submissions.restore")}
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

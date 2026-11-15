@@ -3,6 +3,10 @@
  * to Django, so the session and CSRF cookies are first-party.
  */
 
+/** Dispatched on window when the person has signed out in this tab, so a screen holding something that must not
+ * outlive the session (the answer link, shown once) can drop it. */
+export const SIGNED_OUT_EVENT = "sual:signed-out";
+
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function readCookie(name: string): string | null {

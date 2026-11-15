@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setLanguage, translate, type Key } from "@/lib/i18n";
@@ -282,5 +282,191 @@ describe("SubmissionsPanel (#114)", () => {
     await screen.findByText("Invented answer 1");
 
     for (const list of screen.getAllByRole("list")) expect(list).toHaveClass("list-none");
+  });
+});
+
+describe("SubmissionsPanel: out-of-date lists and double clicks (#114)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reads the list again when a decision is refused, so the item someone else already decided disappears", async () => {
+    const lists: Lists = { pending: [submission(3), submission(4)], dismissed: [] };
+    api(lists, (call, l) => {
+      if (call.method === "POST") {
+        l.pending = [submission(4)];
+        return json(400, { detail: ["This answer has already been decided."] });
+      }
+    });
+    open();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Accept Q3 · Client 3" }));
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.acceptSave") }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("This answer has already been decided.");
+    await waitFor(() => expect(screen.queryByText("Invented answer 3")).not.toBeInTheDocument());
+    expect(screen.getByText("Invented answer 4")).toBeInTheDocument();
+  });
+
+  it("lets only the newest read decide what is shown (a slow Refresh must not bring back a dismissed answer)", async () => {
+    let releaseSlow: (r: Response) => void = () => {};
+    const slow = new Promise<Response>((resolve) => (releaseSlow = resolve));
+    let reads = 0;
+    let dismissedOne = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+        if (init?.method === "POST") {
+          dismissedOne = true;
+          return json(200, {});
+        }
+        reads += 1;
+        if (reads === 2) return slow; // the Refresh: slow, and it will be answered with the OLD list
+        return json(200, dismissedOne ? [submission(2)] : [submission(1), submission(2)]);
+      }),
+    );
+    open();
+    await screen.findByText("Invented answer 1");
+
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.refresh") })); // read 2: slow
+    await waitFor(() => expect(reads).toBe(2));
+    // Refresh disables nothing, so a person can dismiss while it is still on its way:
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss Q1 · Client 1" }));
+    await waitFor(() => expect(screen.queryByText("Invented answer 1")).not.toBeInTheDocument());
+    await act(async () => {
+      releaseSlow(json(200, [submission(1), submission(2)])); // the old list arrives late
+    });
+
+    expect(screen.queryByText("Invented answer 1")).not.toBeInTheDocument();
+  });
+
+  it("does not bring the 'dismiss all' question back by itself after the list shrank and grew again", async () => {
+    const lists: Lists = { pending: [submission(1), submission(2)], dismissed: [] };
+    api(lists);
+    open();
+    fireEvent.click(await screen.findByRole("button", { name: t("submissions.dismissAll") }));
+    expect(screen.getByText(t("submissions.dismissAllAsk"))).toBeInTheDocument();
+
+    lists.pending = [submission(1)];
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.refresh") }));
+    await waitFor(() => expect(screen.queryByText(t("submissions.dismissAllAsk"))).not.toBeInTheDocument());
+    lists.pending = [submission(1), submission(2)];
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.refresh") }));
+
+    expect(await screen.findByRole("button", { name: t("submissions.dismissAll") })).toBeInTheDocument();
+    expect(screen.queryByText(t("submissions.dismissAllAsk"))).not.toBeInTheDocument();
+  });
+
+  it("asks about 'dismiss all' without a count, because the server dismisses everything waiting by then", async () => {
+    api({ pending: [submission(1), submission(2)], dismissed: [] });
+    open();
+
+    fireEvent.click(await screen.findByRole("button", { name: t("submissions.dismissAll") }));
+
+    expect(screen.getByText(t("submissions.dismissAllAsk")).textContent).not.toMatch(/\d/);
+  });
+
+  it("shows a loading state, not the list from last time, when the dismissed answers are opened again", async () => {
+    let dismissedReads = 0;
+    let release: (r: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("state=dismissed")) {
+          dismissedReads += 1;
+          if (dismissedReads === 2) return new Promise<Response>((resolve) => (release = resolve));
+          return json(200, [submission(4, { state: "dismissed" })]);
+        }
+        return json(200, []);
+      }),
+    );
+    open();
+    await screen.findByText(t("submissions.none"));
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.showDismissed") }));
+    await screen.findByText("Invented answer 4");
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.hideDismissed") }));
+
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.showDismissed") }));
+
+    expect(screen.queryByText("Invented answer 4")).not.toBeInTheDocument();
+    expect(screen.getByText(t("submissions.loading"))).toBeInTheDocument();
+    await act(async () => {
+      release(json(200, []));
+    });
+    expect(await screen.findByText(t("submissions.dismissedNone"))).toBeInTheDocument();
+  });
+
+  it("sends one accept even if the form is submitted twice before the first answer comes back", async () => {
+    let release: (r: Response) => void = () => {};
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+        if (init?.method === "POST") {
+          calls.push(url);
+          return new Promise<Response>((resolve) => (release = resolve));
+        }
+        return json(200, [submission(3)]);
+      }),
+    );
+    open();
+    fireEvent.click(await screen.findByRole("button", { name: "Accept Q3 · Client 3" }));
+
+    const form = screen.getByRole("form", { name: "Q3 · Client 3" });
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(calls).toEqual(["/api/projects/5/submissions/3/accept/"]));
+    await act(async () => {
+      release(json(200, {}));
+    });
+    expect(calls).toHaveLength(1); // the second submit never became a request
+  });
+});
+
+describe("SubmissionsPanel: keyboard (#114)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("puts the keyboard in the answer being edited, and back on Accept after Cancel", async () => {
+    api({ pending: [submission(3)], dismissed: [] });
+    open();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Accept Q3 · Client 3" }));
+    expect(screen.getByLabelText(t("submissions.acceptLabel", { label: "Q3" }))).toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: t("question.cancel") }));
+
+    expect(screen.getByRole("button", { name: "Accept Q3 · Client 3" })).toHaveFocus();
+  });
+
+  it("keeps the keyboard on the card after a dismissal removed the button it was on", async () => {
+    const lists: Lists = { pending: [submission(1)], dismissed: [] };
+    api(lists, (call, l) => {
+      if (call.method === "POST") {
+        l.pending = [];
+        return json(200, {});
+      }
+    });
+    open();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dismiss Q1 · Client 1" }));
+
+    await screen.findByText(t("submissions.none"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: t("submissions.title") })).toHaveFocus());
+  });
+});
+
+describe("SubmissionsPanel: a typed name cannot reorder the words around it (#114)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("removes direction controls from the name in the text and in the button names", async () => {
+    api({ pending: [submission(1, { submitter_name: "Mal\u202Elory" })], dismissed: [{ ...submission(2, { submitter_name: "Eve\u2067" }), state: "dismissed" }] });
+    const { container } = render(<SubmissionsPanel projectId={5} onAccepted={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "Accept Q1 · Mallory" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dismiss Q1 · Mallory" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.showDismissed") }));
+    expect(await screen.findByRole("button", { name: "Restore Q2 · Eve" })).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/[\u202A-\u202E\u2066-\u2069]/);
+    expect(screen.getByText(/From Mallory/)).toBeInTheDocument();
   });
 });
