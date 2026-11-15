@@ -266,6 +266,10 @@ function AnswerView({ answer, heading }: { answer: Answer; heading: string }) {
         <p className="text-sm text-muted-foreground">
           {t("question.viaLink", { who: plainName(answer.answered_by), by: answer.recorded_by, date: answer.answered_on })}
         </p>
+      ) : answer.channel === "client" ? (
+        <p className="text-sm text-muted-foreground">
+          {t("question.viaClient", { who: plainName(answer.answered_by), by: answer.recorded_by, date: answer.answered_on })}
+        </p>
       ) : answer.channel === "app" ? (
         <p className="text-sm text-muted-foreground">
           {t("question.by", { who: answer.answered_by })} · {answer.answered_on}

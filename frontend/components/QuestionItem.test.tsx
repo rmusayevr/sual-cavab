@@ -673,6 +673,23 @@ describe("QuestionItem: where an answer came from (#121)", () => {
   });
 });
 
+describe("QuestionItem: an answer a member accepted from a client account (#121)", () => {
+  it("says it was sent by the client account and accepted by the member", async () => {
+    backend({
+      [LIST]: () =>
+        json(200, [
+          question(1, {
+            status: "answered",
+            current_answer: answerOf({ channel: "client", answered_by: "Ada Client", recorded_by: "mark@example.com", answered_on: "2026-11-15" }),
+          }),
+        ]),
+    });
+    render(<Board projectId="5" />);
+
+    expect(await screen.findByText("Sent by Ada Client (client account) · accepted by mark@example.com · 2026-11-15")).toBeInTheDocument();
+  });
+});
+
 describe("QuestionItem: restoring the earlier answer (#121)", () => {
   const RESTORE_1 = "POST /api/projects/5/questions/1/restore-answer/";
   const reopened = (over: Record<string, unknown> = {}) =>

@@ -53,6 +53,7 @@ export const az: Record<Key, string> = {
   "question.blocks": "Bloklayır: {text}",
   "question.answer": "Cavab",
   "question.earlier": "Əvvəlki cavab",
+  "question.viaClient": "{who} göndərib (müştəri hesabı) · {by} qəbul edib · {date}",
   "question.viaLink": "Cavab linki ilə göndərən: {who} (ad yoxlanılmayıb) · qəbul edən: {by} · {date}",
   "question.by": "{who} tərəfindən",
   "question.edit": "Redaktə et",
@@ -128,6 +129,7 @@ export const az: Record<Key, string> = {
 
   "members.label": "Üzvlər",
   "role.owner": "sahib",
+  "role.client": "müştəri (yalnız suallara cavab verir)",
   "role.member": "üzv",
   "members.manage": "Üzvləri idarə et",
   "members.hint": "Sahib üzv əlavə edə və çıxara bilər. Şəxsin hesabı əvvəlcədən olmalıdır; admindən hesab yaratmasını xahiş edin.",
@@ -188,6 +190,7 @@ export const az: Record<Key, string> = {
   "submissions.loading": "Cavablar yüklənir…",
   "submissions.loadError": "Cavabları yükləmək alınmadı.",
   "submissions.none": "Heç nə gözləmir. Link vasitəsilə göndərilən cavablar burada görünəcək.",
+  "submissions.fromAccount": "{who} tərəfindən (müştəri hesabı) · {when}",
   "submissions.from": "Göndərən: {who} (müştərinin yazdığı ad, yoxlanılmayıb) · {when}",
   "submissions.waitingHere": "Sizi gözləyir: cavab linki ilə göndərilən cavablar",
   "submissions.openHint": "Müştərilərin göndərdiyi cavabları qəbul etmək və ya rədd etmək üçün sualı açın.",

@@ -1,6 +1,6 @@
 import type { Key } from "./i18n/en";
 
-export type Role = "owner" | "member";
+export type Role = "owner" | "member" | "client"; // a client only answers questions (#121)
 
 export type Project = {
   id: number;

@@ -25,8 +25,10 @@ export type Submission = {
   question_text: string;
   /** What the client typed. Plain text: never put it in markup. */
   text: string;
-  /** A name the client typed. Never verified. */
+  /** From a link, a name the client typed (never verified); from a client account, the account's own name. */
   submitter_name: string;
+  /** "account": a client account sent it. "link": someone with the private link did. */
+  source: "account" | "link";
   submitted_at: string;
   state: SubmissionState;
   decided_by: string | null;

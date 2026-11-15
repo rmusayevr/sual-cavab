@@ -64,7 +64,7 @@ export default function WaitingAnswers({
             <li key={s.id} className="grid gap-2 border-t pt-3 first:border-t-0 first:pt-0">
               <p className="whitespace-pre-wrap">{s.text}</p>
               <p className="text-sm text-muted-foreground">
-                {t("submissions.from", { who, when: shortDate(s.submitted_at) })}
+                {t(s.source === "account" ? "submissions.fromAccount" : "submissions.from", { who, when: shortDate(s.submitted_at) })}
               </p>
               {accepting === s.id ? (
                 <form onSubmit={(e) => void onAccept(e, s)} className="grid gap-2" aria-label={name}>
