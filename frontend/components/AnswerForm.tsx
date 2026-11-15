@@ -3,19 +3,15 @@
 import { useRef, useState, type FormEvent } from "react";
 
 import { useT } from "@/lib/i18n";
-import { CHANNELS, today, type Channel } from "@/lib/questions";
 
 import type { SubmitResult } from "./QuestionForm";
 import { Alert } from "./ui/Alert";
 import { Button } from "./ui/Button";
-import { Input, Select, Textarea } from "./ui/Field";
+import { Textarea } from "./ui/Field";
 
+/** What a person types to answer a question (#121): the text. Who answered, when and where are the server's. */
 export type AnswerFields = {
   text: string;
-  answered_by: string;
-  answered_on: string;
-  channel: Channel;
-  channel_note: string;
 };
 
 type Props = {
@@ -26,16 +22,10 @@ type Props = {
   canSave?: boolean;
 };
 
-/** Records who answered a question, when, and where. */
+/** Answers a question: one box for the text, saved as given by the signed-in person, today, in the app. */
 export default function AnswerForm({ idPrefix, onSubmit, onCancel, canSave = true }: Props) {
   const t = useT();
-  const [values, setValues] = useState<AnswerFields>({
-    text: "",
-    answered_by: "",
-    answered_on: today(),
-    channel: "chat",
-    channel_note: "",
-  });
+  const [values, setValues] = useState<AnswerFields>({ text: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
@@ -57,83 +47,27 @@ export default function AnswerForm({ idPrefix, onSubmit, onCancel, canSave = tru
     }
   }
 
-  const id = (name: string) => `${idPrefix}-${name}`;
-  const error = (name: string) =>
-    errors[name] && (
-      <div role="alert" id={id(`${name}-error`)} className="text-sm text-primary">
-        {errors[name]}
-      </div>
-    );
-  /** Ties an input to its message, so tabbing back to the field announces it. */
-  const invalid = (name: string) =>
-    errors[name] ? { "aria-invalid": true as const, "aria-describedby": id(`${name}-error`) } : {};
-  const label = (name: string, text: string) => (
-    <label htmlFor={id(name)} className="text-sm font-medium">
-      {text}
-    </label>
-  );
-
-  // Not the shared Field: the ids come from idPrefix and each message is an alert of its own
-  // (the tests depend on it); only the look is shared.
+  const textId = `${idPrefix}-text`;
+  // Not the shared Field: the ids come from idPrefix and the message is an alert of its own (the tests depend on it);
+  // only the look is shared.
   return (
     <form onSubmit={submit} className="grid gap-4">
       <div className="grid gap-1">
-        {label("text", t("answer.text"))}
+        <label htmlFor={textId} className="text-sm font-medium">
+          {t("answer.text")}
+        </label>
         <Textarea
-          id={id("text")}
+          id={textId}
           rows={3}
           value={values.text}
-          onChange={(e) => setValues({ ...values, text: e.target.value })}
-          {...invalid("text")}
+          onChange={(e) => setValues({ text: e.target.value })}
+          {...(errors.text ? { "aria-invalid": true as const, "aria-describedby": `${textId}-error` } : {})}
         />
-        {error("text")}
-      </div>
-      <div className="grid gap-1">
-        {label("by", t("answer.by"))}
-        <Input
-          id={id("by")}
-          value={values.answered_by}
-          onChange={(e) => setValues({ ...values, answered_by: e.target.value })}
-          {...invalid("answered_by")}
-        />
-        {error("answered_by")}
-      </div>
-      <div className="grid gap-1">
-        {label("on", t("answer.date"))}
-        <Input
-          id={id("on")}
-          type="date"
-          value={values.answered_on}
-          onChange={(e) => setValues({ ...values, answered_on: e.target.value })}
-          {...invalid("answered_on")}
-        />
-        {error("answered_on")}
-      </div>
-      <div className="grid gap-1">
-        {label("channel", t("answer.where"))}
-        <Select
-          id={id("channel")}
-          value={values.channel}
-          onChange={(e) => setValues({ ...values, channel: e.target.value as Channel })}
-          {...invalid("channel")}
-        >
-          {CHANNELS.map((c) => (
-            <option key={c.value} value={c.value}>
-              {t(`channel.${c.value}`)}
-            </option>
-          ))}
-        </Select>
-        {error("channel")}
-      </div>
-      <div className="grid gap-1">
-        {label("note", t("answer.note"))}
-        <Input
-          id={id("note")}
-          value={values.channel_note}
-          onChange={(e) => setValues({ ...values, channel_note: e.target.value })}
-          {...invalid("channel_note")}
-        />
-        {error("channel_note")}
+        {errors.text && (
+          <div role="alert" id={`${textId}-error`} className="text-sm text-primary">
+            {errors.text}
+          </div>
+        )}
       </div>
       {errors.form && <Alert tone="error">{errors.form}</Alert>}
       <div className="flex flex-wrap gap-2">

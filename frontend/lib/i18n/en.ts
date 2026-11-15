@@ -44,7 +44,6 @@ export const en = {
   "workspace.all": "All",
   "workspace.none": "No questions yet. Add the first one.",
   "workspace.noneWithStatus": "No questions with this status.",
-  "workspace.selectPrompt": "Select a question to see why it matters, what it blocks and its answer.",
   "workspace.selected": "Selected question",
   "workspace.add": "Add a question",
 
@@ -73,10 +72,6 @@ export const en = {
   "form.adding": "Adding…",
 
   "answer.text": "Answer",
-  "answer.by": "Answered by",
-  "answer.date": "Date",
-  "answer.where": "Where",
-  "answer.note": "Note (optional)",
   "answer.save": "Save answer",
   "answer.keptRetry": "Your answer was not saved, but it is kept below. Check the question, then save it again.",
   "answer.keptCopy": "Your answer was not saved, but it is kept below so you can copy it. The question cannot be answered in its present state.",
@@ -84,6 +79,7 @@ export const en = {
   "channel.meeting": "Meeting",
   "channel.email": "Email",
   "channel.other": "Other",
+  "channel.app": "In the app",
 
   "error.addQuestion": "Could not add the question.",
   "error.changeStatus": "Could not change the status.",
@@ -190,6 +186,9 @@ export const en = {
   "submissions.loadError": "Could not load the answers.",
   "submissions.none": "Nothing is waiting. Answers sent through the link appear here.",
   "submissions.from": "From {who} (name typed by the client, not verified) · {when}",
+  "submissions.waitingHere": "Waiting for you: answers sent through the answer link",
+  "submissions.openHint": "Open a question to accept or dismiss what clients sent for it.",
+  "submissions.openQuestion": "Open {label} ({n} waiting)",
   "submissions.refresh": "Refresh",
   "submissions.accept": "Accept",
   "submissions.acceptLabel": "Answer for {label} (you can edit it; the client's original is kept)",

@@ -30,8 +30,22 @@ class TransitionNotAllowed(Exception):
         super().__init__(f"{current} -> {to}")
 
 
+def in_app_answer(user, text):
+    """An answer typed in the app by `user` (#121): given by them, today, in the app."""
+    return {
+        "text": text,
+        "answered_by": (user.get_full_name() or user.email)[:200],  # the column holds 200; a name can be 301 long
+        "answered_on": timezone.localdate(),
+        "channel": Answer.Channel.APP,
+        "channel_note": "",
+    }
+
+
 def change_status(question, to, user, answer=None):
-    """Move `question` to `to`; `answer` is a dict, required for 'answered'."""
+    """Move `question` to `to`; `answer` is a dict with at least the text, required for 'answered'.
+
+    Whatever the dict leaves out (who answered, when, where) is filled in as an answer typed in the app by `user`;
+    a caller that knows better (accepting what a client sent through the answer link) says so explicitly."""
     current, to = S(question.status), S(to)
     if to not in TRANSITIONS[current]:
         raise TransitionNotAllowed(current, to)
@@ -44,7 +58,7 @@ def change_status(question, to, user, answer=None):
     if to == S.ASKED:
         question.asked_at = now
     elif to == S.ANSWERED:
-        Answer.objects.create(question=question, recorded_by=user, **answer)
+        Answer.objects.create(question=question, recorded_by=user, **{**in_app_answer(user, answer["text"]), **answer})
         question.answered_at = now
     elif to == S.DROPPED:
         question.dropped_at = now

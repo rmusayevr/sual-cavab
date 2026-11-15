@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { QuestionItem } from "@/components/QuestionItem";
@@ -95,18 +95,16 @@ for (const lang of ["en", "az"] as Language[]) {
       expect(screen.getByRole("button", { name: t("question.cancel") })).toBeInTheDocument();
     });
 
-    it("words the answer form, its channels and its buttons", () => {
+    it("words the answer form (one box) and its buttons", () => {
       act(() => setLanguage(lang));
       show(question("open"));
 
       fireEvent.click(screen.getByRole("button", { name: t("transition.recordAnswer") }));
 
-      for (const key of ["answer.text", "answer.by", "answer.date", "answer.where", "answer.note"] as Key[])
-        expect(screen.getByLabelText(t(key))).toBeInTheDocument();
-      const where = screen.getByLabelText(t("answer.where"));
-      for (const c of ["chat", "meeting", "email", "other"] as const)
-        expect(within(where).getByRole("option", { name: t(`channel.${c}`) })).toBeInTheDocument();
+      expect(screen.getByLabelText(t("answer.text"))).toBeInTheDocument();
+      expect(screen.queryByRole("combobox")).not.toBeInTheDocument(); // no place to choose any more (#121)
       expect(screen.getByRole("button", { name: t("answer.save") })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: t("question.cancel") })).toBeInTheDocument();
     });
 
     it("says in the language that a failed status change could not reach the server", async () => {
@@ -218,7 +216,6 @@ for (const lang of ["en", "az"] as Language[]) {
       show(question("open"));
       fireEvent.click(screen.getByRole("button", { name: t("transition.recordAnswer") }));
       fireEvent.change(screen.getByLabelText(t("answer.text")), { target: { value: "Invented answer." } });
-      fireEvent.change(screen.getByLabelText(t("answer.by")), { target: { value: "Invented Person" } });
 
       fireEvent.click(screen.getByRole("button", { name: t("answer.save") }));
 

@@ -12,7 +12,8 @@ Sual-Cavab ("question-answer" in Azerbaijani) keeps them in one place:
 - **Questions per project**, numbered Q1, Q2…, each with why it matters and
   which task it blocks.
 - **A clear status:** open, asked, answered or dropped. Every answer records
-  who gave it, when, and where.
+  who gave it and when (an answer typed in the app is saved as given by the signed-in person, today; answers
+  recorded before #121 also say where they came from).
 - **What's still open**, at a glance.
 
 > Status: early. The first version is being built in the open, issue by issue.
@@ -385,10 +386,12 @@ what is allowed:
 | `answered` | `open` (re-open)                              |
 | `dropped`  | `open` (restore)                              |
 
-- Marking a question `answered` needs an answer: the text, who answered (free
-  text, since the client contact may not be a user), the date, and where
-  (chat, meeting, email or other, with an optional note). The user who recorded
-  it is saved too.
+- Marking a question `answered` needs an answer, and an answer is **only its text** (#121): who answered (the
+  signed-in person's name, or their email), the date (today) and where (`app`, "In the app") are set by the server,
+  and anything else in the request is ignored, so who gave an answer and where it came from cannot be forged by
+  hand. An answer a member accepted from a client's answer link has the channel `link` and the name the client typed.
+  Answers recorded before #121 keep the channel they were given (chat, meeting, email or other, with a note) and
+  the name that was typed.
 - Answers are never edited or deleted. Re-opening a question keeps its answer
   as history (`previous_answers`); answering again adds a new one. To correct
   an answer, re-open and answer again.
@@ -406,7 +409,7 @@ what is allowed:
 The workspace (`/projects/<id>`) shows what the project is waiting on: the
 counts of questions in each status, and every question with its number, status
 and text; a question in status **open** or **asked** also says how long it has
-been open (what it blocks is on the selected question). The age counts from when
+been open (what it blocks is shown when the question is opened: pressing a question opens it below its own row). The age counts from when
 the question was created; re-opening a question does not reset it. The project
 list shows the same count of open questions (`open_question_count`, computed in
 the database from the same two statuses).
@@ -433,9 +436,10 @@ answer, shown as "Earlier answer".
 A team member makes a private link for a project and sends it to the client. The client opens it with no account,
 sees the project's open questions (status open or asked) and can send an answer. **Nothing a client sends is an
 answer yet:** it waits as a *submission*, and a team member accepts it (it then becomes the question's answer, marked
-"Answer link") or dismisses it. The team's side is in the workspace (PR B of three): an
-"Answers from the link" card (what is waiting, with accept, dismiss and restore) and an "Answer link" card (make a
-link, copy it once, revoke it), in both languages. The full link is shown once and held only in memory: it is dropped
+"Answer link") or dismisses it. The team's side is in the workspace: **the answers waiting for a question are inside that
+question** (a "N waiting" mark on its row; open it to accept or dismiss them), an "Answers from the link" card
+summarises them (which questions have some, "dismiss all" for spam, the dismissed ones with restore) and an "Answer
+link" card (make a link, copy it once, revoke it), in both languages. The full link is shown once and held only in memory: it is dropped
 when the person revokes or replaces it, signs out, leaves the page, or after five minutes. Replacing a live link asks
 first, because the one the client already has stops working. An answer a member accepted from a client is marked on
 the question card as sent through the answer link, with the name as typed ("name not verified") and who accepted it;

@@ -383,3 +383,50 @@ describe("ProjectList: the ledger (#72)", () => {
     });
   });
 });
+
+// #121: the page the person is looking at must follow a sign-out, not wait for a refresh.
+describe("ProjectList: signing out (#121)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows the signed-out prompt at once and no longer lists the projects", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(5, "Ticketing", "owner", 2)]))));
+    render(<ProjectList />);
+    await screen.findByText(/Ticketing/);
+
+    act(() => {
+      window.dispatchEvent(new Event("sual:signed-out"));
+    });
+
+    expect(await screen.findByText(/to see your projects/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ticketing/)).not.toBeInTheDocument();
+  });
+
+  it("stops listening when the list is removed from the page", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, page([project(5, "Ticketing")]))));
+    const view = render(<ProjectList />);
+    await screen.findByText(/Ticketing/);
+    const remove = vi.spyOn(window, "removeEventListener");
+
+    view.unmount();
+
+    expect(remove).toHaveBeenCalledWith("sual:signed-out", expect.any(Function));
+  });
+});
+
+describe("ProjectList: a sign-out during the first load (#121)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("stays signed out when the load that was already on its way answers afterwards", async () => {
+    let release: (r: Response) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => (release = resolve))));
+    render(<ProjectList />);
+
+    act(() => {
+      window.dispatchEvent(new Event("sual:signed-out"));
+    });
+    await act(async () => release(json(200, page([project(5, "Ticketing")]))));
+
+    expect(await screen.findByText(/to see your projects/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ticketing/)).not.toBeInTheDocument();
+  });
+});

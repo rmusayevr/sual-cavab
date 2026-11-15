@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Workspace from "./Workspace";
@@ -146,15 +146,48 @@ describe("Workspace (#70)", () => {
     expect(document.querySelector('a[href^="mailto:"], a[href^="sms:"], a[href*="wa.me"], a[href*="t.me"]')).toBeNull();
   });
 
-  it("shows the selected question on the right, with its reason and what it blocks", async () => {
+  it("opens the question below its own row, with its reason and what it blocks", async () => {
     api();
     render(<Workspace />);
-    fireEvent.click(await screen.findByRole("button", { name: /Q2.*Who approves refunds/ }));
+    const row = await screen.findByRole("button", { name: /Q2.*Who approves refunds/ });
+    expect(screen.queryByRole("region", { name: "Selected question" })).not.toBeInTheDocument();
+
+    fireEvent.click(row);
 
     const detail = screen.getByRole("region", { name: "Selected question" });
-    expect(within(detail).getByText("Who approves refunds?")).toBeInTheDocument();
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(row.closest("li")).toContainElement(detail); // inside the same card, below the question
     expect(within(detail).getByText(/Why 2/)).toBeInTheDocument();
     expect(within(detail).getByText(/Blocks 2/)).toBeInTheDocument();
+    expect(within(detail).queryByText("Who approves refunds?")).not.toBeInTheDocument(); // the row above already says it
+  });
+
+  it("closes the question when its row is pressed again, and opens only one at a time", async () => {
+    api();
+    render(<Workspace />);
+    const q1 = await screen.findByRole("button", { name: /Q1.*Which payment providers/ });
+    const q2 = screen.getByRole("button", { name: /Q2.*Who approves refunds/ });
+
+    fireEvent.click(q1);
+    fireEvent.click(q2);
+    expect(screen.getAllByRole("region", { name: "Selected question" })).toHaveLength(1);
+    expect(q1).toHaveAttribute("aria-expanded", "false");
+    expect(q2.closest("li")).toContainElement(screen.getByRole("region", { name: "Selected question" }));
+
+    fireEvent.click(q2);
+
+    expect(screen.queryByRole("region", { name: "Selected question" })).not.toBeInTheDocument();
+    expect(q2).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("has nothing on the right-hand side for the selected question any more", async () => {
+    api();
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("button", { name: /Q1.*Which payment providers/ }));
+
+    const aside = screen.getByRole("complementary");
+    expect(within(aside).queryByRole("region", { name: "Selected question" })).not.toBeInTheDocument();
+    expect(within(aside).getByRole("heading", { name: "Add a question" })).toBeInTheDocument();
   });
 
   it("has exactly one carpet strip", async () => {
@@ -450,17 +483,15 @@ describe("Workspace (#70)", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Q1.*Which payment providers/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "Thirty days, in writing." } });
-    fireEvent.change(screen.getByLabelText("Answered by"), { target: { value: "Invented Person" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
 
     expect(await screen.findByText("A dropped question cannot become answered.")).toBeInTheDocument();
     const detail = screen.getByRole("region", { name: "Selected question" });
     expect(within(detail).getByLabelText("Answer")).toHaveValue("Thirty days, in writing."); // kept through the reload
-    expect(within(detail).getByLabelText("Answered by")).toHaveValue("Invented Person");
     expect(within(detail).queryByRole("button", { name: "Save answer" })).not.toBeInTheDocument();
     expect(within(detail).getByText(/kept below so you can copy it/)).toBeInTheDocument();
-    expect(within(detail).getAllByText("Dropped").length).toBeGreaterThan(0); // the card shows the question as it is now
+    expect(within(detail.closest("li")!).getAllByText("Dropped").length).toBeGreaterThan(0); // the row shows the question as it is now
   });
 
   // #91: a 401 or 403 means the session ended (the backend answers 404 for a project the person is not
@@ -664,5 +695,141 @@ describe("Workspace (#70)", () => {
       expect(screen.queryByText("Manage members")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add member" })).not.toBeInTheDocument();
     });
+  });
+});
+
+// #121: the page the person is looking at must follow a sign-out, not wait for a refresh.
+describe("Workspace: signing out (#121)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const signedInAs = (logout: () => Response) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+        if (url === "/api/auth/me/") return json(200, { id: 1, email: "owner@example.invalid", name: "Olga Owner" });
+        if (url === "/api/auth/logout/" && init?.method === "POST") return logout();
+        if (url.includes("/questions/")) return json(200, served);
+        if (url.endsWith("/members/")) return json(200, members);
+        return projectsReply(url);
+      }),
+    );
+
+  it("shows the signed-out page at once when the person signs out in the header, and no longer shows the project", async () => {
+    signedInAs(() => new Response(null, { status: 204 }));
+    render(<Workspace />);
+    await screen.findByRole("heading", { level: 1, name: "Ticketing" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByText(/to see this project/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Ticketing" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Which payment providers are allowed?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Olga Owner · owner")).not.toBeInTheDocument();
+  });
+
+  it("keeps the project on screen when the sign-out was refused and the person is still signed in", async () => {
+    signedInAs(() => json(403, { detail: "CSRF Failed" }));
+    render(<Workspace />);
+    await screen.findByRole("heading", { level: 1, name: "Ticketing" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByText(/Sign-out failed/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Ticketing" })).toBeInTheDocument();
+    expect(screen.queryByText(/to see this project/)).not.toBeInTheDocument();
+  });
+});
+
+// Review of #122: the open question must stay on screen while it is open, whatever the filter says.
+describe("Workspace: the open question and the filter (#121)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    served = questions;
+  });
+
+  it("keeps the open question on screen when its status stops matching the filter, and drops it once it is closed", async () => {
+    api({ "/transition/": () => json(200, { ...questions[0], status: "asked" }) });
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("button", { name: "Open" })); // the filter: Q1 is the only open question
+    const row = await screen.findByRole("button", { name: /Q1.*Which payment providers/ });
+    fireEvent.click(row);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Mark asked" })); // Q1 is now asked, which the filter hides
+
+    expect(await screen.findByText("Asked", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Selected question" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Q1.*Which payment providers/ })).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: /Q1.*Which payment providers/ })); // closed: the filter applies again
+
+    expect(screen.queryByRole("button", { name: /Q1.*Which payment providers/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps a typed answer when a teammate dropped the question meanwhile, also under a filter that then hides it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+        if (init?.method === "POST" && url.endsWith("/transition/"))
+          return json(400, { to: ["A dropped question cannot become answered."], allowed: ["open"] });
+        if (url === "/api/projects/5/questions/1/") return json(200, { ...questions[0], status: "dropped" });
+        if (url.includes("/answer-link/")) return json(200, { exists: false });
+        if (url.includes("/submissions/")) return json(200, []);
+        if (url.includes("/questions/")) return json(200, served);
+        if (url.endsWith("/members/")) return json(200, members);
+        return projectsReply(url);
+      }),
+    );
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("button", { name: "Open" })); // the filter that "dropped" will stop matching
+    fireEvent.click(await screen.findByRole("button", { name: /Q1.*Which payment providers/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+    fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "Thirty days, in writing." } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+
+    expect(await screen.findByText("A dropped question cannot become answered.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Answer")).toHaveValue("Thirty days, in writing."); // not thrown away with the row
+  });
+
+  it("gives an open question's button a target only while the question is open (no pointer to nothing)", async () => {
+    api();
+    render(<Workspace />);
+    const row = await screen.findByRole("button", { name: /Q1.*Which payment providers/ });
+    expect(row).not.toHaveAttribute("aria-controls");
+
+    fireEvent.click(row);
+
+    const detail = screen.getByRole("region", { name: "Selected question" });
+    expect(row.getAttribute("aria-controls")).toBe(detail.id);
+  });
+});
+
+// Review of #122: a sign-out that arrives while the first load is still on its way must not be undone by its answer.
+describe("Workspace: a sign-out during the first load (#121)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("stays signed out when the load that was already on its way answers afterwards", async () => {
+    let release: (r: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/projects/5/") return new Promise<Response>((resolve) => (release = resolve));
+        if (url.includes("/questions/")) return json(200, served);
+        if (url.endsWith("/members/")) return json(200, members);
+        return projectsReply(url);
+      }),
+    );
+    render(<Workspace />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/projects/5/", expect.anything()));
+
+    act(() => {
+      window.dispatchEvent(new Event("sual:signed-out"));
+    });
+    await act(async () => release(projectsReply("/api/projects/5/")));
+
+    expect(await screen.findByText(/to see this project/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Ticketing" })).not.toBeInTheDocument();
   });
 });

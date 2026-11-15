@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { plainName } from "@/lib/answerLink";
@@ -39,7 +39,7 @@ export async function failure(response: Response, fallback: string, shown: strin
 }
 
 export const QUESTION_FIELDS = ["text", "why_it_matters", "blocks"] as const;
-const ANSWER_FIELDS = ["text", "answered_by", "answered_on", "channel", "channel_note"];
+const ANSWER_FIELDS = ["text"];
 
 /**
  * One question of the workspace: its text, why it matters, what it blocks and its answers, with the
@@ -53,10 +53,16 @@ export function QuestionItem({
   question,
   base,
   onChanged,
+  inline = false,
+  extra,
 }: {
   question: FullQuestion;
   base: string;
   onChanged: (q: FullQuestion) => void;
+  /** Shown under the question's own row in the list (#121): no card of its own and no repeat of its label, status and text. */
+  inline?: boolean;
+  /** Shown with the answers, not while the question is being edited: the answers waiting for a decision (#121). */
+  extra?: ReactNode;
 }) {
   const t = useT();
   const [mode, setMode] = useState<Mode>("view");
@@ -136,9 +142,8 @@ export function QuestionItem({
   }
 
   const id = `q${question.id}`;
-  return (
-    <li data-testid="question">
-      <Card className="grid gap-3">
+  const content = (
+    <>
         {mode === "edit" ? (
           <QuestionForm
             idPrefix={`edit-${question.id}`}
@@ -150,17 +155,22 @@ export function QuestionItem({
           />
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs text-primary">{question.label}</span>
-              <StatusChip status={question.status} />
-            </div>
-            <p>{question.text}</p>
+            {!inline && (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs text-primary">{question.label}</span>
+                  <StatusChip status={question.status} />
+                </div>
+                <p>{question.text}</p>
+              </>
+            )}
             {question.why_it_matters && <p className="text-sm text-muted-foreground">{t("question.why", { text: question.why_it_matters })}</p>}
             {question.blocks && <p className="text-sm text-muted-foreground">{t("question.blocks", { text: question.blocks })}</p>}
             {question.current_answer && <AnswerView answer={question.current_answer} heading={t("question.answer")} />}
             {question.previous_answers.map((a) => (
               <AnswerView key={a.id} answer={a} heading={t("question.earlier")} />
             ))}
+            {extra}
           </>
         )}
 
@@ -209,7 +219,13 @@ export function QuestionItem({
           </div>
         )}
         {message && <Alert tone="error">{message}</Alert>}
-      </Card>
+    </>
+  );
+
+  if (inline) return <div data-testid="question" className="grid gap-3">{content}</div>;
+  return (
+    <li data-testid="question">
+      <Card className="grid gap-3">{content}</Card>
     </li>
   );
 }
@@ -224,7 +240,12 @@ function AnswerView({ answer, heading }: { answer: Answer; heading: string }) {
         <p className="text-sm text-muted-foreground">
           {t("question.viaLink", { who: plainName(answer.answered_by), by: answer.recorded_by, date: answer.answered_on })}
         </p>
+      ) : answer.channel === "app" ? (
+        <p className="text-sm text-muted-foreground">
+          {t("question.by", { who: answer.answered_by })} · {answer.answered_on}
+        </p>
       ) : (
+        // An answer recorded before #121, when a person said where it came from.
         <p className="text-sm text-muted-foreground">
           {t("question.by", { who: answer.answered_by })} · {t(`channel.${answer.channel}`)}
           {answer.channel_note ? ` (${answer.channel_note})` : ""} · {answer.answered_on}

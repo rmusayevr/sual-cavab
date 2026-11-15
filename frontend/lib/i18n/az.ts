@@ -46,7 +46,6 @@ export const az: Record<Key, string> = {
   "workspace.all": "Hamısı",
   "workspace.none": "Hələ sual yoxdur. İlk sualı əlavə edin.",
   "workspace.noneWithStatus": "Bu statusda sual yoxdur.",
-  "workspace.selectPrompt": "Sualın niyə vacib olduğunu, nəyi blokladığını və cavabını görmək üçün sualı seçin.",
   "workspace.selected": "Seçilmiş sual",
   "workspace.add": "Sual əlavə et",
 
@@ -75,10 +74,6 @@ export const az: Record<Key, string> = {
   "form.adding": "Əlavə edilir…",
 
   "answer.text": "Cavab",
-  "answer.by": "Cavab verən",
-  "answer.date": "Tarix",
-  "answer.where": "Kanal",
-  "answer.note": "Qeyd (istəyə bağlı)",
   "answer.save": "Cavabı saxla",
   "answer.keptRetry": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda saxlanır. Suala baxın, sonra yenidən saxlayın.",
   "answer.keptCopy": "Yazdığınız cavab yadda saxlanılmayıb, amma aşağıda saxlanır və onu kopyalaya bilərsiniz. Bu suala indiki vəziyyətində cavab yazmaq mümkün deyil.",
@@ -86,6 +81,7 @@ export const az: Record<Key, string> = {
   "channel.meeting": "Görüş",
   "channel.email": "E-poçt",
   "channel.other": "Digər",
+  "channel.app": "Tətbiqdə",
 
   "error.addQuestion": "Sualı əlavə etmək alınmadı.",
   "error.changeStatus": "Statusu dəyişmək alınmadı.",
@@ -192,6 +188,9 @@ export const az: Record<Key, string> = {
   "submissions.loadError": "Cavabları yükləmək alınmadı.",
   "submissions.none": "Heç nə gözləmir. Link vasitəsilə göndərilən cavablar burada görünəcək.",
   "submissions.from": "Göndərən: {who} (müştərinin yazdığı ad, yoxlanılmayıb) · {when}",
+  "submissions.waitingHere": "Sizi gözləyir: cavab linki ilə göndərilən cavablar",
+  "submissions.openHint": "Müştərilərin göndərdiyi cavabları qəbul etmək və ya rədd etmək üçün sualı açın.",
+  "submissions.openQuestion": "{label} sualını aç ({n} gözləyir)",
   "submissions.refresh": "Yenilə",
   "submissions.accept": "Qəbul et",
   "submissions.acceptLabel": "{label} üçün cavab (redaktə edə bilərsiniz; müştərinin orijinalı saxlanır)",

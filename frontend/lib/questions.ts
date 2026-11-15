@@ -1,16 +1,10 @@
 import { en, type Key } from "./i18n/en";
 import type { Question, QuestionStatus } from "./projects";
 
-/** Where an answer came from. "link" is set by the server when a member accepts what a client sent through
- * the answer link (#114); it is not in CHANNELS because a person cannot pick it (the server refuses it). */
-export type Channel = "chat" | "meeting" | "email" | "other" | "link";
-
-export const CHANNELS: { value: Exclude<Channel, "link">; label: string }[] = [
-  { value: "chat", label: en["channel.chat"] },
-  { value: "meeting", label: en["channel.meeting"] },
-  { value: "email", label: en["channel.email"] },
-  { value: "other", label: en["channel.other"] },
-];
+/** Where an answer came from. The server sets it, and nobody picks it any more (#121): "app" for an answer typed
+ * in the app, "link" for one a member accepted from a client's answer link (#114). The other three are on answers
+ * recorded before #121, when a person said where an answer came from. */
+export type Channel = "app" | "link" | "chat" | "meeting" | "email" | "other";
 
 export type Answer = {
   id: number;
@@ -55,38 +49,6 @@ export function transitionKey(from: QuestionStatus, to: QuestionStatus): Key {
 /** The same words in English (the screens use `t(transitionKey(...))` for the chosen language). */
 export function transitionLabel(from: QuestionStatus, to: QuestionStatus): string {
   return en[transitionKey(from, to)];
-}
-
-const pad = (n: number | string) => String(n).padStart(2, "0");
-
-/** The date on the browser's own calendar, YYYY-MM-DD. */
-function browserDate(now: Date): string {
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
-/**
- * The date in Asia/Baku, YYYY-MM-DD, built from the parts so it does not depend on how a locale
- * writes a date. Keep the zone equal to settings.TIME_ZONE in backend/config/settings.py: the server
- * refuses an answer date after its today.
- */
-function bakuDate(now: Date): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Baku", year: "numeric", month: "2-digit", day: "2-digit" })
-    .formatToParts(now);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${get("year")}-${pad(get("month"))}-${pad(get("day"))}`;
-}
-
-/**
- * The default date of an answer (#48): the EARLIER of the browser's date and Baku's, YYYY-MM-DD.
- * The server refuses a date after today in Baku, so a browser ahead of Baku just after its own
- * midnight must not offer its own date; a browser behind Baku (the Americas) must not be handed a
- * date in its own future. Where the two calendars agree, as in Baku, it is just today. Dates of the
- * form YYYY-MM-DD compare correctly as text. `local` is a parameter so tests do not depend on the
- * machine's time zone.
- */
-export function today(now: Date = new Date(), local: string = browserDate(now)): string {
-  const baku = bakuDate(now);
-  return local < baku ? local : baku;
 }
 
 /**

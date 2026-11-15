@@ -18,7 +18,6 @@ from unittest import mock
 from django.contrib.auth import get_user_model
 from django.db import connection, connections
 from django.test import TransactionTestCase
-from django.utils import timezone
 from rest_framework.test import APIClient
 
 from questions.models import Answer, Question
@@ -149,12 +148,7 @@ class RowLockTests(TransactionTestCase):
             start.wait(10)
             body = {
                 "to": "answered",
-                "answer": {
-                    "text": "Refunds are allowed within 14 days.",
-                    "answered_by": "Invented Contact",
-                    "answered_on": timezone.localdate().isoformat(),
-                    "channel": "email",
-                },
+                "answer": {"text": "Refunds are allowed within 14 days."},
             }
             url = f"/api/projects/{self.project.pk}/questions/{question.number}/transition/"
             return as_user(caller).post(url, body, format="json").status_code
