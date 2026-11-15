@@ -11,10 +11,12 @@ import type { FullQuestion } from "@/lib/questions";
 import { STATUSES } from "@/lib/status";
 import { LanguageSwitch, useT } from "@/lib/i18n";
 
+import AnswerLinkPanel from "./AnswerLinkPanel";
 import MembersPanel from "./MembersPanel";
 import QuestionForm, { type QuestionFields, type SubmitResult } from "./QuestionForm";
 import { QUESTION_FIELDS, QuestionItem, failure } from "./QuestionItem";
 import SessionStatus from "./SessionStatus";
+import SubmissionsPanel from "./SubmissionsPanel";
 import { Alert } from "./ui/Alert";
 import { Button, buttonClasses } from "./ui/Button";
 import { Card } from "./ui/Card";
@@ -171,6 +173,16 @@ export default function Workspace() {
     return await failure(response, t("error.addQuestion"), [...QUESTION_FIELDS]);
   }
 
+  /** A submission became this question's answer: read the question again so its card shows the answer. */
+  async function reloadQuestion(number: number) {
+    try {
+      const response = await apiFetch(`${base}${number}/`);
+      if (response.ok) replace((await response.json()) as FullQuestion);
+    } catch {
+      // the answer is saved; the card catches up the next time the page loads
+    }
+  }
+
   return shell(
     <div className="mx-auto grid max-w-[90rem] grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-[15rem_minmax(0,1fr)_24rem]">
       <nav aria-label={t("session.yourProjects")} className="min-w-0 rounded-md bg-navy p-3 text-navy-foreground lg:self-start">
@@ -308,6 +320,9 @@ export default function Workspace() {
           <h2 className="text-lg font-semibold">{t("workspace.add")}</h2>
           <QuestionForm idPrefix="add" submitLabel={t("form.add")} busyLabel={t("form.adding")} clearOnSuccess onSubmit={add} />
         </Card>
+
+        <SubmissionsPanel projectId={project.id} onAccepted={reloadQuestion} />
+        <AnswerLinkPanel projectId={project.id} />
 
       </aside>
     </div>,

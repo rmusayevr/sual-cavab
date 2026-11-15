@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TRANSITIONS, fieldErrors, today, transitionLabel } from "./questions";
+import { CHANNELS, TRANSITIONS, fieldErrors, today, transitionLabel } from "./questions";
 
 describe("fieldErrors", () => {
   it("maps each field to its message", () => {
@@ -76,5 +76,11 @@ describe("today", () => {
     const now = new Date();
     const own = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     expect(today(now) <= own).toBe(true);
+  });
+});
+
+describe("CHANNELS (#114)", () => {
+  it("does not offer 'link': it marks an answer accepted from the answer link, and a person cannot pick it", () => {
+    expect(CHANNELS.map((c) => c.value)).toEqual(["chat", "meeting", "email", "other"]);
   });
 });

@@ -38,6 +38,8 @@ beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
+      if (url.includes("/answer-link/")) return json(200, { exists: false });
+      if (url.includes("/submissions/")) return json(200, []);
       if (url.includes("/questions/")) return json(200, [q(1, "open"), q(2, "asked"), q(3, "answered"), q(4, "dropped")]);
       if (url.includes("/auth/me")) return json(200, { id: 1, email: "ada@example.invalid", name: "Ada" });
       return /^\/api\/projects\/\d+\/$/.test(url) ? json(200, project) : json(200, page([project]));

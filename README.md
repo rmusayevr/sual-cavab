@@ -433,8 +433,10 @@ answer, shown as "Earlier answer".
 A team member makes a private link for a project and sends it to the client. The client opens it with no account,
 sees the project's open questions (status open or asked) and can send an answer. **Nothing a client sends is an
 answer yet:** it waits as a *submission*, and a team member accepts it (it then becomes the question's answer, marked
-"Answer link") or dismisses it. This part is the **backend only** (PR A of three): the screens for the team and for
-the client come in the next two PRs, so until then the routes below are used directly.
+"Answer link") or dismisses it. The team's side is in the workspace (PR B of three): an
+"Answers from the link" card (what is waiting, with accept, dismiss and restore) and an "Answer link" card (make a
+link, copy it once, revoke it), in both languages. The client's page (`/answer#<token>`) is the next PR, so until
+then a link made here does not open anything.
 
 - **The link:** `https://<app>/answer#<token>`. The token is 256 bits and sits in the URL *fragment*, which browsers
   never send to the server, so it stays out of server and proxy logs and out of `Referer`. It is shown **once**, when
@@ -456,7 +458,7 @@ the client come in the next two PRs, so until then the routes below are used dir
   and sessions are ignored on these routes. A test calls every route of the project (all methods) with and without a link token,
   signed out and signed in as a member, and fails if the token changes the status of any answer outside those two
   (and the body of any JSON answer when signed out). The router's `.json`-style suffix routes are not walked.
-- **The team:** `GET`, `POST` (`{"days": 1-30}`, returns the token once) and `DELETE` on
+- **The team** (the cards above use these routes): `GET`, `POST` (`{"days": 1-30}`, returns the token once) and `DELETE` on
   `/api/projects/<id>/answer-link/`; `GET /api/projects/<id>/submissions/?state=pending|accepted|dismissed` (who, as
   typed, and when); `POST .../submissions/<id>/accept/` (optionally `{"text"}` to edit the answer first; the client's
   original stays on the submission), `.../dismiss/` and `.../restore/` (undo a dismissal);
@@ -485,7 +487,7 @@ The interface is English by default, with Azerbaijani as a second language (#71)
 - **First paint is always English**: the server cannot know the choice, and the markup must match. A person who chose Azerbaijani sees it as soon as the page has loaded, after a brief English flash (accepted for v1).
 - **Never translated:** what a person typed (questions, answers).
 - **Status words** come from the dictionaries (`status.open` and so on), one set per language, next to the one table of colours (`lib/status.ts`). They follow the language on every page, including pages whose other words are still English.
-- **The Azerbaijani wording was first written by Claude, not by a native speaker; the owner reviewed and changed it on 2026-11-10** (for example `Ləğv olunub` for a dropped question and `sahib` for an owner). Technical terms stay in English. **Exception, not yet reviewed by the owner:** `landing.lead` (both languages) was reworded on 2026-11-15 by Claude when drafting was removed (#115).
+- **The Azerbaijani wording was first written by Claude, not by a native speaker; the owner reviewed and changed it on 2026-11-10** (for example `Ləğv olunub` for a dropped question and `sahib` for an owner). Technical terms stay in English. **Exception, not yet reviewed by the owner:** `landing.lead` (both languages) was reworded on 2026-11-15 by Claude when drafting was removed (#115), and the strings of the two answer-link cards (`answerLink.*`, `submissions.*`, `channel.link`) were written by Claude in the same way (#114).
 - **Translated:** the landing page, the sign-in page and form, the projects page and its list and new-project form, the workspace (`/projects/[id]`: shell, members, how long a question has been open, question card, add and edit forms, answer form), the 404, the session status in every header, the home link's name, the status words and the waking-up note. The landing page's sample questions stay in English (a question is the ledger entry and is never translated, as in the design example). **Still English** (things that cannot follow a browser choice): the page titles and social-card text (they are fixed when the page is built) and any message the server itself sends back (a refused status change, a validation error: shown as the server wrote it).
 
 ## Staging on Render
