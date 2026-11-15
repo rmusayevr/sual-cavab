@@ -9,7 +9,7 @@ from answerlinks.services import revoke_links
 
 from .models import Membership, Project
 from .pagination import ProjectPagination
-from .permissions import lock_caller_membership, role_may_manage_members
+from .permissions import is_only_a_client, lock_caller_membership, role_may_manage_members
 from .serializers import AddMemberSerializer, MemberSerializer, ProjectSerializer
 from .throttles import MemberAddThrottle
 
@@ -69,6 +69,8 @@ class ProjectViewSet(
 
     @transaction.atomic
     def perform_create(self, serializer):
+        if is_only_a_client(self.request.user):
+            raise PermissionDenied("A client account answers questions; it cannot start a project.")
         project = serializer.save(created_by=self.request.user)
         Membership.objects.create(project=project, user=self.request.user, role=Membership.Role.OWNER)
 

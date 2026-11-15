@@ -199,6 +199,7 @@ export default function MembersPanel({
               <Select name="role" value={role} onChange={(e) => setRole(e.target.value as Role)} {...props}>
                 <option value="member">{t("role.member")}</option>
                 <option value="owner">{t("role.owner")}</option>
+                <option value="client">{t("role.client")}</option>
               </Select>
             )}
           </Field>

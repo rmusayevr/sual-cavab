@@ -430,3 +430,66 @@ describe("ProjectList: a sign-out during the first load (#121)", () => {
     expect(screen.queryByText(/Ticketing/)).not.toBeInTheDocument();
   });
 });
+
+describe("ProjectList: projects where I am a client (#121)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const routes = (team: unknown[], client: unknown, clientStatus = 200) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/client/projects/") return json(clientStatus, client);
+        return json(200, page(team));
+      }),
+    );
+
+  it("lists them in a section of their own, linking to the page for a client, next to my team projects", async () => {
+    routes([project(1, "Ticketing", "owner")], [{ id: 7, name: "Invented booking site" }]);
+
+    render(<ProjectList />);
+
+    expect(await screen.findByRole("link", { name: "Invented booking site" })).toHaveAttribute("href", "/answering/7");
+    expect(screen.getByRole("link", { name: "Ticketing" })).toHaveAttribute("href", "/projects/1");
+    expect(screen.getByText("Projects where you answer questions")).toBeInTheDocument();
+  });
+
+  it("for a person who is only a client: shows those projects, no 'not on any project' and no form to start one", async () => {
+    routes([], [{ id: 7, name: "Invented booking site" }]);
+
+    render(<ProjectList />);
+
+    await screen.findByRole("link", { name: "Invented booking site" });
+    expect(screen.queryByText(/not on any project yet/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create project" })).not.toBeInTheDocument();
+  });
+
+  it("shows nothing extra to a person who is not a client anywhere", async () => {
+    routes([project(1, "Ticketing", "owner")], []);
+
+    render(<ProjectList />);
+
+    await screen.findByRole("link", { name: "Ticketing" });
+    expect(screen.queryByText("Projects where you answer questions")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create project" })).toBeInTheDocument();
+  });
+
+  it("ignores a reply that is not a list", async () => {
+    routes([project(1, "Ticketing", "owner")], "oops");
+
+    render(<ProjectList />);
+
+    expect(await screen.findByRole("link", { name: "Ticketing" })).toBeInTheDocument();
+    expect(screen.queryByText("Projects where you answer questions")).not.toBeInTheDocument();
+  });
+
+  it("still shows the team projects when the client list cannot be read", async () => {
+    routes([project(1, "Ticketing", "owner")], {}, 500);
+
+    render(<ProjectList />);
+
+    expect(await screen.findByRole("link", { name: "Ticketing" })).toBeInTheDocument();
+    expect(screen.queryByText("Projects where you answer questions")).not.toBeInTheDocument();
+  });
+});

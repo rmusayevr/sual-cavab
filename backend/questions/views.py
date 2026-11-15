@@ -10,7 +10,7 @@ from projects.permissions import lock_caller_membership
 
 from .models import Question
 from .serializers import QuestionSerializer, TransitionSerializer
-from .services import TransitionNotAllowed, change_status
+from .services import NothingToRestore, TransitionNotAllowed, change_status, restore_last_answer
 
 
 class QuestionViewSet(
@@ -82,4 +82,16 @@ class QuestionViewSet(
                 raise ValidationError(
                     {"to": [f"A {err.current} question cannot become {err.to}."], "allowed": err.allowed}
                 )
+        return Response(self.get_serializer(self.get_queryset().get(pk=locked.pk)).data)
+
+    @action(detail=True, methods=["post"], url_path="restore-answer")
+    def restore_answer(self, request, project_id=None, number=None):
+        """Put the earlier answer of a re-opened question back: the question is answered again."""
+        with transaction.atomic():
+            lock_caller_membership(self.project, request.user)
+            locked = get_object_or_404(Question.objects.select_for_update().filter(project=self.project), number=number)
+            try:
+                restore_last_answer(locked)
+            except NothingToRestore as err:
+                raise ValidationError({"detail": [str(err)]})
         return Response(self.get_serializer(self.get_queryset().get(pk=locked.pk)).data)

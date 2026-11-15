@@ -25,21 +25,27 @@ can deadlock, and PostgreSQL aborts one side with nothing half-written.
 
 from django.http import Http404
 
-from .models import Membership
+from .models import TEAM_ROLES, Membership
 
 
 def role_may_manage_members(role) -> bool:
     return role == Membership.Role.OWNER
 
 
+def is_only_a_client(user):
+    """True for a person whose memberships are all as a client (#121): they have no team side to start a project on."""
+    memberships = Membership.objects.filter(user=user)
+    return memberships.filter(role=Membership.Role.CLIENT).exists() and not memberships.filter(role__in=TEAM_ROLES).exists()
+
+
 def lock_caller_membership(project, user):
-    """Row-lock the caller's membership of `project`; 404 if they have none.
+    """Row-lock the caller's TEAM membership of `project`; 404 if they have none (a client has none).
 
     Call first inside `transaction.atomic()`, before touching any other row. The
     visible_to() check at the start of the request had no lock, so a member
     removed since then is refused here, not allowed one more write.
     """
-    membership = Membership.objects.select_for_update().filter(project=project, user=user).first()
+    membership = Membership.objects.select_for_update().filter(project=project, user=user, role__in=TEAM_ROLES).first()
     if membership is None:
         raise Http404
     return membership

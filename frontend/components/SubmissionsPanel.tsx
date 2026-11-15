@@ -122,7 +122,7 @@ export default function SubmissionsPanel({
                     </p>
                     <p className="whitespace-pre-wrap text-muted-foreground">{s.text}</p>
                     <p className="text-sm text-muted-foreground">
-                      {t("submissions.from", { who, when: shortDate(s.submitted_at) })}
+                      {t(s.source === "account" ? "submissions.fromAccount" : "submissions.from", { who, when: shortDate(s.submitted_at) })}
                     </p>
                     <div>
                       <Button

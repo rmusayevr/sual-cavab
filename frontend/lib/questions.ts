@@ -2,9 +2,9 @@ import { en, type Key } from "./i18n/en";
 import type { Question, QuestionStatus } from "./projects";
 
 /** Where an answer came from. The server sets it, and nobody picks it any more (#121): "app" for an answer typed
- * in the app, "link" for one a member accepted from a client's answer link (#114). The other three are on answers
+ * in the app, "link" for one a member accepted from a client's answer link (#114), "client" for one accepted from a client account (#121). The other three are on answers
  * recorded before #121, when a person said where an answer came from. */
-export type Channel = "app" | "link" | "chat" | "meeting" | "email" | "other";
+export type Channel = "app" | "link" | "client" | "chat" | "meeting" | "email" | "other";
 
 export type Answer = {
   id: number;

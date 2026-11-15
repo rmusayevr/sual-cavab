@@ -16,6 +16,7 @@ const submission = (id: number, over: Record<string, unknown> = {}) => ({
   question_text: `Invented question ${id}?`,
   text: `Invented answer ${id}`,
   submitter_name: `Client ${id}`,
+  source: "link",
   submitted_at: "2026-11-15T09:30:00Z",
   state: "pending",
   decided_by: null,
@@ -104,6 +105,26 @@ describe("SubmissionsPanel (#114)", () => {
     // each question's answers are in a section of their own, and the card does not list them again
     expect(screen.getAllByRole("region", { name: t("submissions.waitingHere") })).toHaveLength(2);
     expect(screen.getAllByText("Invented answer 1")).toHaveLength(1);
+  });
+
+  it("says an answer came from a client account (the name is the account's), not from a link", async () => {
+    api({ pending: [submission(1, { source: "account", submitter_name: "Ada Client" }), submission(2)], dismissed: [] });
+    open();
+
+    const first = (await screen.findByText("Invented answer 1")).closest("li")!;
+    expect(within(first).getByText("From Ada Client (client account) · 2026-11-15")).toBeInTheDocument();
+    expect(within(first).queryByText(/not verified/)).not.toBeInTheDocument();
+    const second = screen.getByText("Invented answer 2").closest("li")!;
+    expect(within(second).getByText(/not verified/)).toBeInTheDocument();
+  });
+
+  it("marks a dismissed answer from a client account as one too", async () => {
+    api({ pending: [], dismissed: [{ ...submission(3, { source: "account", submitter_name: "Ada Client" }), state: "dismissed" }] });
+    open();
+
+    fireEvent.click(await screen.findByRole("button", { name: t("submissions.showDismissed") }));
+
+    expect(await screen.findByText("From Ada Client (client account) · 2026-11-15")).toBeInTheDocument();
   });
 
   it("shows what the client typed as plain text, never as markup", async () => {

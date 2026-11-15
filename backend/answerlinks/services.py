@@ -13,7 +13,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from projects.models import Project
+from projects.models import TEAM_ROLES, Project
 from questions.models import Question
 
 from .models import AnswerLink
@@ -45,7 +45,9 @@ def usable_links():
         revoked_at__isnull=True,
         expires_at__gt=timezone.now(),
         created_by__is_active=True,
+        # In one filter() call: the creator's membership of the project, and that it is a TEAM membership.
         project__memberships__user=F("created_by"),
+        project__memberships__role__in=TEAM_ROLES,
     )
 
 

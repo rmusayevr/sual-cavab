@@ -105,6 +105,22 @@ class UnavailableLinkTests(LinkTestCase):
 
         self.assert_unavailable(**with_token(self.token))
 
+    def test_a_link_stops_working_when_its_creator_becomes_a_client_of_the_project(self):
+        # A client account is not on the team (#121): a link a person made as a member must not outlive that.
+        self.project.memberships.filter(user=self.owner).update(role="client")
+
+        self.assert_unavailable(**with_token(self.token))
+
+    def test_a_link_made_by_someone_who_becomes_a_client_stays_dead_when_they_are_a_member_again(self):
+        # Through the Django admin a role can change both ways; the link must end, not just pause.
+        membership = self.project.memberships.get(user=self.owner)
+        membership.role = "client"
+        membership.save()
+        membership.role = "owner"
+        membership.save()
+
+        self.assert_unavailable(**with_token(self.token))
+
     def test_a_link_stops_working_when_its_creator_is_deactivated(self):
         self.owner.is_active = False
         self.owner.save()

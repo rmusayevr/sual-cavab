@@ -9,7 +9,7 @@ const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
-const member = (user_id: number, email: string, role: "owner" | "member", name = "") => ({
+const member = (user_id: number, email: string, role: "owner" | "member" | "client", name = "") => ({
   user_id,
   email,
   name,
@@ -87,6 +87,16 @@ describe("MembersPanel (#33)", () => {
 
       await screen.findByText("new@example.invalid was added.");
       expect(calls.find((c) => c.method === "POST")?.body).toEqual({ email: "new@example.invalid", role: "owner" });
+    });
+
+    it("can add a client: someone who only answers questions", async () => {
+      const calls = api((c) => (c.method === "POST" ? json(201, member(3, "ada@example.invalid", "client")) : undefined));
+      open();
+
+      fill("ada@example.invalid", "client");
+
+      await screen.findByText("ada@example.invalid was added.");
+      expect(calls.find((c) => c.method === "POST")?.body).toEqual({ email: "ada@example.invalid", role: "client" });
     });
 
     it("shows an unknown email next to the Email field, keeps what was typed, and adds nothing to the list", async () => {

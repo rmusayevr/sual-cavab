@@ -672,3 +672,69 @@ describe("QuestionItem: where an answer came from (#121)", () => {
     expect(await screen.findByText(/by Əli Məmmədov · Meeting \(Weekly sync\) · 2026-03-01/)).toBeInTheDocument();
   });
 });
+
+describe("QuestionItem: an answer a member accepted from a client account (#121)", () => {
+  it("says it was sent by the client account and accepted by the member", async () => {
+    backend({
+      [LIST]: () =>
+        json(200, [
+          question(1, {
+            status: "answered",
+            current_answer: answerOf({ channel: "client", answered_by: "Ada Client", recorded_by: "mark@example.com", answered_on: "2026-11-15" }),
+          }),
+        ]),
+    });
+    render(<Board projectId="5" />);
+
+    expect(await screen.findByText("Sent by Ada Client (client account) · accepted by mark@example.com · 2026-11-15")).toBeInTheDocument();
+  });
+});
+
+describe("QuestionItem: restoring the earlier answer (#121)", () => {
+  const RESTORE_1 = "POST /api/projects/5/questions/1/restore-answer/";
+  const reopened = (over: Record<string, unknown> = {}) =>
+    question(1, { status: "open", previous_answers: [answerOf({ id: 1, text: "14 days.", superseded_at: "2026-03-02T00:00:00Z" })], ...over });
+
+  it("offers it on a re-opened question, and one click answers the question again with that answer", async () => {
+    const calls = backend({
+      [LIST]: () => json(200, [reopened()]),
+      [RESTORE_1]: () =>
+        json(200, question(1, { status: "answered", current_answer: answerOf({ id: 1, text: "14 days." }), previous_answers: [] })),
+    });
+    render(<Board projectId="5" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Restore the earlier answer" }));
+
+    expect(await screen.findByRole("button", { name: "Re-open" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restore the earlier answer" })).not.toBeInTheDocument();
+    expect(calls.filter((c) => c.method === "POST")).toEqual([{ url: "/api/projects/5/questions/1/restore-answer/", method: "POST", body: {} }]);
+  });
+
+  it("is not offered where there is nothing to put back", async () => {
+    backend({
+      [LIST]: () =>
+        json(200, [
+          question(1), // never answered
+          question(2, { status: "answered", current_answer: answerOf({ id: 3 }), previous_answers: [answerOf({ id: 2, superseded_at: "2026-03-02T00:00:00Z" })] }),
+          question(3, { status: "dropped", previous_answers: [answerOf({ id: 4, superseded_at: "2026-03-02T00:00:00Z" })] }),
+        ]),
+    });
+    render(<Board projectId="5" />);
+    await screen.findByText("Invented question 1");
+
+    expect(screen.queryByRole("button", { name: "Restore the earlier answer" })).not.toBeInTheDocument();
+  });
+
+  it("shows the reason when the server refuses, and the card stays as it was", async () => {
+    backend({
+      [LIST]: () => json(200, [reopened()]),
+      [RESTORE_1]: () => json(400, { detail: ["This question already has an answer."] }),
+    });
+    render(<Board projectId="5" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Restore the earlier answer" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("This question already has an answer.");
+    expect(screen.getByRole("button", { name: "Restore the earlier answer" })).toBeEnabled();
+  });
+});

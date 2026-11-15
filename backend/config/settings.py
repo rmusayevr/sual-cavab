@@ -206,6 +206,9 @@ REST_FRAMEWORK = {
         # The public answer link (answerlinks.throttles, #114): per link, not per address.
         "answer_link_read": os.environ.get("DJANGO_ANSWER_LINK_READ_RATE", "300/hour"),
         "answer_link_submit": os.environ.get("DJANGO_ANSWER_LINK_SUBMIT_RATE", "60/hour"),
+        # A client account, per person (answerlinks.throttles, #121).
+        "client_read": os.environ.get("DJANGO_CLIENT_READ_RATE", "300/hour"),
+        "client_submit": os.environ.get("DJANGO_CLIENT_SUBMIT_RATE", "60/hour"),
         # Requests whose token failed, all in one shared bucket (a valid link is never counted in it).
         "answer_link_invalid": os.environ.get("DJANGO_ANSWER_LINK_INVALID_RATE", "120/min"),
     },
