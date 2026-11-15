@@ -571,3 +571,62 @@ describe("SubmissionsPanel: the summary card (#121)", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe("SubmissionsPanel: where a refusal and the keyboard go (#121)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows a refused Restore in the card even though the answer is waiting again by then", async () => {
+    const lists: Lists = { pending: [], dismissed: [submission(4, { state: "dismissed" })] };
+    api(lists, (call, l) => {
+      if (call.method !== "POST") return undefined;
+      l.pending = [submission(4)]; // another member restored it first
+      l.dismissed = [];
+      return json(400, { detail: ["Only a dismissed answer can be restored."] });
+    });
+    open();
+    await screen.findByText(t("submissions.none"));
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.showDismissed") }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Restore Q4 · Client 4" }));
+
+    const message = await screen.findByText("Only a dismissed answer can be restored.");
+    expect(screen.getAllByText("Only a dismissed answer can be restored.")).toHaveLength(1); // not repeated inside Q4
+    expect(within(message.closest("[aria-labelledby]") as HTMLElement).getByRole("heading", { name: t("submissions.title") })).toBeInTheDocument();
+  });
+
+  it("keeps the keyboard on the card after 'Dismiss all' and after Restore removed the button that was pressed", async () => {
+    const lists: Lists = { pending: [submission(1), submission(2)], dismissed: [] };
+    api(lists, (call, l) => {
+      if (call.method !== "POST") return undefined;
+      if (call.url.includes("dismiss-pending")) {
+        l.dismissed = (l.pending as object[]).map((p) => ({ ...p, state: "dismissed" }));
+        l.pending = [];
+      } else {
+        l.pending = [submission(1)];
+        l.dismissed = [];
+      }
+      return json(200, {});
+    });
+    open();
+    fireEvent.click(await screen.findByRole("button", { name: t("submissions.dismissAll") }));
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.dismissAllYes") }));
+    await screen.findByText(t("submissions.none"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: t("submissions.title") })).toHaveFocus());
+
+    fireEvent.click(screen.getByRole("button", { name: t("submissions.showDismissed") }));
+    (screen.getByRole("heading", { name: t("submissions.title") }) as HTMLElement).blur();
+    fireEvent.click(await screen.findByRole("button", { name: "Restore Q1 · Client 1" }));
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: t("submissions.title") })).toHaveFocus());
+  });
+
+  it("does not add a heading level inside a question: the waiting answers have a labelled area, not an h3", async () => {
+    api({ pending: [submission(1)], dismissed: [] });
+    open();
+
+    await screen.findByText("Invented answer 1");
+
+    expect(screen.queryByRole("heading", { level: 3 })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: t("submissions.waitingHere") })).toBeInTheDocument();
+  });
+});

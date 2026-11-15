@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import Workspace from "./Workspace";
@@ -738,5 +738,98 @@ describe("Workspace: signing out (#121)", () => {
     expect(await screen.findByText(/Sign-out failed/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "Ticketing" })).toBeInTheDocument();
     expect(screen.queryByText(/to see this project/)).not.toBeInTheDocument();
+  });
+});
+
+// Review of #122: the open question must stay on screen while it is open, whatever the filter says.
+describe("Workspace: the open question and the filter (#121)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    served = questions;
+  });
+
+  it("keeps the open question on screen when its status stops matching the filter, and drops it once it is closed", async () => {
+    api({ "/transition/": () => json(200, { ...questions[0], status: "asked" }) });
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("button", { name: "Open" })); // the filter: Q1 is the only open question
+    const row = await screen.findByRole("button", { name: /Q1.*Which payment providers/ });
+    fireEvent.click(row);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Mark asked" })); // Q1 is now asked, which the filter hides
+
+    expect(await screen.findByText("Asked", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Selected question" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Q1.*Which payment providers/ })).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: /Q1.*Which payment providers/ })); // closed: the filter applies again
+
+    expect(screen.queryByRole("button", { name: /Q1.*Which payment providers/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps a typed answer when a teammate dropped the question meanwhile, also under a filter that then hides it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/auth/csrf/") return new Response(null, { status: 204 });
+        if (init?.method === "POST" && url.endsWith("/transition/"))
+          return json(400, { to: ["A dropped question cannot become answered."], allowed: ["open"] });
+        if (url === "/api/projects/5/questions/1/") return json(200, { ...questions[0], status: "dropped" });
+        if (url.includes("/answer-link/")) return json(200, { exists: false });
+        if (url.includes("/submissions/")) return json(200, []);
+        if (url.includes("/questions/")) return json(200, served);
+        if (url.endsWith("/members/")) return json(200, members);
+        return projectsReply(url);
+      }),
+    );
+    render(<Workspace />);
+    fireEvent.click(await screen.findByRole("button", { name: "Open" })); // the filter that "dropped" will stop matching
+    fireEvent.click(await screen.findByRole("button", { name: /Q1.*Which payment providers/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
+    fireEvent.change(screen.getByLabelText("Answer"), { target: { value: "Thirty days, in writing." } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
+
+    expect(await screen.findByText("A dropped question cannot become answered.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Answer")).toHaveValue("Thirty days, in writing."); // not thrown away with the row
+  });
+
+  it("gives an open question's button a target only while the question is open (no pointer to nothing)", async () => {
+    api();
+    render(<Workspace />);
+    const row = await screen.findByRole("button", { name: /Q1.*Which payment providers/ });
+    expect(row).not.toHaveAttribute("aria-controls");
+
+    fireEvent.click(row);
+
+    const detail = screen.getByRole("region", { name: "Selected question" });
+    expect(row.getAttribute("aria-controls")).toBe(detail.id);
+  });
+});
+
+// Review of #122: a sign-out that arrives while the first load is still on its way must not be undone by its answer.
+describe("Workspace: a sign-out during the first load (#121)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("stays signed out when the load that was already on its way answers afterwards", async () => {
+    let release: (r: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/projects/5/") return new Promise<Response>((resolve) => (release = resolve));
+        if (url.includes("/questions/")) return json(200, served);
+        if (url.endsWith("/members/")) return json(200, members);
+        return projectsReply(url);
+      }),
+    );
+    render(<Workspace />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/projects/5/", expect.anything()));
+
+    act(() => {
+      window.dispatchEvent(new Event("sual:signed-out"));
+    });
+    await act(async () => release(projectsReply("/api/projects/5/")));
+
+    expect(await screen.findByText(/to see this project/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Ticketing" })).not.toBeInTheDocument();
   });
 });

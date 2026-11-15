@@ -303,13 +303,13 @@ describe("QuestionItem: record an answer", () => {
   it("shows the API's message next to the answer and keeps what was typed", async () => {
     backend({
       [LIST]: () => json(200, [question(1)]),
-      [TRANSITION_1]: () => json(400, { answer: { text: ["Ensure this field has no more than 4000 characters."] } }),
+      [TRANSITION_1]: () => json(400, { answer: { text: ["This field is required."] } }),
     });
     render(<Board projectId="5" />);
     fireEvent.click(await screen.findByRole("button", { name: "Record answer" }));
     fill();
     fireEvent.click(screen.getByRole("button", { name: "Save answer" }));
-    expect(await screen.findByText("Ensure this field has no more than 4000 characters.")).toBeInTheDocument();
+    expect(await screen.findByText("This field is required.")).toBeInTheDocument();
     expect(screen.getByLabelText("Answer")).toHaveValue("30 days.");
   });
 

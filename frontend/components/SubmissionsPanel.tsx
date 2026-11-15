@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useRef } from "react";
 
 import { plainName, shortDate } from "@/lib/answerLink";
 import { useT } from "@/lib/i18n";
@@ -27,6 +27,7 @@ export default function SubmissionsPanel({
 }) {
   const t = useT();
   const headingId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const { state, pending, dismissed, showDismissed, askAll, busy, problem } = submissions;
 
   // Which questions have answers waiting, in question order.
@@ -37,15 +38,12 @@ export default function SubmissionsPanel({
   // A refusal is shown here when it was about "dismiss all", about an answer in the dismissed list, or about an
   // answer that is no longer waiting (someone else decided it): its own question no longer shows it, and the
   // person must still hear why nothing happened.
-  const mine =
-    problem && (problem.id === "all" || dismissed?.some((d) => d.id === problem.id) || !pending.some((s) => s.id === problem.id))
-      ? problem
-      : null;
+  const mine = problem && (problem.where === "card" || !pending.some((s) => s.id === problem.id)) ? problem : null;
 
   return (
     <Card className="grid gap-3" aria-labelledby={headingId}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id={headingId} className="text-lg font-semibold">
+        <h2 ref={headingRef} tabIndex={-1} id={headingId} className="text-lg font-semibold">
           {t("submissions.title")}
         </h2>
         {state.kind === "ready" && pending.length > 0 && (
@@ -86,7 +84,11 @@ export default function SubmissionsPanel({
           (askAll ? (
             <span role="group" aria-label={t("submissions.dismissAllAsk")} className="flex flex-wrap items-center gap-2">
               <span>{t("submissions.dismissAllAsk")}</span>
-              <Button variant="danger" disabled={busy} onClick={() => void submissions.dismissAll()}>
+              <Button
+                variant="danger"
+                disabled={busy}
+                onClick={() => void submissions.dismissAll().then((done) => done && headingRef.current?.focus())}
+              >
                 {t("submissions.dismissAllYes")}
               </Button>
               <Button variant="secondary" autoFocus disabled={busy} onClick={() => submissions.setAskAll(false)}>
@@ -127,7 +129,7 @@ export default function SubmissionsPanel({
                         variant="secondary"
                         disabled={busy}
                         aria-label={`${t("submissions.restore")} ${s.question_label} · ${who}`}
-                        onClick={() => void submissions.restore(s)}
+                        onClick={() => void submissions.restore(s).then((done) => done && headingRef.current?.focus())}
                       >
                         {t("submissions.restore")}
                       </Button>

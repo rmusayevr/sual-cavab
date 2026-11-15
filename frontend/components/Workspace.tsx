@@ -50,21 +50,26 @@ export default function Workspace() {
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<number | null>(null);
   const base = `/api/projects/${id}/questions/`;
+  const signedOutNow = useRef(false); // set by a sign-out, cleared when a new load starts: a load already on its way must not undo it
 
   // The person signed out in the header (SessionStatus): show the signed-out page now, not after a refresh (#121).
   useEffect(() => {
-    const signedOut = () => setState({ kind: "signed-out" });
+    const signedOut = () => {
+      signedOutNow.current = true;
+      setState({ kind: "signed-out" });
+    };
     window.addEventListener(SIGNED_OUT_EVENT, signedOut);
     return () => window.removeEventListener(SIGNED_OUT_EVENT, signedOut);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+    signedOutNow.current = false; // a new load: whatever it finds is the truth now
     // The project itself is asked for on its own: the list is in pages (#49), so this project may not be on the
     // first one, and "is it yours" is answered by its own 404, not by looking for it in the list.
     Promise.all([apiFetch(`/api/projects/${id}/`), apiFetch("/api/projects/"), apiFetch(base)])
       .then(async ([projectRes, projectsRes, questionsRes]) => {
-        if (cancelled) return;
+        if (cancelled || signedOutNow.current) return;
         // The backend's SessionAuthentication answers 403 (never 401) when nobody is signed in, and 404 for a
         // project the person is not on, so only a 404 means "not found" (#91). 401 is kept for a proxy or a
         // future authentication class.
@@ -126,6 +131,27 @@ export default function Workspace() {
     }
   }
 
+  /** Open a question from the summary card. One this page has not loaded (added by a teammate meanwhile) is read first. */
+  async function openQuestion(number: number) {
+    if (state.kind === "ready" && !state.questions.some((q) => q.number === number)) {
+      try {
+        const response = await apiFetch(`${base}${number}/`);
+        if (!response.ok) return;
+        const found = (await response.json()) as FullQuestion;
+        setState((s) =>
+          s.kind === "ready" && !s.questions.some((q) => q.number === found.number)
+            ? { ...s, questions: [...s.questions, found].sort((a, b) => a.number - b.number) }
+            : s,
+        );
+      } catch {
+        return; // the card still lists it; the next Refresh or load shows it
+      }
+    }
+    setFilter("all");
+    setSelected(number);
+    setFocusDetail(true);
+  }
+
   // What clients sent through the answer link: one state for the answers inside the questions and the summary card.
   const submissions = useSubmissions(id, { enabled: state.kind === "ready", onAccepted: reloadQuestion });
 
@@ -136,7 +162,6 @@ export default function Workspace() {
   useEffect(() => {
     if (focusDetail) {
       detail.current?.focus();
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFocusDetail(false);
     }
   }, [focusDetail, selected]);
@@ -195,7 +220,9 @@ export default function Workspace() {
   // By the number the server answered with, not the address: /projects/05 is project 5 (review of #105).
   const project = projects.find((p) => p.id === currentId)!;
   const count = (s: QuestionStatus) => questions.filter((q) => q.status === s).length;
-  const shown = filter === "all" ? questions : questions.filter((q) => q.status === filter);
+  // The question that is open stays on screen whatever the filter says: its own change of status (or a teammate's)
+  // must not take the row, and a typed answer inside it, away.
+  const shown = filter === "all" ? questions : questions.filter((q) => q.status === filter || q.number === selected);
 
   async function add(values: QuestionFields): Promise<SubmitResult> {
     const response = await apiFetch(base, { method: "POST", body: values });
@@ -306,7 +333,7 @@ export default function Workspace() {
                       type="button"
                       onClick={() => setSelected(isOpen ? null : q.number)}
                       aria-expanded={isOpen}
-                      aria-controls={`question-${q.number}`}
+                      aria-controls={isOpen ? `question-${q.number}` : undefined}
                       className="m-0 grid min-h-11 min-w-0 cursor-pointer gap-1 border-0 bg-transparent p-0 text-left text-inherit [font:inherit]"
                     >
                       <span className="flex flex-wrap items-center gap-2">
@@ -359,11 +386,7 @@ export default function Workspace() {
 
         <SubmissionsPanel
           submissions={submissions}
-          onOpen={(number) => {
-            setFilter("all");
-            setSelected(number);
-            setFocusDetail(true);
-          }}
+          onOpen={(number) => void openQuestion(number)}
         />
         <AnswerLinkPanel projectId={project.id} />
 

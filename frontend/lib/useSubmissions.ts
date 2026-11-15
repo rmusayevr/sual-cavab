@@ -9,8 +9,11 @@ import { fieldErrors } from "./questions";
 
 export type SubmissionsState = { kind: "loading" } | { kind: "error" } | { kind: "ready"; pending: Submission[] };
 
-/** A refusal, and what it was about: one answer, or "all" (dismiss all), so it is shown where it belongs. */
-export type Problem = { message: string; id: number | "all" };
+/**
+ * A refusal, and where it belongs: "question" (accepting or dismissing one answer, shown inside its question while the
+ * answer is still waiting) or "card" (dismiss all, restore: the summary card, so it is never shown nowhere).
+ */
+export type Problem = { message: string; id: number | "all"; where: "question" | "card" };
 
 /**
  * What clients sent through the answer link, waiting for a member to decide, and the ways to decide (#114).
@@ -74,7 +77,14 @@ export function useSubmissions(
   }, [enabled, load]);
 
   /** Do one change, then read the lists again (also after a refusal: the refusal usually means the list is out of date). */
-  async function change(path: string, body: unknown, fallback: string, id: number | "all", then?: () => void): Promise<boolean> {
+  async function change(
+    path: string,
+    body: unknown,
+    fallback: string,
+    id: number | "all",
+    where: Problem["where"],
+    then?: () => void,
+  ): Promise<boolean> {
     if (inFlight.current) return false; // a second click while the first is still on its way
     inFlight.current = true;
     setBusy(true);
@@ -93,11 +103,11 @@ export function useSubmissions(
         // not JSON (a proxy error page): the fallback is the message
       }
       const reasons = Object.values(fieldErrors(reply));
-      setProblem({ message: reasons.length > 0 ? reasons.join(" ") : fallback, id });
+      setProblem({ message: reasons.length > 0 ? reasons.join(" ") : fallback, id, where });
       await load(showDismissed);
       return false;
     } catch {
-      setProblem({ message: t("error.server"), id });
+      setProblem({ message: t("error.server"), id, where });
       return false;
     } finally {
       inFlight.current = false;
@@ -128,10 +138,10 @@ export function useSubmissions(
     },
     /** Make the answer the question's answer. `text` may be edited from what the client sent; the original stays. */
     accept: (s: Submission, text: string) =>
-      change(`${s.id}/accept/`, { text }, t("submissions.acceptFailed"), s.id, () => onAccepted(s.question_number)),
-    dismiss: (s: Submission) => change(`${s.id}/dismiss/`, {}, t("submissions.dismissFailed"), s.id),
-    restore: (s: Submission) => change(`${s.id}/restore/`, {}, t("submissions.restoreFailed"), s.id),
-    dismissAll: () => change("dismiss-pending/", {}, t("submissions.dismissFailed"), "all", () => setAskAll(false)),
+      change(`${s.id}/accept/`, { text }, t("submissions.acceptFailed"), s.id, "question", () => onAccepted(s.question_number)),
+    dismiss: (s: Submission) => change(`${s.id}/dismiss/`, {}, t("submissions.dismissFailed"), s.id, "question"),
+    restore: (s: Submission) => change(`${s.id}/restore/`, {}, t("submissions.restoreFailed"), s.id, "card"),
+    dismissAll: () => change("dismiss-pending/", {}, t("submissions.dismissFailed"), "all", "card", () => setAskAll(false)),
   };
 }
 

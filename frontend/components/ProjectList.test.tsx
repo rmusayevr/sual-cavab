@@ -412,3 +412,21 @@ describe("ProjectList: signing out (#121)", () => {
     expect(remove).toHaveBeenCalledWith("sual:signed-out", expect.any(Function));
   });
 });
+
+describe("ProjectList: a sign-out during the first load (#121)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("stays signed out when the load that was already on its way answers afterwards", async () => {
+    let release: (r: Response) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => (release = resolve))));
+    render(<ProjectList />);
+
+    act(() => {
+      window.dispatchEvent(new Event("sual:signed-out"));
+    });
+    await act(async () => release(json(200, page([project(5, "Ticketing")]))));
+
+    expect(await screen.findByText(/to see your projects/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ticketing/)).not.toBeInTheDocument();
+  });
+});

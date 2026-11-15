@@ -34,7 +34,7 @@ def in_app_answer(user, text):
     """An answer typed in the app by `user` (#121): given by them, today, in the app."""
     return {
         "text": text,
-        "answered_by": user.get_full_name() or user.email,
+        "answered_by": (user.get_full_name() or user.email)[:200],  # the column holds 200; a name can be 301 long
         "answered_on": timezone.localdate(),
         "channel": Answer.Channel.APP,
         "channel_note": "",

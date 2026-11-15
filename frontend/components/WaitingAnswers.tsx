@@ -50,11 +50,12 @@ export default function WaitingAnswers({
     }
   }
 
-  const mine = problem && items.some((s) => s.id === problem.id) ? problem : null;
+  // A refusal about one of these answers, while it is still waiting; the others are the card's.
+  const mine = problem && problem.where === "question" && items.some((s) => s.id === problem.id) ? problem : null;
 
   return (
     <section aria-label={t("submissions.waitingHere")} className="grid gap-3 rounded-md border border-l-4 border-l-saffron bg-muted p-3">
-      <h3 className="text-sm font-medium">{t("submissions.waitingHere")}</h3>
+      <p className="text-sm font-medium">{t("submissions.waitingHere")}</p>
       <ul className="m-0 grid list-none gap-4 p-0">
         {items.map((s) => {
           const who = plainName(s.submitter_name);

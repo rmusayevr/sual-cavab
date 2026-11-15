@@ -230,6 +230,17 @@ class TransitionApiTests(QuestionTestCase):
         self.assertEqual(current["answered_on"], timezone.localdate().isoformat())
         self.assertEqual(body["status"], "answered")
 
+    def test_a_very_long_name_cannot_break_saving_an_answer(self):
+        # AbstractUser allows 150 characters each for first and last name; the column for who answered holds 200.
+        self.ask()
+        self.owner.first_name, self.owner.last_name = "A" * 150, "B" * 150
+        self.owner.save()
+
+        response = self.move(1, "answered", answer=answer_payload())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(Answer.objects.get().answered_by), 200)
+
     def test_a_member_without_a_name_is_recorded_by_email(self):
         self.ask()
 

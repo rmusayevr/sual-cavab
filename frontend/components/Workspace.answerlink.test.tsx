@@ -193,3 +193,44 @@ describe("Workspace: answers sent through the link are inside their question (#1
     expect(await screen.findByText("Nothing is waiting. Answers sent through the link appear here.")).toBeInTheDocument();
   });
 });
+
+describe("Workspace: the summary card opens a question the page has not loaded yet (#121)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("loads the question, then opens it with its waiting answer", async () => {
+    const added = q(9, "open", "A question another member added meanwhile");
+    const waitingForNine = {
+      id: 90,
+      question_number: 9,
+      question_label: "Q9",
+      question_text: "x",
+      text: "Answer for the new one",
+      submitter_name: "Leyla",
+      submitted_at: "2026-11-15T09:30:00Z",
+      state: "pending",
+      decided_by: null,
+      decided_at: null,
+    };
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        calls.push(url);
+        if (url.includes("/submissions/")) return json(200, url.includes("state=pending") ? [waitingForNine] : []);
+        if (url.includes("/answer-link/")) return json(200, { exists: false });
+        if (url.endsWith("/questions/9/")) return json(200, added);
+        if (url.includes("/questions/")) return json(200, questions);
+        if (url.endsWith("/members/")) return json(200, members);
+        return projectsReply(url);
+      }),
+    );
+    render(<Workspace />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open Q9 (1 waiting)" }));
+
+    const detail = await screen.findByRole("region", { name: "Selected question" });
+    expect(within(detail).getByText("Answer for the new one")).toBeInTheDocument();
+    expect(screen.getByText("A question another member added meanwhile")).toBeInTheDocument();
+    expect(calls).toContain("/api/projects/5/questions/9/");
+  });
+});
