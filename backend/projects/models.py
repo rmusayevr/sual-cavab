@@ -2,15 +2,29 @@ from django.conf import settings
 from django.db import models
 
 
+# The roles of the team. A client (#121) is a third kind of membership and is NOT in this list: it never opens the
+# team's door, only the client's own.
+TEAM_ROLES = ["owner", "member"]
+
+
 class ProjectQuerySet(models.QuerySet):
     def visible_to(self, user):
-        """The only way to reach projects: those the user is a member of (#5).
+        """The team's door, and the only one every team route uses: the projects the user is a team member of (#5).
+
+        A client (#121) does not pass it, so every route behind it refuses a client exactly as it refuses a
+        stranger. Both conditions are in one filter() call, so they must hold for the SAME membership row.
 
         No exception for superusers; they use the Django admin.
         """
         if not user or not user.is_authenticated:
             return self.none()
-        return self.filter(memberships__user=user).distinct()
+        return self.filter(memberships__user=user, memberships__role__in=TEAM_ROLES).distinct()
+
+    def visible_to_client(self, user):
+        """The client's door (#121): the projects the user is a client of. Only the client routes use it."""
+        if not user or not user.is_authenticated:
+            return self.none()
+        return self.filter(memberships__user=user, memberships__role="client").distinct()
 
     def with_open_count(self):
         """Annotate how many questions are still open (status open or asked).
@@ -53,6 +67,7 @@ class Membership(models.Model):
     class Role(models.TextChoices):
         OWNER = "owner", "Owner"
         MEMBER = "member", "Member"
+        CLIENT = "client", "Client"  # can only answer the open questions (#121); never reaches the team's side
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="memberships")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships")

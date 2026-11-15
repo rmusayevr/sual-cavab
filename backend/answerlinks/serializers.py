@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from projects.models import Project
 from questions.models import Question
 
 from .models import AnswerSubmission
@@ -36,17 +37,19 @@ class AcceptSerializer(serializers.Serializer):
 
 
 class SubmissionSerializer(serializers.ModelSerializer):
-    """What the team sees: who sent it (a name the client typed, never verified) and when."""
+    """What the team sees: who sent it (from a link: a name typed, never verified; from an account: the account's) and when."""
 
     question_number = serializers.IntegerField(source="question.number", read_only=True)
     question_label = serializers.CharField(source="question.label", read_only=True)
     question_text = serializers.CharField(source="question.text", read_only=True)
     decided_by = serializers.SerializerMethodField()
+    source = serializers.SerializerMethodField()
 
     class Meta:
         model = AnswerSubmission
         fields = [
             "id",
+            "source",
             "question_number",
             "question_label",
             "question_text",
@@ -61,6 +64,10 @@ class SubmissionSerializer(serializers.ModelSerializer):
 
     def get_decided_by(self, submission):
         return submission.decided_by.email if submission.decided_by_id else None
+
+    def get_source(self, submission):
+        """"account" (a client account: the name is verified) or "link" (typed, never verified)."""
+        return "account" if submission.submitted_by_id else "link"
 
 
 def link_state(link):
@@ -82,3 +89,18 @@ def describe_link(link):
         "expires_at": link.expires_at,
         "revoked_at": link.revoked_at,
     }
+
+
+class ClientProjectSerializer(serializers.ModelSerializer):
+    """A client's project, as the client sees it: its id and name, nothing else (no client name, no description)."""
+
+    class Meta:
+        model = Project
+        fields = ["id", "name"]
+        read_only_fields = fields
+
+
+class ClientAnswerInputSerializer(serializers.Serializer):
+    """What a client account sends: the text. The name is the account's, so a name in the request is ignored."""
+
+    text = serializers.CharField(max_length=MAX_TEXT)

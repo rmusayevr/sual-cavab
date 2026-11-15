@@ -139,7 +139,7 @@ class SubmissionsView(ProjectMemberView):
             # A typo must not look like "nothing is waiting".
             raise ValidationError({"state": [f"Use any of: {', '.join(AnswerSubmission.State.values)}."]})
         submissions = (
-            AnswerSubmission.objects.filter(link__project=self.project, state=state)
+            AnswerSubmission.objects.filter(question__project=self.project, state=state)
             .select_related("question", "decided_by")
             .order_by("submitted_at", "id")
         )
@@ -153,7 +153,7 @@ class DismissPendingView(ProjectMemberView):
         with transaction.atomic():
             lock_caller_membership(self.project, request.user)
             count = AnswerSubmission.objects.filter(
-                link__project=self.project, state=AnswerSubmission.State.PENDING
+                question__project=self.project, state=AnswerSubmission.State.PENDING
             ).update(state=AnswerSubmission.State.DISMISSED, decided_by=request.user, decided_at=timezone.now())
         return Response({"dismissed": count})
 
@@ -164,7 +164,7 @@ class SubmissionDecisionView(ProjectMemberView):
 
     def locked_pending_submission(self, submission_id):
         submission = get_object_or_404(
-            AnswerSubmission.objects.select_for_update(of=("self",)).filter(link__project=self.project),
+            AnswerSubmission.objects.select_for_update(of=("self",)).filter(question__project=self.project),
             pk=submission_id,
         )
         if submission.state != AnswerSubmission.State.PENDING:
@@ -190,7 +190,8 @@ class AcceptSubmissionView(SubmissionDecisionView):
                         "text": payload.validated_data.get("text", submission.text),
                         "answered_by": submission.submitter_name,
                         "answered_on": timezone.localdate(),
-                        "channel": Answer.Channel.LINK,
+                        # From a link (someone with no account) or from a client account (the name is verified).
+                        "channel": Answer.Channel.LINK if submission.link_id else Answer.Channel.CLIENT,
                     },
                 )
             except TransitionNotAllowed:
@@ -212,7 +213,7 @@ class RestoreSubmissionView(ProjectMemberView):
         with transaction.atomic():
             lock_caller_membership(self.project, request.user)
             submission = get_object_or_404(
-                AnswerSubmission.objects.select_for_update(of=("self",)).filter(link__project=self.project),
+                AnswerSubmission.objects.select_for_update(of=("self",)).filter(question__project=self.project),
                 pk=submission_id,
             )
             if submission.state != AnswerSubmission.State.DISMISSED:

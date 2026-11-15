@@ -47,3 +47,20 @@ class InvalidTokenThrottle(_SharedCache, ExactCountMixin, SimpleRateThrottle):
 
     def get_cache_key(self, request, view):
         return self.cache_format % {"scope": self.scope, "ident": "all"}
+
+
+class PerUserThrottle(_SharedCache, ExactCountMixin, SimpleRateThrottle):
+    """Counts a signed-in client's requests per person (#121), keyed on the user's id, never on the address."""
+
+    def get_cache_key(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": request.user.pk}
+
+
+class ClientReadThrottle(PerUserThrottle):
+    scope = "client_read"
+
+
+class ClientSubmitThrottle(PerUserThrottle):
+    scope = "client_submit"

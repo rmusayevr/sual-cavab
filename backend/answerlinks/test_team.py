@@ -190,7 +190,7 @@ class SubmissionListTests(LinkTestCase):
         (item,) = response.json()
         self.assertEqual(
             set(item),
-            {"id", "question_number", "question_label", "question_text", "text", "submitter_name", "submitted_at",
+            {"id", "source", "question_number", "question_label", "question_text", "text", "submitter_name", "submitted_at",
              "state", "decided_by", "decided_at"},
         )
         self.assertEqual((item["submitter_name"], item["text"], item["question_label"]), ("Leyla", "Stripe", "Q1"))
